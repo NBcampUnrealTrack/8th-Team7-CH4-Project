@@ -7,10 +7,13 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Net/UnrealNetwork.h"
 
 AProductBase::AProductBase()
 {
  	PrimaryActorTick.bCanEverTick = false;
+
+    bReplicates = true;
 
     // 컴포넌트 설정
     Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
@@ -25,18 +28,14 @@ AProductBase::AProductBase()
     SphereCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnBeginOverlapCart);
 
-
     // 기본 변수 설정
     ProductState = EProductState::None;
-
-
-    bReplicates = true;
 }
 
 void AProductBase::Initialize(const FVector& SpawnLocation)
 {
     SetActorLocation(SpawnLocation);
-    ProductState = EProductState::Display;
+    SetProductState(EProductState::Display);
 }
 
 void AProductBase::BeginPlay()
@@ -44,7 +43,7 @@ void AProductBase::BeginPlay()
 	Super::BeginPlay();
 
     ApplyDataAsset();
-    ProductState = EProductState::Display;
+    SetProductState(EProductState::Display);
 }
 
 void AProductBase::OnConstruction(const FTransform& Transform)
@@ -54,9 +53,18 @@ void AProductBase::OnConstruction(const FTransform& Transform)
     ApplyDataAsset();
 }
 
-void AProductBase::OnBeginOverlapCart(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void AProductBase::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(ThisClass, ProductState);
+}
+
+void AProductBase::OnBeginOverlapCart(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+                                      UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+    if (!HasAuthority()) return;
+
     // 태그로 확인하는데 이후에 Interface를 사용할지 컴포넌트를 사용할지 생각해볼 것
     if (IsValid(OtherActor) && OtherActor->ActorHasTag(TEXT("Player")))
     {
@@ -81,4 +89,53 @@ void AProductBase::ApplyDataAsset()
     {
         Mesh->SetStaticMesh(ProductDataAsset->ProductMesh);
     }
+}
+
+void AProductBase::ApplyProductState()
+{
+    switch (ProductState)
+    {
+    case EProductState::Display:
+        SetActorHiddenInGame(false);
+        SphereCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        break;
+
+    case EProductState::Loaded:
+        SetActorHiddenInGame(true);
+        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        break;
+
+    case EProductState::Falling:
+        SetActorHiddenInGame(false);
+        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        break;
+
+    case EProductState::Paid:
+        SetActorHiddenInGame(true);
+        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        break;
+
+    case EProductState::None:   // Fall Through
+    default:
+        SetActorHiddenInGame(true);
+        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        break;
+    }
+}
+
+void AProductBase::SetProductState(EProductState NewState)
+{
+    if (!HasAuthority()) return;
+
+    if (ProductState == NewState) return;
+
+    ProductState = NewState;
+
+    // 서버 또한 State에 따른 변화를 적용해야 함
+    ApplyProductState();
+}
+
+void AProductBase::OnRep_ProductState()
+{
+    ApplyProductState();
 }

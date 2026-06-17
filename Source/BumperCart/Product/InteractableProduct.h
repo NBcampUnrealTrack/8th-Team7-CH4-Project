@@ -6,9 +6,6 @@
 #include "ProductBase.h"
 #include "InteractableProduct.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnBeginOverlapInteractableProduct, AProductBase*, Product, AActor*, Interactor);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEndOverlapInteractableProduct, AProductBase*, Product, AActor*, Interactor);
-
 UCLASS()
 class BUMPERCART_API AInteractableProduct : public AProductBase
 {
@@ -17,12 +14,9 @@ class BUMPERCART_API AInteractableProduct : public AProductBase
 public:
     AInteractableProduct();
 
-public:
-    UPROPERTY(BlueprintAssignable)
-    FOnBeginOverlapInteractableProduct OnBeginOverlapInteractableProduct;
-
-    UPROPERTY(BlueprintAssignable)
-    FOnBeginOverlapInteractableProduct OnEndOverlapInteractableProduct;
+    // 누군가가 카트에 적재할 경우 호출하는 함수, 기존에 접촉했던 플레이어에게 알려야 함
+    UFUNCTION()
+    void OnLoaded();
 
 protected:
 
@@ -37,9 +31,9 @@ protected:
         int32 OtherBodyIndex);
 
 private:
-    // 상호작용 활성화 하는 함수, BeginOverlap 에서 호출함
-    void EnableInteraction(AActor* OtherActor);
-
     // 상호작용 비활성화 하는 함수, EndOverlap과 습득시 호출함
     void DisableInteraction(AActor* OtherActor);
+
+    UPROPERTY()
+    TSet<AActor*> OverlappedActors;
 };

@@ -27,6 +27,8 @@ protected:
 
     virtual void OnConstruction(const FTransform& Transform) override;
 
+    void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
     // SphereCollision과 충돌 감지하는 함수
     UFUNCTION()
     void OnBeginOverlapCart(
@@ -37,9 +39,20 @@ protected:
         bool bFromSweep,
         const FHitResult& SweepResult);
 
+    // BeginOverlap 내부에서 호출될 가상 함수
     virtual void ProcessBeginOverlap(AActor* OtherActor);
 
+    // 데이터 에셋을 적용하는 함수
     void ApplyDataAsset();
+
+    // 상품의 상태를 설정하는 함수, 서버에서 처리함
+    void SetProductState(EProductState NewState);
+
+    // 함수의 상태를 적용하는 함수
+    void ApplyProductState();
+
+    UFUNCTION()
+    void OnRep_ProductState();
 
 protected:
     /* 컴포넌트 */
@@ -61,6 +74,6 @@ protected:
     FProductData ProductData;
 
     // 상품의 현재 상태
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
+    UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     EProductState ProductState;
 };

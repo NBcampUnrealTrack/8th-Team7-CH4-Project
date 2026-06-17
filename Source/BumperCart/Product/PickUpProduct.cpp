@@ -6,6 +6,6 @@
 
 void APickUpProduct::ProcessBeginOverlap(AActor* OtherActor)
 {
-    ProductState = EProductState::Loaded;
+    SetProductState(EProductState::Loaded);
     UE_LOG(LogTemp, Warning, TEXT("상품 적재!!"));
 }

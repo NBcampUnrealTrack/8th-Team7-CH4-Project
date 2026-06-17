@@ -12,34 +12,51 @@ AInteractableProduct::AInteractableProduct()
     SphereCollision->OnComponentEndOverlap.AddDynamic(this, &ThisClass::OnEndOverlapCart);
 }
 
+void AInteractableProduct::OnLoaded()
+{
+    if (!HasAuthority()) return;
+
+    SetProductState(EProductState::Loaded);
+
+    for (AActor* OverlappedActor : OverlappedActors)
+    {
+        if (IsValid(OverlappedActor))
+        {
+            DisableInteraction(OverlappedActor);
+        }
+    }
+    OverlappedActors.Empty();
+}
+
 void AInteractableProduct::ProcessBeginOverlap(AActor* OtherActor)
 {
-    EnableInteraction(OtherActor);
+    // Overlap Count 증가시켜야 함
+    UE_LOG(LogTemp, Warning, TEXT("%s 상품에 %s 플레이어 들어옴"), *this->GetName(), *OtherActor->GetName());
+    OverlappedActors.Add(OtherActor);
+
+    // 특정 클라이언트의 함수 호출 필요, 인터페이스 or Cast
 }
 
 void AInteractableProduct::OnEndOverlapCart(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
     UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
+    if (!HasAuthority()) return;
+
+
     if (IsValid(OtherActor) && OtherActor->ActorHasTag(TEXT("Player")))
     {
         // 진열된 상태가 아니면 충돌 X
         if (ProductState != EProductState::Display) return;
 
+        // Overlap Count 감소시켜야 함
+        // Player의 Overlap Count가 0이될 때 상호작용 비활성화
+        UE_LOG(LogTemp, Warning, TEXT("%s 상품에서 %s 플레이어 벗어남"), *this->GetName(), *OtherActor->GetName());
+        OverlappedActors.Remove(OtherActor);
         DisableInteraction(OtherActor);
     }
 }
 
-void AInteractableProduct::EnableInteraction(AActor* OtherActor)
-{
-    // Overlap Count 증가시켜야 함
-    UE_LOG(LogTemp, Warning, TEXT("%s 상품에 %s 플레이어 들어옴"), *this->GetName(), *OtherActor->GetName());
-    OnBeginOverlapInteractableProduct.Broadcast(this, OtherActor);
-}
-
 void AInteractableProduct::DisableInteraction(AActor* OtherActor)
 {
-    // Overlap Count 감소시켜야 함
-    // Player의 Overlap Count가 0이될 때 상호작용 비활성화
-    UE_LOG(LogTemp, Warning, TEXT("%s 상품에서 %s 플레이어 벗어남"), *this->GetName(), *OtherActor->GetName());
-    OnEndOverlapInteractableProduct.Broadcast(this, OtherActor);
+    // 특정 클라이언트의 함수 호출 필요, 인터페이스 or Cast
 }
