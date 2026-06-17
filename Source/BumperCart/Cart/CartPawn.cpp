@@ -1,0 +1,201 @@
+//BumperCart - B(카트/플레이어 조작) 파트
+
+#include "CartPawn.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "EnhancedInputComponent.h"
+#include "InputActionValue.h"
+#include "TimerManager.h"
+#include "BumperCart.h"
+
+ACartPawn::ACartPawn()
+{
+	PrimaryActorTick.bCanEverTick = true;
+
+	//카트는 조향(A/D)으로 직접 회전하므로 컨트롤러 회전은 사용하지 않는다.
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+
+	//이동 컴포넌트 기본 세팅 (수치는 B2에서 본격 튜닝)
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->bOrientRotationToMovement = false; //Yaw는 우리가 직접 제어
+		Move->RotationRate = FRotator::ZeroRotator;
+		Move->bUseSeparateBrakingFriction = true;
+		Move->GroundFriction = 3.0f; //낮을수록 미끄러짐(드리프트)
+		Move->BrakingFriction = 1.5f;
+		Move->MaxAcceleration = 1200.f;
+		Move->MaxWalkSpeed = 900.f;
+		Move->BrakingDecelerationWalking = 1400.f;
+		Move->JumpZVelocity = 0.f; //카트는 점프 없음
+		Move->AirControl = 0.f;
+	}
+
+	//카메라: 고정 쿼터뷰. 카트가 회전해도 각도는 고정되고 위치만 따라간다.
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->TargetArmLength = 1100.f; //쿼터뷰라 멀리서
+	CameraBoom->SetRelativeRotation(FRotator(-55.f, 0.f, 0.f)); //아래로 비스듬히 내려봄
+	CameraBoom->bUsePawnControlRotation = false;
+	CameraBoom->bInheritPitch = false; //카트 회전과 무관하게 각도 고정
+	CameraBoom->bInheritYaw = false;
+	CameraBoom->bInheritRoll = false;
+	CameraBoom->bDoCollisionTest = false; //탑다운이라 벽에 카메라가 당겨지지 않게
+	CameraBoom->bEnableCameraLag = true; //위치만 부드럽게 따라감
+	CameraBoom->CameraLagSpeed = 8.f;
+
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->bUsePawnControlRotation = false;
+}
+
+void ACartPawn::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		DefaultMaxWalkSpeed = Move->MaxWalkSpeed;
+		DefaultBrakingDeceleration = Move->BrakingDecelerationWalking;
+	}
+}
+
+void ACartPawn::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (!Move)
+	{
+		return;
+	}
+
+	//--- 브레이크 / 추력 ---
+	if (bIsBraking)
+	{
+		//브레이크 중에는 추력을 넣지 않고 감속도를 크게 해서 급정지시킨다.
+		Move->BrakingDecelerationWalking = BrakeDeceleration;
+	}
+	else
+	{
+		Move->BrakingDecelerationWalking = DefaultBrakingDeceleration;
+
+		if (!FMath::IsNearlyZero(ThrottleInput))
+		{
+			//카트가 바라보는 방향으로 전/후진
+			AddMovementInput(GetActorForwardVector(), ThrottleInput);
+		}
+	}
+
+	//--- 조향 (A/D = Yaw 회전) ---
+	if (!FMath::IsNearlyZero(SteerInput))
+	{
+		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용 (카트 특유의 둔한 조향)
+		const float Speed = Move->Velocity.Size2D();
+		const float SpeedAlpha = FMath::Clamp(Speed / FMath::Max(DefaultMaxWalkSpeed, 1.f), 0.f, 1.f);
+		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
+
+		const float YawDelta = SteerInput * TurnRateDegPerSec * SpeedFactor * DeltaSeconds;
+		AddActorWorldRotation(FRotator(0.f, YawDelta, 0.f));
+	}
+}
+
+void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+	if (!EIC)
+	{
+		UE_LOG(LogBumperCart, Error, TEXT("CartPawn: Enhanced Input Component를 찾지 못했습니다."));
+		return;
+	}
+
+	if (ThrottleAction)
+	{
+		EIC->BindAction(ThrottleAction, ETriggerEvent::Triggered, this, &ACartPawn::OnThrottle);
+		EIC->BindAction(ThrottleAction, ETriggerEvent::Completed, this, &ACartPawn::OnThrottleReleased);
+	}
+	if (SteerAction)
+	{
+		EIC->BindAction(SteerAction, ETriggerEvent::Triggered, this, &ACartPawn::OnSteer);
+		EIC->BindAction(SteerAction, ETriggerEvent::Completed, this, &ACartPawn::OnSteerReleased);
+	}
+	if (BrakeAction)
+	{
+		EIC->BindAction(BrakeAction, ETriggerEvent::Started, this, &ACartPawn::OnBrakeStart);
+		EIC->BindAction(BrakeAction, ETriggerEvent::Completed, this, &ACartPawn::OnBrakeStop);
+	}
+	if (BoostAction)
+	{
+		EIC->BindAction(BoostAction, ETriggerEvent::Started, this, &ACartPawn::OnBoost);
+	}
+}
+
+void ACartPawn::OnThrottle(const FInputActionValue& Value)
+{
+	ThrottleInput = Value.Get<float>();
+}
+
+void ACartPawn::OnThrottleReleased(const FInputActionValue& Value)
+{
+	ThrottleInput = 0.f;
+}
+
+void ACartPawn::OnSteer(const FInputActionValue& Value)
+{
+	SteerInput = Value.Get<float>();
+}
+
+void ACartPawn::OnSteerReleased(const FInputActionValue& Value)
+{
+	SteerInput = 0.f;
+}
+
+void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
+{
+	bIsBraking = true;
+}
+
+void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
+{
+	bIsBraking = false;
+}
+
+void ACartPawn::OnBoost(const FInputActionValue& Value)
+{
+	if (bIsBoosting || bBoostOnCooldown)
+	{
+		return;
+	}
+
+	bIsBoosting = true;
+	bBoostOnCooldown = true;
+
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		//최고 속도를 잠시 올리고, 즉발 가속 느낌을 위해 전방으로 런치
+		Move->MaxWalkSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier;
+		const FVector LaunchVelocity = GetActorForwardVector() * DefaultMaxWalkSpeed * (BoostSpeedMultiplier - 1.f);
+		LaunchCharacter(LaunchVelocity, false, false);
+	}
+
+	GetWorldTimerManager().SetTimer(BoostTimerHandle, this, &ACartPawn::EndBoost, BoostDuration, false);
+}
+
+void ACartPawn::EndBoost()
+{
+	bIsBoosting = false;
+
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->MaxWalkSpeed = DefaultMaxWalkSpeed;
+	}
+
+	GetWorldTimerManager().SetTimer(BoostCooldownTimerHandle, this, &ACartPawn::ResetBoostCooldown, BoostCooldown, false);
+}
+
+void ACartPawn::ResetBoostCooldown()
+{
+	bBoostOnCooldown = false;
+}

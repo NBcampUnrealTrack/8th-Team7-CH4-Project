@@ -25,6 +25,7 @@ public class BumperCart : ModuleRules
 
 		PublicIncludePaths.AddRange(new string[] {
 			"BumperCart",
+			"BumperCart/Cart",
 			"BumperCart/Variant_Platforming",
 			"BumperCart/Variant_Platforming/Animation",
 			"BumperCart/Variant_Combat",
