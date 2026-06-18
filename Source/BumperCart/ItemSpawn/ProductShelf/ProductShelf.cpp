@@ -28,22 +28,55 @@ void AProductShelf::BeginPlay()
 
 void AProductShelf::SpawnRandomItems()
 {
-    if (!TestActorClass)
+    TSubclassOf<AActor> ClassToSpawn = nullptr;
+
+    if (TestActorClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("가판대에 TestActorClass가 지정되지 않았습니다!"));
+        ClassToSpawn = TestActorClass;
+    }
+
+    if (!ClassToSpawn)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("가판대에 스폰할 TestActorClass가 지정되지 않았습니다!"));
+        return;
+    }
+
+    if (!bSpawning)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("아이템 스폰 불가"));
         return;
     }
 
     for (int i = 0; i < SpawnCount; i++)
     {
+
+        if (SpawnedItems.Num() >= SpawnMaxCount)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("아이템 스폰 제한"));
+            break;
+        }
+
         FVector SpawnLocation = LaunchPoints->GetComponentLocation();
         FRotator SpawnRotation = UKismetMathLibrary::RandomRotator();
 
-        AActor* TestItem = GetWorld()->SpawnActor<AActor>(TestActorClass, SpawnLocation, SpawnRotation);
+        AActor* SpawnItem = GetWorld()->SpawnActor<AActor>(ClassToSpawn, SpawnLocation, SpawnRotation);
 
-        if (TestItem)
+        if (SpawnItem)
         {
-            UPrimitiveComponent* PhysComp = Cast<UPrimitiveComponent>(TestItem->GetRootComponent());
+            SpawnedItems.Add(SpawnItem);
+
+            /*
+            AProductBase* ProductBaseInstance = Cast<AProductBase>(SpawnedActor);
+            if (ProductBaseInstance)
+            {
+                // 여기서 나중에 GetRandomValidProductAsset() 같은 함수로 데이터 에셋을 뽑아 주입합니다.
+                // UProductDataAsset* RandomAsset = GetRandomValidProductAsset();
+                // ProductBaseInstance->ProductDataAsset = RandomAsset;
+                // ProductBaseInstance->ApplyDataAsset();
+            }
+            */
+
+            UPrimitiveComponent* PhysComp = Cast<UPrimitiveComponent>(SpawnItem->GetRootComponent());
             if (PhysComp)
             {
                 // 가판대 정면 방향을 기준으로 좌우/상하로 퍼지는 무작위 벡터 계산
@@ -58,7 +91,19 @@ void AProductShelf::SpawnRandomItems()
                 PhysComp->AddImpulse(RandomDir * LaunchForce, NAME_None, true);
             }
         }
-        
     }
+
+    // 사라진 아이템 처리
+    SpawnedItems.RemoveAll([](AActor* Item)
+    {
+        return !IsValid(Item);
+    });
+
+    UE_LOG(LogTemp, Log, TEXT("현재 가판대가 관리 중인 아이템 개수: %d개"), SpawnedItems.Num());
+}
+
+bool AProductShelf::SetSpawnToggle(bool bToggle)
+{
+    return bSpawning = bToggle;
 }
 

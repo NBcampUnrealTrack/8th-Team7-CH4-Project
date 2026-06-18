@@ -45,7 +45,11 @@ protected:
 
     // 스폰되는 아이템 갯수
     UPROPERTY(EditAnywhere, Category = "Spawning Config")
-    int32 SpawnCount = 5;
+    int32 SpawnCount = 3;
+
+    // 아이템 스폰 제한수
+    UPROPERTY(EditAnywhere, Category = "Spawning Config")
+    int32 SpawnMaxCount = 15;
 
     // 아이템 리스폰 시간
     UPROPERTY(EditAnywhere, Category = "Spawning Config")
@@ -55,13 +59,13 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Spawning Config")
     float LaunchForce = 500.0f;
 
+    // 아이템 스폰가능 확인
+    UPROPERTY(VisibleAnywhere, Category = "Spawning Config")
+    bool bSpawning = false;
+
     // 테스트 아이템
     UPROPERTY(EditAnywhere, Category = "Spawning Config")
     TSubclassOf<AActor> TestActorClass;
-
-    // 아이템 데이터
-    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelf Config")
-    //TSubclassOf<AProductBase> ProductBaseClass;
 
 private:
     FTimerHandle RespawnTimerHandle;
@@ -69,6 +73,26 @@ private:
     void SpawnRandomItems();
 
     //TSubclassOf<AActor> GetRandomValidProductClass();
+
+public:
+    bool SetSpawnToggle(bool bToggle);
+
+#pragma endregion
+
+
+#pragma region Item
+private:
+    // 아이템 베이스 클래스
+    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelf Config")
+    //TSubclassOf<AProductBase> ProductBaseClass;
+
+    // 아이템 데이터 에셋
+    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelf Config")
+    //TArray<UProductDataAsset*> ProductDataAssets;
+
+    UPROPERTY()
+    TArray<AActor*> SpawnedItems;
+
 #pragma endregion
 
 };
