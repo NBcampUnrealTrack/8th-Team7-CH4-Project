@@ -35,7 +35,7 @@ void UCartLoadComponent::Initialize()
     LoadInfo.CurrentLoadedCount = 0;
     LoadInfo.CurrentWeight = 0;
 
-    LoadedProducts.Empty();
+    LoadedProducts.Reset();
 }
 
 bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
@@ -59,7 +59,23 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
     // 적재 정보 갱신
     UpdateLoadInfo();
 
-    Product->AttachToActor(GetOwner(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+
+    USceneComponent* AttachParent = GetOwner()->GetRootComponent();
+    if (!IsValid(AttachParent))
+    {
+        return false;
+    }
+
+    const bool bAttached = Product->AttachToComponent(
+        AttachParent,
+        FAttachmentTransformRules::KeepWorldTransform
+    );
+
+    if (bAttached)
+    {
+        Product->SetActorRelativeLocation(FVector(0.f, 0.f, 100.f));
+        Product->SetActorRelativeRotation(FRotator::ZeroRotator);
+    }
 
     return true;
 }
@@ -93,9 +109,8 @@ void UCartLoadComponent::DropProducts(float Impulse)
 
 int32 UCartLoadComponent::GetTotalValue() const
 {
-    if (LoadInfo.CurrentLoadedCount == 0) return 0;
-
     int32 TotalValue = 0;
+
     for (const AProductBase* Product : LoadedProducts)
     {
         if (IsValid(Product))
@@ -107,21 +122,35 @@ int32 UCartLoadComponent::GetTotalValue() const
     return TotalValue;
 }
 
-void UCartLoadComponent::ClearProducts()
+int32 UCartLoadComponent::GetCurrentLoadedCount() const
 {
-    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return;
+    return LoadInfo.CurrentLoadedCount;
+}
 
+bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProducts)
+{
+    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return false;
+    if (LoadedProducts.IsEmpty()) return false;
+
+    OutProducts.Empty();
+
+    // 정산에 필요한 데이터를 Out 배열에 넣고, 정산 상태로 변경한뒤 삭제
     for (int32 i = LoadedProducts.Num() - 1; i >= 0; --i)
     {
-        if (IsValid(LoadedProducts[i]))
-        {
-            LoadedProducts[i]->Destroy();
-        }
+        if (!IsValid(LoadedProducts[i])) continue;
+
+        OutProducts.Add(LoadedProducts[i]->GetLoadedProductInfo());
+
+        LoadedProducts[i]->SetProductState(EProductState::Paid);
+
+        LoadedProducts[i]->Destroy();
     }
 
     LoadedProducts.Empty();
 
     UpdateLoadInfo();
+
+    return OutProducts.Num() > 0;
 }
 
 int32 UCartLoadComponent::CalculateDropCount(float Impulse) const

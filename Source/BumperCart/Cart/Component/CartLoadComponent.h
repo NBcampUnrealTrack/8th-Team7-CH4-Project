@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Product/ProductTypes.h"
 #include "CartLoadComponent.generated.h"
 
 
@@ -44,13 +45,16 @@ public:
     bool TryAddProduct(AProductBase* Product);
 
     // 받은 충격량에 따라 상품을 떨어뜨리는 함수
+    UFUNCTION(BlueprintCallable)
     void DropProducts(float Impulse);
 
     int32 GetTotalValue() const;
 
-    // 적재중인 상품들을 정리하는 함수
-    // 계산대에서 상품 정산 후 호출하는 함수
-    void ClearProducts();
+    int32 GetCurrentLoadedCount() const;
+
+    // 계산대에서 상품 정산 시 호출하는 함수
+    // 상품 정보 구조체 배열을 채우고, 현재 적재된 상품을 전부 제거함
+    bool CheckoutProducts(TArray<FLoadedProductInfo>& OutProducts);
 
 public:
     UPROPERTY(BlueprintAssignable)
