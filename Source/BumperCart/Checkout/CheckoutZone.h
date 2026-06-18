@@ -20,6 +20,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+public:
+    void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
 // ------------------------------------------------------------
 // Overlap 이벤트
 // ------------------------------------------------------------
@@ -46,13 +49,13 @@ private:
 // 컴포넌트
 // ------------------------------------------------------------
 private:
-    UPROPERTY(VisibleAnywhere, Category = "Checkout|Components")
+    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
     TObjectPtr<USceneComponent> SceneRoot;
 
-    UPROPERTY(VisibleAnywhere, Category = "Checkout|Components")
+    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
     TObjectPtr<UStaticMeshComponent> CounterMesh;
 
-    UPROPERTY(VisibleAnywhere, Category = "Checkout|Components")
+    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
     TObjectPtr<UBoxComponent> CheckoutTrigger;
 
 // ------------------------------------------------------------
@@ -67,11 +70,12 @@ private:
 
 private:
     // 범위 내 플레이어 배열
-    UPROPERTY(VisibleAnywhere, Category = "Checkout|Player")
+    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Player")
     TArray<TObjectPtr<ACharacter>> PlayersInZone;
 
     // 계산 중인 플레이어
-    UPROPERTY(VisibleAnywhere, Category = "Checkout|Player")
+    // 복제 데이터
+    UPROPERTY(VisibleAnywhere, Replicated, Category = "_Checkout|Player")
     TObjectPtr<ACharacter> CurrentCheckoutPlayer;
 
 // ------------------------------------------------------------
@@ -87,12 +91,20 @@ private:
     // 다음 계산 대상 찾기
     ACharacter* FindNextCheckoutPlayer();
 
+    // 클라이언트에서 값을 복제 받을 때 호출되는 콜백 함수
+    // 색상, UI 표시용
+    UFUNCTION()
+    void OnRep_CurrentCounterState();
+
 private:
     // 현재 계산대 오픈 상태
-    UPROPERTY(EditAnywhere, Category = "Checkout|Condition")
-    ECounterState CurrentCounterState = ECounterState::OPEN;
+    // 복제 데이터
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCounterState, Category = "_Checkout|Condition")
+    ECounterState CurrentCounterState = ECounterState::Open;
 
     // 현재 계산 진행 중인지
+    // 복제 데이터
+    UPROPERTY(VisibleAnywhere, Replicated, Category = "_Checkout|Condition")
     bool bIsCheckoutInProgress = false;
 
 // ------------------------------------------------------------
@@ -107,17 +119,23 @@ private:
 
 private:
     // 계산 진행도
-    UPROPERTY(VisibleInstanceOnly, Category = "Checkout|Checkout")
+    UPROPERTY(VisibleInstanceOnly, Category = "_Checkout|Progress")
     float CheckoutProgress = 0.0f;
 
     // 계산 시간 타이머
     FTimerHandle CheckoutTimerHandle;
 
     // 현재 월드 시간 기준 계산 시작 시간
+    // 복제 데이터
+    UPROPERTY(VisibleInstanceOnly, Replicated, Category = "_Checkout|Progress")
     float CheckoutStartTime = 0.0f;
+
     // 계산 경과 시간
     float ElapsedCheckoutTime = 0.0f;
+
     // 목표 계산 시간
+    // 복제 데이터
+    UPROPERTY(VisibleInstanceOnly, Replicated, Category = "_Checkout|Progress")
     float RequiredCheckoutTime = 0.0f;
 
 // ------------------------------------------------------------
@@ -142,11 +160,11 @@ private:
 
 private:
     // 기본 정산 시간
-    UPROPERTY(EditAnywhere, Category = "Checkout|Time")
+    UPROPERTY(EditAnywhere, Category = "_Checkout|Time")
     float BaseCheckoutTime = 2.0f;
 
     // 추가 정산 시간
-    UPROPERTY(EditAnywhere, Category = "Checkout|Time")
+    UPROPERTY(EditAnywhere, Category = "_Checkout|Time")
     float AdditionalCheckoutTime = 1.0f;
 
 // ------------------------------------------------------------

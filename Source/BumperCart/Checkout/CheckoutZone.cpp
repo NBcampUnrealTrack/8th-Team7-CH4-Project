@@ -4,13 +4,14 @@
 #include "Components/SceneComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Engine/Engine.h"
 
 ACheckoutZone::ACheckoutZone()
 {
  	PrimaryActorTick.bCanEverTick = false;
-    //bReplicates = true;
+    bReplicates = true;
 
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     SetRootComponent(SceneRoot);
@@ -32,11 +33,23 @@ void ACheckoutZone::BeginPlay()
     CheckoutTrigger->OnComponentEndOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneEndOverlap);
 }
 
+void ACheckoutZone::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(ACheckoutZone, CurrentCounterState);
+    DOREPLIFETIME(ACheckoutZone, CurrentCheckoutPlayer);
+    DOREPLIFETIME(ACheckoutZone, bIsCheckoutInProgress);
+    DOREPLIFETIME(ACheckoutZone, CheckoutStartTime);
+    DOREPLIFETIME(ACheckoutZone, RequiredCheckoutTime);
+}
+
 // ------------------------------------------------------------
 // Overlap 이벤트
 // ------------------------------------------------------------
 void ACheckoutZone::OnCheckoutZoneBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+    // 플레이어의 상태를 서버가 결정
     if (!HasAuthority())
     {
         return;
@@ -54,6 +67,7 @@ void ACheckoutZone::OnCheckoutZoneBeginOverlap(UPrimitiveComponent* OverlappedCo
 
 void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex)
 {
+    // 플레이어의 상태를 서버가 결정
     if (!HasAuthority())
     {
         return;
@@ -65,6 +79,7 @@ void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComp
     {
         return;
     }
+
 
     RemovePlayerFromZone(PlayerCharacter);
 
@@ -130,6 +145,34 @@ ACharacter* ACheckoutZone::FindNextCheckoutPlayer()
     return nullptr;
 }
 
+void ACheckoutZone::OnRep_CurrentCounterState()
+{
+    switch (CurrentCounterState)
+    {
+    case ECounterState::None:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: None"));
+        break;
+
+    case ECounterState::Open:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Open"));
+        // 초록색 색상 로직
+        break;
+
+    case ECounterState::ClosingSoon:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: ClosingSoon"));
+        // 노란색 색상 로직
+        break;
+
+    case ECounterState::Closed:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Closed"));
+        // 빨간색 색상 로직
+        break;
+
+    default:
+        break;
+    }
+}
+
 // ------------------------------------------------------------
 // 계산 조건
 // ------------------------------------------------------------
@@ -142,7 +185,7 @@ bool ACheckoutZone::CanStartCheckout(ACharacter* PlayerCharacter) const
     }
 
     // 계산대 오픈 중인지
-    if (CurrentCounterState != ECounterState::OPEN)
+    if (CurrentCounterState == ECounterState::Closed)
     {
         return false;
     }
@@ -264,6 +307,13 @@ void ACheckoutZone::CompleteCheckout()
 
     ACharacter* CompletedPlayer = CurrentCheckoutPlayer;
 
+    // 정산 점수 계산
+    // 나중에 PlayerState로 전달 필요
+    {
+        CheckoutScore = CalculateCheckoutScore();
+        //PlayerState->AddScore(CehckoutScore);
+    }
+
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore);
     if (GEngine)
     {
@@ -273,11 +323,6 @@ void ACheckoutZone::CompleteCheckout()
             FColor::Blue,
             FString::Printf(TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore)
         );
-    }
-
-    // 정산 로직
-    {
-
     }
 
     // 정산이 완료되면 플레이어는 대기열에서 제거

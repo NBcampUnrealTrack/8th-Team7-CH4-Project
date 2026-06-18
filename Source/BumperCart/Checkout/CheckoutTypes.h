@@ -7,7 +7,8 @@
 UENUM(BlueprintType)
 enum class ECounterState : uint8
 {
-    OPEN,           // 계산대 열림
-    CLOSING_SOON,   // 계산대 마감 임박
-    CLOSED          // 계산대 닫힘
+    None,
+    Open,           // 계산대 열림
+    ClosingSoon,    // 계산대 마감 임박
+    Closed          // 계산대 닫힘
 };
