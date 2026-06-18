@@ -72,6 +72,19 @@ void ACartPawn::Tick(float DeltaSeconds)
 		return;
 	}
 
+	//--- 최고 속도: 부스터 > 후진 > 기본 ---
+	float TargetMaxSpeed = DefaultMaxWalkSpeed;
+	const float ForwardSpeed = FVector::DotProduct(Move->Velocity, GetActorForwardVector());
+	if (ThrottleInput < 0.f && ForwardSpeed < -10.f) //실제로 뒤로 가는 중이면 후진 속도로 제한
+	{
+		TargetMaxSpeed *= MaxReverseSpeedRatio;
+	}
+	if (bIsBoosting) //부스터가 최우선
+	{
+		TargetMaxSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier;
+	}
+	Move->MaxWalkSpeed = TargetMaxSpeed;
+
 	//--- 브레이크 / 추력 ---
 	if (bIsBraking)
 	{
@@ -174,8 +187,7 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
-		//최고 속도를 잠시 올리고, 즉발 가속 느낌을 위해 전방으로 런치
-		Move->MaxWalkSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier;
+		//즉발 가속 느낌을 위해 전방으로 런치 (최고 속도 상승은 Tick에서 처리)
 		const FVector LaunchVelocity = GetActorForwardVector() * DefaultMaxWalkSpeed * (BoostSpeedMultiplier - 1.f);
 		LaunchCharacter(LaunchVelocity, false, false);
 	}
@@ -186,12 +198,6 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 void ACartPawn::EndBoost()
 {
 	bIsBoosting = false;
-
-	if (UCharacterMovementComponent* Move = GetCharacterMovement())
-	{
-		Move->MaxWalkSpeed = DefaultMaxWalkSpeed;
-	}
-
 	GetWorldTimerManager().SetTimer(BoostCooldownTimerHandle, this, &ACartPawn::ResetBoostCooldown, BoostCooldown, false);
 }
 

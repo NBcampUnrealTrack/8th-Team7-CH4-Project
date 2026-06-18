@@ -12,12 +12,6 @@ class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
 
-/**
- *  카트 플레이어 폰.
- *  - W/S   : 전/후진 추력      - A/D  : 좌우 회전(조향)
- *  - Space : 브레이크/급정지   - Shift: 짧은 부스터
- *  실제 스폰은 이 클래스를 상속한 BP_CartPawn에서 메시/InputAction을 지정해 사용한다.
- */
 UCLASS(abstract)
 class ACartPawn : public ACharacter
 {
@@ -28,7 +22,7 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
-	/** 부스터 진행 중인지 (E HUD 등에서 사용 가능) */
+	//부스터 진행 중인지
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBoosting() const { return bIsBoosting; }
 
@@ -56,19 +50,24 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* BoostAction; //Shift (Bool)
 
-	//---------- 조향 튜닝 (B2에서 본격 조정, BP에서 컴파일 없이 수정 가능) ----------
-	/** 초당 회전 각도(도). */
+	//---------- 전후진 ----------
+	// 후진 최고 속도 = 전진 최고 속도 * MaxReverseSpeedRatio (쇼핑카트는 후진이 느리다)
+	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0", ClampMax = "1"))
+	float MaxReverseSpeedRatio = 0.5f;
+
+	//---------- 조향 튜닝 ----------
+	//초당 회전 각도(도)
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0"))
 	float TurnRateDegPerSec = 130.f;
 
-	/** 정지 상태에서의 최소 조향 배율(0~1). 속도가 빠를수록 1에 가까워진다. */
+	//정지 상태에서의 최소 조향 배율
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0", ClampMax = "1"))
 	float MinSteerSpeedFactor = 0.35f;
 
 	//---------- 브레이크 ----------
-	/** 브레이크 시 감속도. 클수록 급정지. */
+	//브레이크 시 감속도
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
-	float BrakeDeceleration = 4000.f;
+	float BrakeDeceleration = 3000.f;
 
 	//---------- 부스터 ----------
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "1"))
