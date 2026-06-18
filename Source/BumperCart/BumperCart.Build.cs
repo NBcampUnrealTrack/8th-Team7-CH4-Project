@@ -21,7 +21,8 @@ public class BumperCart : ModuleRules
 			"Slate",
             "OnlineSubsystemEOS",
             "OnlineSubsystem",
-            "OnlineSubsystemUtils"
+            "OnlineSubsystemUtils",
+            "SlateCore",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
