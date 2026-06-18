@@ -1,5 +1,6 @@
 ﻿#include "Checkout/CheckoutZone.h"
 
+#include "GameFramework/Character.h"
 #include "Components/SceneComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -41,16 +42,14 @@ void ACheckoutZone::OnCheckoutZoneBeginOverlap(UPrimitiveComponent* OverlappedCo
         return;
     }
 
-    APawn* PlayerPawn = Cast<APawn>(OtherActor);
+    ACharacter* PlayerCharacter = Cast<ACharacter>(OtherActor);
 
-    if (!IsValid(PlayerPawn))
+    if (!IsValid(PlayerCharacter))
     {
         return;
     }
 
-    AddPlayerInZone(PlayerPawn);
-
-    UE_LOG(LogTemp, Warning, TEXT("계산 구역 진입"));
+    AddPlayerInZone(PlayerCharacter);
 }
 
 void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex)
@@ -60,14 +59,14 @@ void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComp
         return;
     }
 
-    APawn* PlayerPawn = Cast<APawn>(OtherActor);
+    ACharacter* PlayerCharacter = Cast<ACharacter>(OtherActor);
 
-    if (!IsValid(PlayerPawn))
+    if (!IsValid(PlayerCharacter))
     {
         return;
     }
 
-    RemovePlayerFromZone(PlayerPawn);
+    RemovePlayerFromZone(PlayerCharacter);
 
     UE_LOG(LogTemp, Warning, TEXT("계산 구역 이탈"));
 }
@@ -75,31 +74,35 @@ void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComp
 // ------------------------------------------------------------
 // 구역 내 플레이어
 // ------------------------------------------------------------
-void ACheckoutZone::AddPlayerInZone(APawn* PlayerPawn)
+void ACheckoutZone::AddPlayerInZone(ACharacter* PlayerCharacter)
 {
-    if (!IsValid(PlayerPawn))
+    if (!IsValid(PlayerCharacter))
     {
         return;
     }
 
-    PlayersInZone.AddUnique(PlayerPawn);
+    PlayersInZone.AddUnique(PlayerCharacter);
+
+    UE_LOG(LogTemp, Warning, TEXT("계산 구역 진입: %s / 현재 계산대 내 인원: %d"), *GetNameSafe(PlayerCharacter), PlayersInZone.Num());
 
     // 배열에 추가 후 Checkout 시도
     // CheckoutZone에 진입 시 자동으로 정산 시작
     TryStartCheckout();
 }
 
-void ACheckoutZone::RemovePlayerFromZone(APawn* PlayerPawn)
+void ACheckoutZone::RemovePlayerFromZone(ACharacter* PlayerCharacter)
 {
-    if (!IsValid(PlayerPawn))
+    if (!IsValid(PlayerCharacter))
     {
         return;
     }
 
-    PlayersInZone.Remove(PlayerPawn);
+    PlayersInZone.Remove(PlayerCharacter);
+
+    UE_LOG(LogTemp, Warning, TEXT("계산 구역 이탈: %s / 현재 계산대 내 인원: %d"), *GetNameSafe(PlayerCharacter), PlayersInZone.Num());
 
     // 현재 정산 중인 플레이어가 이탈한 경우 정산 취소
-    if (CurrentCheckoutPlayer == PlayerPawn)
+    if (CurrentCheckoutPlayer == PlayerCharacter)
     {
         CancelCheckout();
 
@@ -108,15 +111,15 @@ void ACheckoutZone::RemovePlayerFromZone(APawn* PlayerPawn)
     }
 }
 
-APawn* ACheckoutZone::FindNextCheckoutPlayer()
+ACharacter* ACheckoutZone::FindNextCheckoutPlayer()
 {
     for (int32 i = 0; i < PlayersInZone.Num(); ++i)
     {
-        APawn* PlayerPawn = PlayersInZone[i].Get();
+        ACharacter* PlayerCharacter = PlayersInZone[i].Get();
 
-        if (IsValid(PlayerPawn))
+        if (IsValid(PlayerCharacter))
         {
-            return PlayerPawn;
+            return PlayerCharacter;
         }
 
         // 유효하지 않은 Pawn 배열에서 제거
@@ -130,10 +133,10 @@ APawn* ACheckoutZone::FindNextCheckoutPlayer()
 // ------------------------------------------------------------
 // 계산 조건
 // ------------------------------------------------------------
-bool ACheckoutZone::CanStartCheckout(APawn* PlayerPawn) const
+bool ACheckoutZone::CanStartCheckout(ACharacter* PlayerCharacter) const
 {
     // 플레이어인지
-    if (!IsValid(PlayerPawn))
+    if (!IsValid(PlayerCharacter))
     {
         return false;
     }
@@ -151,7 +154,7 @@ bool ACheckoutZone::CanStartCheckout(APawn* PlayerPawn) const
     }
 
     // 플레이어가 배열 안에 있는지
-    if (!PlayersInZone.Contains(PlayerPawn))
+    if (!PlayersInZone.Contains(PlayerCharacter))
     {
         return false;
     }
@@ -172,7 +175,7 @@ void ACheckoutZone::TryStartCheckout()
         return;
     }
 
-    APawn* NextPlayer = FindNextCheckoutPlayer();
+    ACharacter* NextPlayer = FindNextCheckoutPlayer();
 
     if (!CanStartCheckout(NextPlayer))
     {
@@ -185,21 +188,21 @@ void ACheckoutZone::TryStartCheckout()
 // ------------------------------------------------------------
 // 계산 진행
 // ------------------------------------------------------------
-void ACheckoutZone::StartCheckout(APawn* PlayerPawn)
+void ACheckoutZone::StartCheckout(ACharacter* PlayerCharacter)
 {
-    if (!CanStartCheckout(PlayerPawn))
+    if (!CanStartCheckout(PlayerCharacter))
     {
         return;
     }
 
-    CurrentCheckoutPlayer = PlayerPawn;
+    CurrentCheckoutPlayer = PlayerCharacter;
     bIsCheckoutInProgress = true;
 
     // 정산 시간 계산
     CheckoutProgress = 0.0f;
     ElapsedCheckoutTime = 0.0f;
-    RequiredCheckoutTime = CalculateCheckoutDuration();     // 최종 정산 시간 계산
-    CheckoutStartTime = GetWorld()->GetTimeSeconds();       // 정산 시작 시점, 월드 시간 기준임
+    RequiredCheckoutTime = CalculateCheckoutDuration(1);     // 최종 정산 시간 계산
+    CheckoutStartTime = GetWorld()->GetTimeSeconds();       // 정산 시작 시점
 
     GetWorldTimerManager().SetTimer(
         CheckoutTimerHandle,
@@ -209,7 +212,7 @@ void ACheckoutZone::StartCheckout(APawn* PlayerPawn)
         true
     );
 
-    UE_LOG(LogTemp, Warning, TEXT("정산 시작"));
+    UE_LOG(LogTemp, Warning, TEXT("%s 정산 시작"), *GetNameSafe(CurrentCheckoutPlayer));
 }
 
 void ACheckoutZone::UpdateCheckoutProgress()
@@ -228,11 +231,11 @@ void ACheckoutZone::UpdateCheckoutProgress()
         return;
     }
 
-    const double CurrentTime = GetWorld()->GetTimeSeconds();
-    ElapsedCheckoutTime = static_cast<float>(CurrentTime - CheckoutStartTime);
+    // 정산 시작부터 경과 시간 계산
+    float CurrentTime = GetWorld()->GetTimeSeconds();       // 월드 경과 시간
+    ElapsedCheckoutTime = CurrentTime - CheckoutStartTime;  // 월드 경과 시간 - 정산 시작 순간
     CheckoutProgress = FMath::Clamp(ElapsedCheckoutTime / RequiredCheckoutTime, 0.0f, 1.0f);
 
-    UE_LOG(LogTemp, Log, TEXT("정산 진행도: %.0f%%"),CheckoutProgress * 100.0f);
     if (GEngine)
     {
         GEngine->AddOnScreenDebugMessage(
@@ -252,7 +255,6 @@ void ACheckoutZone::UpdateCheckoutProgress()
 // ------------------------------------------------------------
 // 계산 종료
 // ------------------------------------------------------------
-
 void ACheckoutZone::CompleteCheckout()
 {
     if (!bIsCheckoutInProgress)
@@ -260,9 +262,18 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
-    APawn* CompletedPlayer = CurrentCheckoutPlayer;
+    ACharacter* CompletedPlayer = CurrentCheckoutPlayer;
 
-    //UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore);
+    UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore);
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(
+            1,
+            3.0f,
+            FColor::Blue,
+            FString::Printf(TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore)
+        );
+    }
 
     // 정산 로직
     {
@@ -271,12 +282,12 @@ void ACheckoutZone::CompleteCheckout()
 
     // 정산이 완료되면 플레이어는 대기열에서 제거
     PlayersInZone.Remove(CompletedPlayer);
+
+    // 계산대 세팅 초기화
     ResetCheckout();
 
-    // 계산대 비활성화
-    {
-
-    }
+    // 다음에 들어온 플레이어 정산 시작
+    TryStartCheckout();
 }
 
 void ACheckoutZone::CancelCheckout()
@@ -307,15 +318,9 @@ void ACheckoutZone::ResetCheckout()
 // ------------------------------------------------------------
 // 계산 시간 및 점수
 // ------------------------------------------------------------
-
-float ACheckoutZone::CalculateCheckoutDuration() const
+float ACheckoutZone::CalculateCheckoutDuration(int32 ProductCount) const
 {
-    // 상품 개수에 따른 추가 시간 계산
-    {
-
-    }
-
-    return BaseCheckoutTime + AdditionalCheckoutTime;
+    return BaseCheckoutTime + AdditionalCheckoutTime * ProductCount;
 }
 
 int32 ACheckoutZone::CalculateCheckoutScore() const
