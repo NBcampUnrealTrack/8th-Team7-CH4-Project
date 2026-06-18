@@ -2,19 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Engine/DataAsset.h"
 #include "Product/PickUpProduct.h"
 #include "ProductShelf.generated.h"
 
 class APickUpProduct;
-
-UENUM(BlueprintType)
-enum class EShelfType : uint8
-{
-    Common = 0,
-    Rare = 1,
-    Unique = 2,
-};
 
 UCLASS()
 class BUMPERCART_API AProductShelf : public AActor
@@ -42,19 +33,15 @@ protected:
 
 #pragma region Spawning
 protected:
-    // 가판대 등급
-    UPROPERTY(EditAnywhere, Category = "Spawning Config")
-    EShelfType ShelfType;
-
-    // 스폰되는 아이템 갯수
+    // 스폰되는 아이템 갯수 - 테스트
     UPROPERTY(EditAnywhere, Category = "Spawning Config")
     int32 SpawnCount = 3;
 
-    // 아이템 스폰 제한수
+    // 아이템 스폰 제한수 - 테스트
     UPROPERTY(EditAnywhere, Category = "Spawning Config")
     int32 SpawnMaxCount = 15;
 
-    // 아이템 리스폰 시간
+    // 아이템 리스폰 시간 - 테스트
     UPROPERTY(EditAnywhere, Category = "Spawning Config")
     float RespawnDelay = 5.0f;
 
@@ -71,23 +58,24 @@ protected:
     TSubclassOf<AActor> TestActorClass;
 
 private:
+    // 테스트용 타이머 -> 후에 매니저로 옮겨서 관리
     FTimerHandle RespawnTimerHandle;
 
+    // 기존 가판대가 아이템 목록을 가지고있을 때 - 테스트용으로 남김
     void SpawnRandomItems();
 
 public:
     bool SetSpawnToggle(bool bToggle);
+
+    // 매니저에서 호출 제품 스폰
+    void SpawnSpecificItem(TSubclassOf<APickUpProduct> ItemClass);
 
 #pragma endregion
 
 
 #pragma region Item
 private:
-    // 스폰되는 아이템 목록
-    UPROPERTY(EditAnywhere, Category = "Shelf Config")
-    TArray<TSubclassOf<APickUpProduct>> ProductBlueprintClasses;
-
-    // 스폰된 아이템 목록
+    // 스폰된 아이템 목록 - 매니저에서 관리 예정
     UPROPERTY()
     TArray<AActor*> SpawnedItems;
 
