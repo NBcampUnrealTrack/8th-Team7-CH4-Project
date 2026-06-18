@@ -64,10 +64,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0", ClampMax = "1"))
 	float MinSteerSpeedFactor = 0.35f;
 
+	//조향 입력을 따라가는 속도. 낮을수록 묵직하게 늦게 먹는다(회전 지연)
+	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0.1"))
+	float SteerInterpSpeed = 3.f;
+
 	//---------- 브레이크 ----------
 	//브레이크 시 감속도
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
-	float BrakeDeceleration = 3000.f;
+	float BrakeDeceleration = 2000.f;
 
 	//---------- 부스터 ----------
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "1"))
@@ -96,6 +100,7 @@ private:
 	//현재 프레임 입력값
 	float ThrottleInput = 0.f;
 	float SteerInput = 0.f;
+	float CurrentSteer = 0.f; //부드럽게 보간된 조향값
 	bool bIsBraking = false;
 
 	//부스터 상태

@@ -102,15 +102,16 @@ void ACartPawn::Tick(float DeltaSeconds)
 		}
 	}
 
-	//--- 조향 (A/D = Yaw 회전) ---
-	if (!FMath::IsNearlyZero(SteerInput))
+	//--- 조향 (A/D = Yaw 회전). 입력을 부드럽게 따라가 회전 지연감을 준다 ---
+	CurrentSteer = FMath::FInterpTo(CurrentSteer, SteerInput, DeltaSeconds, SteerInterpSpeed);
+	if (!FMath::IsNearlyZero(CurrentSteer))
 	{
 		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용 (카트 특유의 둔한 조향)
 		const float Speed = Move->Velocity.Size2D();
 		const float SpeedAlpha = FMath::Clamp(Speed / FMath::Max(DefaultMaxWalkSpeed, 1.f), 0.f, 1.f);
 		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
 
-		const float YawDelta = SteerInput * TurnRateDegPerSec * SpeedFactor * DeltaSeconds;
+		const float YawDelta = CurrentSteer * TurnRateDegPerSec * SpeedFactor * DeltaSeconds;
 		AddActorWorldRotation(FRotator(0.f, YawDelta, 0.f));
 	}
 }
