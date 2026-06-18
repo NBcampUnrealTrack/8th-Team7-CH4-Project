@@ -3,7 +3,10 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Engine/DataAsset.h"
+#include "Product/PickUpProduct.h"
 #include "ProductShelf.generated.h"
+
+class APickUpProduct;
 
 UENUM(BlueprintType)
 enum class EShelfType : uint8
@@ -90,6 +93,11 @@ private:
     //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelf Config")
     //TArray<UProductDataAsset*> ProductDataAssets;
 
+    // 스폰할 아이템 목록
+    UPROPERTY(EditAnywhere, Category = "Shelf Config")
+    TArray<TSubclassOf<APickUpProduct>> ProductBlueprintClasses;
+
+    // 스폰된 아이템 목록
     UPROPERTY()
     TArray<AActor*> SpawnedItems;
 

@@ -1,6 +1,8 @@
 ﻿#include "ItemSpawn/ProductShelf/ProductShelf.h"
+
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/PrimitiveComponent.h"
+#include "Product/PickUpProduct.h"
 
 AProductShelf::AProductShelf()
 {
@@ -28,16 +30,9 @@ void AProductShelf::BeginPlay()
 
 void AProductShelf::SpawnRandomItems()
 {
-    TSubclassOf<AActor> ClassToSpawn = nullptr;
-
-    if (TestActorClass)
+    if (ProductBlueprintClasses.Num() == 0)
     {
-        ClassToSpawn = TestActorClass;
-    }
-
-    if (!ClassToSpawn)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("가판대에 스폰할 TestActorClass가 지정되지 않았습니다!"));
+        UE_LOG(LogTemp, Warning, TEXT("[%s] 가판대에 등록된 아이템 블루프린트가 없습니다!"), *GetName());
         return;
     }
 
@@ -56,25 +51,21 @@ void AProductShelf::SpawnRandomItems()
             break;
         }
 
+        // 아이템 목록에서 랜덤 선택
+        int32 RandomIndex = FMath::RandRange(0, ProductBlueprintClasses.Num() - 1);
+        TSubclassOf<APickUpProduct> ChosenClass = ProductBlueprintClasses[RandomIndex];
+
+        if (!ChosenClass) continue;
+
         FVector SpawnLocation = LaunchPoints->GetComponentLocation();
         FRotator SpawnRotation = UKismetMathLibrary::RandomRotator();
 
-        AActor* SpawnItem = GetWorld()->SpawnActor<AActor>(ClassToSpawn, SpawnLocation, SpawnRotation);
+        AActor* SpawnItem = GetWorld()->SpawnActor<AActor>(ChosenClass, SpawnLocation, SpawnRotation);
 
         if (SpawnItem)
         {
+            // 스폰된 아이템 배열에 저장
             SpawnedItems.Add(SpawnItem);
-
-            /*
-            AProductBase* ProductBaseInstance = Cast<AProductBase>(SpawnedActor);
-            if (ProductBaseInstance)
-            {
-                // 여기서 나중에 GetRandomValidProductAsset() 같은 함수로 데이터 에셋을 뽑아 주입합니다.
-                // UProductDataAsset* RandomAsset = GetRandomValidProductAsset();
-                // ProductBaseInstance->ProductDataAsset = RandomAsset;
-                // ProductBaseInstance->ApplyDataAsset();
-            }
-            */
 
             UPrimitiveComponent* PhysComp = Cast<UPrimitiveComponent>(SpawnItem->GetRootComponent());
             if (PhysComp)
