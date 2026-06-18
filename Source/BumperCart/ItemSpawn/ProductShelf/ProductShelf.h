@@ -75,8 +75,6 @@ private:
 
     void SpawnRandomItems();
 
-    //TSubclassOf<AActor> GetRandomValidProductClass();
-
 public:
     bool SetSpawnToggle(bool bToggle);
 
@@ -85,15 +83,7 @@ public:
 
 #pragma region Item
 private:
-    // 아이템 베이스 클래스
-    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelf Config")
-    //TSubclassOf<AProductBase> ProductBaseClass;
-
-    // 아이템 데이터 에셋
-    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelf Config")
-    //TArray<UProductDataAsset*> ProductDataAssets;
-
-    // 스폰할 아이템 목록
+    // 스폰되는 아이템 목록
     UPROPERTY(EditAnywhere, Category = "Shelf Config")
     TArray<TSubclassOf<APickUpProduct>> ProductBlueprintClasses;
 
