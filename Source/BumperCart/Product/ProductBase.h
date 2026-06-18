@@ -22,6 +22,24 @@ public:
     // 스폰할 때 위치 설정 및 상태를 초기화하는 함수
     void Initialize(const FVector& SpawnLocation);
 
+    // 상품의 상태를 설정하는 함수, 서버에서 처리함
+    void SetProductState(EProductState NewState);
+
+    // Loaded 상태로 변환 시도하는 함수
+    bool TrySetLoaded();
+
+    // 카트에서 해당 상품을 떨어뜨리는 함수
+    void DropFromCart(AActor* CartActor);
+
+    UFUNCTION(BlueprintPure)
+    int32 GetWeight() const;
+
+    UFUNCTION(BlueprintPure)
+    int32 GetValue() const;
+
+    UFUNCTION(BlueprintPure)
+    EProductState GetProductState() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -44,9 +62,6 @@ protected:
 
     // 데이터 에셋을 적용하는 함수
     void ApplyDataAsset();
-
-    // 상품의 상태를 설정하는 함수, 서버에서 처리함
-    void SetProductState(EProductState NewState);
 
     // 함수의 상태를 적용하는 함수
     void ApplyProductState();

@@ -1,6 +1,6 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
+ 
 #include "Product/ProductBase.h"
 
 #include "ProductDataAsset.h"
@@ -32,17 +32,17 @@ AProductBase::AProductBase()
     ProductState = EProductState::None;
 }
 
-void AProductBase::Initialize(const FVector& SpawnLocation)
+void AProductBase::BeginPlay()
 {
-    SetActorLocation(SpawnLocation);
+    Super::BeginPlay();
+
+    ApplyDataAsset();
     SetProductState(EProductState::Display);
 }
 
-void AProductBase::BeginPlay()
+void AProductBase::Initialize(const FVector& SpawnLocation)
 {
-	Super::BeginPlay();
-
-    ApplyDataAsset();
+    SetActorLocation(SpawnLocation);
     SetProductState(EProductState::Display);
 }
 
@@ -64,15 +64,10 @@ void AProductBase::OnBeginOverlapCart(UPrimitiveComponent* OverlappedComponent, 
                                       UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
     if (!HasAuthority()) return;
+    if (!IsValid(OtherActor)) return;
+    if (ProductState != EProductState::Display) return;
 
-    // 태그로 확인하는데 이후에 Interface를 사용할지 컴포넌트를 사용할지 생각해볼 것
-    if (IsValid(OtherActor) && OtherActor->ActorHasTag(TEXT("Player")))
-    {
-        // 진열된 상태가 아니면 충돌 X
-        if (ProductState != EProductState::Display) return;
-
-        ProcessBeginOverlap(OtherActor);
-    }
+    ProcessBeginOverlap(OtherActor);
 }
 
 void AProductBase::ProcessBeginOverlap(AActor* OtherActor)
@@ -101,7 +96,8 @@ void AProductBase::ApplyProductState()
         break;
 
     case EProductState::Loaded:
-        SetActorHiddenInGame(true);
+        //SetActorHiddenInGame(true);
+        SetActorHiddenInGame(false);
         SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
 
@@ -135,7 +131,39 @@ void AProductBase::SetProductState(EProductState NewState)
     ApplyProductState();
 }
 
+bool AProductBase::TrySetLoaded()
+{
+    if (!HasAuthority()) return false;
+
+    if (ProductState != EProductState::Display) return false;
+
+    SetProductState(EProductState::Loaded);
+    return true;
+}
+
+void AProductBase::DropFromCart(AActor* CartActor)
+{
+    // 카트에서 떨어뜨림
+    // Falling 상태로 변환
+    // 카트 주변에 흩트리기
+}
+
 void AProductBase::OnRep_ProductState()
 {
     ApplyProductState();
+}
+
+int32 AProductBase::GetWeight() const
+{
+    return ProductData.Weight;
+}
+
+int32 AProductBase::GetValue() const
+{
+    return ProductData.Value;
+}
+
+EProductState AProductBase::GetProductState() const
+{
+    return ProductState;
 }
