@@ -14,10 +14,14 @@ AProductBase::AProductBase()
  	PrimaryActorTick.bCanEverTick = false;
 
     bReplicates = true;
+    SetReplicateMovement(true);
 
     // 컴포넌트 설정
     Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
-    Mesh->SetCollisionProfileName(TEXT("NoCollision"));
+    Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    Mesh->SetCollisionProfileName(TEXT("ProductPhysics"));
+    Mesh->SetSimulatePhysics(false);
+    Mesh->SetMobility(EComponentMobility::Movable);
     SetRootComponent(Mesh);
 
     SphereCollision = CreateDefaultSubobject<USphereComponent>(TEXT("SphereCollision"));
@@ -27,6 +31,7 @@ AProductBase::AProductBase()
     SphereCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
     SphereCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnBeginOverlapCart);
+
 
     // 기본 변수 설정
     ProductState = EProductState::None;
@@ -92,28 +97,49 @@ void AProductBase::ApplyProductState()
     {
     case EProductState::Display:
         SetActorHiddenInGame(false);
+        Mesh->SetSimulatePhysics(true);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
         SphereCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         break;
 
     case EProductState::Loaded:
         //SetActorHiddenInGame(true);
         SetActorHiddenInGame(false);
+
+        SetReplicateMovement(false);
+
+        Mesh->SetSimulatePhysics(false);
+        Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+        Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
         SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
 
     case EProductState::Falling:
         SetActorHiddenInGame(false);
+        Mesh->SetSimulatePhysics(true);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
         SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
 
     case EProductState::Paid:
         SetActorHiddenInGame(true);
+        Mesh->SetSimulatePhysics(false);
+        Mesh->SetCollisionProfileName(TEXT("NoCollision"));
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
         SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
 
     case EProductState::None:   // Fall Through
     default:
         SetActorHiddenInGame(true);
+        Mesh->SetSimulatePhysics(false);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
         SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
     }
@@ -143,8 +169,27 @@ bool AProductBase::TrySetLoaded()
 
 void AProductBase::DropFromCart(AActor* CartActor)
 {
-    // 카트에서 떨어뜨림
+    if (!HasAuthority()) return;
+
+    // 카트에서 떨어뜨림, nullptr로 Attach하면 떨어짐
+    DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
     // Falling 상태로 변환
+    //SetProductState(EProductState::Falling);
+
+    // 임시로 앞에 떨어뜨림
+    FVector Pos = GetActorLocation();
+    if (IsValid(CartActor))
+    {
+        Pos = CartActor->GetActorLocation() +
+            CartActor->GetActorForwardVector() * 300.f + FVector(0.f, 0.f, 50.f);
+    }
+
+    SetActorLocation(Pos);
+
+    SetProductState(EProductState::Falling);
+
+
     // 카트 주변에 흩트리기
 }
 
@@ -166,4 +211,18 @@ int32 AProductBase::GetValue() const
 EProductState AProductBase::GetProductState() const
 {
     return ProductState;
+}
+
+FLoadedProductInfo AProductBase::GetLoadedProductInfo() const
+{
+    FLoadedProductInfo Info;
+
+    if (IsValid(ProductDataAsset))
+    {
+        Info.ProductId = ProductDataAsset->ProductId;
+    }
+    Info.Value = ProductData.Value;
+    Info.Weight = ProductData.Weight;
+
+    return Info;
 }
