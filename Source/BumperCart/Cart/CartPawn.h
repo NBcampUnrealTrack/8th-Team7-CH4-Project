@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Cart/Component/CartLoadComponent.h" //(추가) FLoadInfo / UCartLoadComponent 타입 사용
 #include "CartPawn.generated.h"
 
 class USpringArmComponent;
@@ -91,6 +92,11 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
 	float BoostCooldown = 2.5f;
 
+	//---------- 적재 (C 상품 시스템 연동) ----------
+	//(추가) C가 만든 적재 컴포넌트. 생성자에서 부착, BeginPlay에서 적재 변경 이벤트에 바인딩
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
+	UCartLoadComponent* LoadComponent;
+
 	//---------- 적재 무게감 ----------
 	//현재 적재율 0~1 (테스트는 BP에서 직접 설정, 실제론 C가 SetLoadRatio로 갱신)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
@@ -120,6 +126,10 @@ protected:
 
 	void EndBoost();
 	void ResetBoostCooldown();
+
+	//(추가) C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용이라 UFUNCTION 필수
+	UFUNCTION()
+	void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
 
 private:
 	//현재 프레임 입력값

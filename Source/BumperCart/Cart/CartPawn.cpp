@@ -49,6 +49,9 @@ ACartPawn::ACartPawn()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+	//적재 컴포넌트(C 상품 시스템) 부착. 적재율 연동은 BeginPlay에서 이벤트 바인딩
+	LoadComponent = CreateDefaultSubobject<UCartLoadComponent>(TEXT("CartLoadComponent"));
 }
 
 void ACartPawn::BeginPlay()
@@ -59,6 +62,12 @@ void ACartPawn::BeginPlay()
 	{
 		DefaultMaxWalkSpeed = Move->MaxWalkSpeed;
 		DefaultBrakingDeceleration = Move->BrakingDecelerationWalking;
+	}
+
+	//C의 적재 정보가 바뀔 때마다 적재율 갱신 (서버/클라 각자 자기 인스턴스에서 반영)
+	if (LoadComponent)
+	{
+		LoadComponent->OnLoadInfoChanged.AddDynamic(this, &ACartPawn::HandleLoadInfoChanged);
 	}
 }
 
@@ -72,7 +81,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		return;
 	}
 
-	//적재 무게 반영 배율 (가득 실을수록 느리고/둔하고/잘 안 멈춤)
+	//적재 무게 반영 배율
 	const float LoadSpeedMul = FMath::Lerp(1.f, LoadMaxSpeedScale, LoadRatio);
 	const float LoadTurnMul = FMath::Lerp(1.f, LoadTurnScale, LoadRatio);
 	const float LoadBrakeMul = FMath::Lerp(1.f, LoadBrakeScale, LoadRatio);
@@ -215,4 +224,14 @@ void ACartPawn::ResetBoostCooldown()
 void ACartPawn::SetLoadRatio(float InLoadRatio)
 {
 	LoadRatio = FMath::Clamp(InLoadRatio, 0.f, 1.f);
+}
+
+//적재 변경 델리게이트 핸들러
+void ACartPawn::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo)
+{
+	//계산한 적재율(현재무게/최대무게)을 그대로 카트에 반영
+	if (LoadComponent)
+	{
+		SetLoadRatio(LoadComponent->GetLoadRatio());
+	}
 }
