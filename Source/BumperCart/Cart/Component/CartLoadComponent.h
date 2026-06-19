@@ -55,6 +55,8 @@ public:
 
     int32 GetCurrentLoadedCount() const;
 
+    float GetLoadRatio() const;
+
     // 계산대에서 상품 정산 시 호출하는 함수
     // 상품 정보 구조체 배열을 채우고, 현재 적재된 상품을 전부 제거함
     bool CheckoutProducts(TArray<FLoadedProductInfo>& OutProducts);
@@ -78,6 +80,7 @@ private:
     // 적재 정보를 갱신하는 함수
     void UpdateLoadInfo();
 
+    // 서버 RPC, 클라이언트에서 테스트 용도
     UFUNCTION(Server, Reliable)
     void Server_RequestDropProducts(float Impulse);
 

@@ -60,7 +60,7 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
     UpdateLoadInfo();
 
     // Owner에 부착
-    Product->AttachToActor(GetOwner(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+    //Product->AttachToActor(GetOwner(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 
     return true;
 }
@@ -126,6 +126,11 @@ int32 UCartLoadComponent::GetTotalValue() const
 int32 UCartLoadComponent::GetCurrentLoadedCount() const
 {
     return LoadInfo.CurrentLoadedCount;
+}
+
+float UCartLoadComponent::GetLoadRatio() const
+{
+    return MaxWeight > 0 ? (float)LoadInfo.CurrentWeight / MaxWeight : 0.f;
 }
 
 bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProducts)
