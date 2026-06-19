@@ -72,8 +72,13 @@ void ACartPawn::Tick(float DeltaSeconds)
 		return;
 	}
 
-	//--- 최고 속도: 부스터 > 후진 > 기본 ---
-	float TargetMaxSpeed = DefaultMaxWalkSpeed;
+	//적재 무게 반영 배율 (가득 실을수록 느리고/둔하고/잘 안 멈춤)
+	const float LoadSpeedMul = FMath::Lerp(1.f, LoadMaxSpeedScale, LoadRatio);
+	const float LoadTurnMul = FMath::Lerp(1.f, LoadTurnScale, LoadRatio);
+	const float LoadBrakeMul = FMath::Lerp(1.f, LoadBrakeScale, LoadRatio);
+
+	//--- 최고 속도: 부스터 > 후진 > 기본, 적재 무게 반영 ---
+	float TargetMaxSpeed = DefaultMaxWalkSpeed * LoadSpeedMul;
 	const float ForwardSpeed = FVector::DotProduct(Move->Velocity, GetActorForwardVector());
 	if (ThrottleInput < 0.f && ForwardSpeed < -10.f) //실제로 뒤로 가는 중이면 후진 속도로 제한
 	{
@@ -81,15 +86,15 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 	if (bIsBoosting) //부스터가 최우선
 	{
-		TargetMaxSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier;
+		TargetMaxSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier * LoadSpeedMul;
 	}
 	Move->MaxWalkSpeed = TargetMaxSpeed;
 
 	//--- 브레이크 / 추력 ---
 	if (bIsBraking)
 	{
-		//브레이크 중에는 추력을 넣지 않고 감속도를 크게 해서 급정지시킨다.
-		Move->BrakingDecelerationWalking = BrakeDeceleration;
+		//브레이크 중에는 추력을 넣지 않고 감속도를 크게 해서 급정지시킨다. (무거우면 덜 멈춤)
+		Move->BrakingDecelerationWalking = BrakeDeceleration * LoadBrakeMul;
 	}
 	else
 	{
@@ -111,7 +116,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		const float SpeedAlpha = FMath::Clamp(Speed / FMath::Max(DefaultMaxWalkSpeed, 1.f), 0.f, 1.f);
 		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
 
-		const float YawDelta = CurrentSteer * TurnRateDegPerSec * SpeedFactor * DeltaSeconds;
+		const float YawDelta = CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
 		AddActorWorldRotation(FRotator(0.f, YawDelta, 0.f));
 	}
 }
@@ -205,4 +210,9 @@ void ACartPawn::EndBoost()
 void ACartPawn::ResetBoostCooldown()
 {
 	bBoostOnCooldown = false;
+}
+
+void ACartPawn::SetLoadRatio(float InLoadRatio)
+{
+	LoadRatio = FMath::Clamp(InLoadRatio, 0.f, 1.f);
 }

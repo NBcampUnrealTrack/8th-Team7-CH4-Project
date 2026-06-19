@@ -26,6 +26,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBoosting() const { return bIsBoosting; }
 
+	//현재 적재율(0~1). C(상품 담당)가 SetLoadRatio로 갱신
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	float GetLoadRatio() const { return LoadRatio; }
+
+	//적재율 설정 (C 연동 진입점). 0~1로 clamp
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	void SetLoadRatio(float InLoadRatio);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -82,6 +90,23 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
 	float BoostCooldown = 2.5f;
+
+	//---------- 적재 무게감 ----------
+	//현재 적재율 0~1 (테스트는 BP에서 직접 설정, 실제론 C가 SetLoadRatio로 갱신)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadRatio = 0.f;
+
+	//가득 실었을 때 최고 속도 배율 (낮을수록 무거우면 느림)
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadMaxSpeedScale = 0.6f;
+
+	//가득 실었을 때 회전 배율
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadTurnScale = 0.6f;
+
+	//가득 실었을 때 브레이크 배율 (낮을수록 무거우면 잘 안 멈춤)
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadBrakeScale = 0.7f;
 
 protected:
 	//---------- 입력 핸들러 ----------
