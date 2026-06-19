@@ -94,4 +94,14 @@ protected:
     // 상품의 현재 상태
     UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     EProductState ProductState;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
+    float ReturnDelay;
+
+private:
+    UFUNCTION()
+    void HandleReturnDisplay();
+
+private:
+    FTimerHandle ReturnDisplayTimer;
 };

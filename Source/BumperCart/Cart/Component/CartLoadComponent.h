@@ -44,6 +44,9 @@ public:
     // 상품 적재를 시도하는 함수
     bool TryAddProduct(AProductBase* Product);
 
+    UFUNCTION(BlueprintCallable)
+    void RequestDropProduct(float Impulse);
+
     // 받은 충격량에 따라 상품을 떨어뜨리는 함수
     UFUNCTION(BlueprintCallable)
     void DropProducts(float Impulse);
@@ -74,6 +77,9 @@ private:
 
     // 적재 정보를 갱신하는 함수
     void UpdateLoadInfo();
+
+    UFUNCTION(Server, Reliable)
+    void Server_RequestDropProducts(float Impulse);
 
 private:
     // TArray를 복제할지, 무게, 적재량을 복제할지

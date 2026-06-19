@@ -35,6 +35,7 @@ AProductBase::AProductBase()
 
     // 기본 변수 설정
     ProductState = EProductState::None;
+    ReturnDelay = 2.f;
 }
 
 void AProductBase::BeginPlay()
@@ -97,6 +98,8 @@ void AProductBase::ApplyProductState()
     {
     case EProductState::Display:
         SetActorHiddenInGame(false);
+        SetReplicateMovement(true);
+
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
@@ -106,8 +109,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Loaded:
         //SetActorHiddenInGame(true);
         SetActorHiddenInGame(false);
-
-        SetReplicateMovement(false);
+        //SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
@@ -119,6 +121,8 @@ void AProductBase::ApplyProductState()
 
     case EProductState::Falling:
         SetActorHiddenInGame(false);
+        SetReplicateMovement(true);
+
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
@@ -171,11 +175,11 @@ void AProductBase::DropFromCart(AActor* CartActor)
 {
     if (!HasAuthority()) return;
 
-    // 카트에서 떨어뜨림, nullptr로 Attach하면 떨어짐
+    // 카트에서 떨어뜨림
     DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
     // Falling 상태로 변환
-    //SetProductState(EProductState::Falling);
+    SetProductState(EProductState::Falling);
 
     // 임시로 앞에 떨어뜨림
     FVector Pos = GetActorLocation();
@@ -187,15 +191,28 @@ void AProductBase::DropFromCart(AActor* CartActor)
 
     SetActorLocation(Pos);
 
-    SetProductState(EProductState::Falling);
-
-
     // 카트 주변에 흩트리기
+    //  - 구현 예정 -
+
+
+    // 일정 시간뒤 진열 상태로 전환
+    GetWorldTimerManager().SetTimer(
+        ReturnDisplayTimer,
+        this,
+        &ThisClass::HandleReturnDisplay,
+        ReturnDelay,
+        false
+    );
 }
 
 void AProductBase::OnRep_ProductState()
 {
     ApplyProductState();
+}
+
+void AProductBase::HandleReturnDisplay()
+{
+    SetProductState(EProductState::Display);
 }
 
 int32 AProductBase::GetWeight() const
