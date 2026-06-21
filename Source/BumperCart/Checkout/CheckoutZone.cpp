@@ -136,14 +136,19 @@ ACharacter* ACheckoutZone::FindNextCheckoutPlayer()
     {
         ACharacter* PlayerCharacter = PlayersInZone[i].Get();
 
-        if (IsValid(PlayerCharacter))
+        // 유효하지 않은 플레이어 배열에서 제거
+        if (!IsValid(PlayerCharacter))
+        {
+            PlayersInZone.RemoveAt(i);
+            --i;
+            continue;
+        }
+
+        // 정산 가능한 플레이어 리턴
+        if (CanStartCheckout(PlayerCharacter))
         {
             return PlayerCharacter;
         }
-
-        // 유효하지 않은 Pawn 배열에서 제거
-        PlayersInZone.RemoveAt(i);
-        --i;
     }
 
     return nullptr;
@@ -230,6 +235,7 @@ void ACheckoutZone::TryStartCheckout()
         return;
     }
 
+    // 배열에서 정산 가능한 플레이어 찾기
     ACharacter* NextPlayer = FindNextCheckoutPlayer();
 
     if (!CanStartCheckout(NextPlayer))
