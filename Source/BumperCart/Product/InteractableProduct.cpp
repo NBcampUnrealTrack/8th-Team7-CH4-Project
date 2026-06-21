@@ -44,7 +44,7 @@ void AInteractableProduct::OnEndOverlapCart(UPrimitiveComponent* OverlappedCompo
 {
     if (!HasAuthority()) return;
     if (!IsValid(OtherActor)) return;
-    if (ProductState != EProductState::Display) return;
+    if (ProductState.State != EProductState::Display) return;
 
 
     // Overlap Count 감소시켜야 함

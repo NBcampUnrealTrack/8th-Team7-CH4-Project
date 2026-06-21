@@ -4,6 +4,7 @@
 #include "Product/ProductBase.h"
 
 #include "ProductDataAsset.h"
+#include "Product/DataAsset/ProductDropConfig.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -32,9 +33,6 @@ AProductBase::AProductBase()
     SphereCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnBeginOverlapCart);
 
-
-    // 기본 변수 설정
-    ProductState = EProductState::None;
 }
 
 void AProductBase::BeginPlay()
@@ -70,7 +68,7 @@ void AProductBase::OnBeginOverlapCart(UPrimitiveComponent* OverlappedComponent, 
 {
     if (!HasAuthority()) return;
     if (!IsValid(OtherActor)) return;
-    if (ProductState != EProductState::Display) return;
+    if (ProductState.State != EProductState::Display) return;
 
     ProcessBeginOverlap(OtherActor);
 }
@@ -93,10 +91,12 @@ void AProductBase::ApplyDataAsset()
 
 void AProductBase::ApplyProductState()
 {
-    switch (ProductState)
+    switch (ProductState.State)
     {
     case EProductState::Display:
         SetActorHiddenInGame(false);
+        SetNetUpdateFrequency(20.f);
+
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
@@ -104,10 +104,8 @@ void AProductBase::ApplyProductState()
         break;
 
     case EProductState::Loaded:
-        //SetActorHiddenInGame(true);
-        SetActorHiddenInGame(false);
-
-        SetReplicateMovement(false);
+        SetActorHiddenInGame(true);
+        SetNetUpdateFrequency(1.f);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
@@ -119,6 +117,8 @@ void AProductBase::ApplyProductState()
 
     case EProductState::Falling:
         SetActorHiddenInGame(false);
+        SetNetUpdateFrequency(30.f);
+
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
@@ -127,6 +127,8 @@ void AProductBase::ApplyProductState()
 
     case EProductState::Paid:
         SetActorHiddenInGame(true);
+        SetNetUpdateFrequency(1.f);
+
         Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionProfileName(TEXT("NoCollision"));
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -137,6 +139,8 @@ void AProductBase::ApplyProductState()
     case EProductState::None:   // Fall Through
     default:
         SetActorHiddenInGame(true);
+        SetNetUpdateFrequency(1.f);
+
         Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -149,9 +153,9 @@ void AProductBase::SetProductState(EProductState NewState)
 {
     if (!HasAuthority()) return;
 
-    if (ProductState == NewState) return;
+    if (ProductState.State == NewState) return;
 
-    ProductState = NewState;
+    ProductState.State = NewState;
 
     // 서버 또한 State에 따른 변화를 적용해야 함
     ApplyProductState();
@@ -161,41 +165,81 @@ bool AProductBase::TrySetLoaded()
 {
     if (!HasAuthority()) return false;
 
-    if (ProductState != EProductState::Display) return false;
+    if (ProductState.State != EProductState::Display) return false;
 
     SetProductState(EProductState::Loaded);
+    ForceNetUpdate();
     return true;
 }
 
 void AProductBase::DropFromCart(AActor* CartActor)
 {
     if (!HasAuthority()) return;
+    if (!IsValid(CartActor) || !IsValid(DropConfig)) return;
 
-    // 카트에서 떨어뜨림, nullptr로 Attach하면 떨어짐
-    DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+    // 카트에서 떨어뜨림
+    //DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+    // 물리/충돌 잠깐 해제
+    Mesh->SetSimulatePhysics(false);
+    Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+    Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+    Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // 위치 잡기
+    FVector Offset = FVector(
+        FMath::RandRange(-DropConfig->HorizontalOffset, DropConfig->HorizontalOffset),
+        FMath::RandRange(-DropConfig->HorizontalOffset, DropConfig->HorizontalOffset),
+        0.f);
+    FVector DropLocation = CartActor->GetActorLocation() + Offset + FVector(0.f, 0.f, DropConfig->HeightOffset);
+    SetActorLocation(DropLocation, false, nullptr, ETeleportType::TeleportPhysics);
+
+    // 위쪽 방향 기준으로 랜덤 원뿔 위치 방향에 줄 Impulse 계산
+    float SpreadRadian = FMath::DegreesToRadians(DropConfig->HalfAngle);
+    float ImpulseVal = FMath::RandRange(DropConfig->MinImpulse, DropConfig->MaxImpulse);
+    FVector ImpulseDirection = FMath::VRandCone(FVector::UpVector, SpreadRadian) * ImpulseVal;
+
+    ProductState.DropLocation = DropLocation;
 
     // Falling 상태로 변환
-    //SetProductState(EProductState::Falling);
-
-    // 임시로 앞에 떨어뜨림
-    FVector Pos = GetActorLocation();
-    if (IsValid(CartActor))
-    {
-        Pos = CartActor->GetActorLocation() +
-            CartActor->GetActorForwardVector() * 300.f + FVector(0.f, 0.f, 50.f);
-    }
-
-    SetActorLocation(Pos);
-
     SetProductState(EProductState::Falling);
 
+    // 물리 활성화
+    Mesh->WakeAllRigidBodies();
 
-    // 카트 주변에 흩트리기
+    Mesh->AddImpulse(ImpulseDirection, NAME_None, true);
+
+    // 강제로 위치 업데이트
+    ForceNetUpdate();
+
+    // 일정 시간뒤 진열 상태로 전환
+    GetWorldTimerManager().SetTimer(
+        ReturnDisplayTimer,
+        this,
+        &ThisClass::HandleReturnDisplay,
+        DropConfig->FallingDuration,
+        false
+    );
 }
 
 void AProductBase::OnRep_ProductState()
 {
+    // Falling의 경우 물리를 먼저 끄고 위치를 조정한다음 상태 반영
+    if (ProductState.State == EProductState::Falling)
+    {
+        Mesh->SetSimulatePhysics(false);
+        Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+        Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+
+        SetActorLocation(ProductState.DropLocation, false, nullptr, ETeleportType::TeleportPhysics);
+    }
+
     ApplyProductState();
+}
+
+void AProductBase::HandleReturnDisplay()
+{
+    SetProductState(EProductState::Display);
 }
 
 int32 AProductBase::GetWeight() const
@@ -210,7 +254,7 @@ int32 AProductBase::GetValue() const
 
 EProductState AProductBase::GetProductState() const
 {
-    return ProductState;
+    return ProductState.State;
 }
 
 FLoadedProductInfo AProductBase::GetLoadedProductInfo() const

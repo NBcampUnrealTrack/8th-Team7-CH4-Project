@@ -10,6 +10,8 @@
 class UProductDataAsset;
 class UStaticMeshComponent;
 class USphereComponent;
+class UProductDropConfig;
+
 
 UCLASS()
 class BUMPERCART_API AProductBase : public AActor
@@ -87,11 +89,22 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
     TObjectPtr<UProductDataAsset> ProductDataAsset;
 
+    // Drop 관련 설정
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Drop")
+    TObjectPtr<UProductDropConfig> DropConfig;
+
     // 상품 정보
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     FProductData ProductData;
 
-    // 상품의 현재 상태
+    // 상품의 현재 상태, 드롭 위치를 저장하는 구조체
     UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
-    EProductState ProductState;
+    FProductRepState ProductState;
+
+private:
+    UFUNCTION()
+    void HandleReturnDisplay();
+
+private:
+    FTimerHandle ReturnDisplayTimer;
 };

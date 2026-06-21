@@ -44,6 +44,9 @@ public:
     // 상품 적재를 시도하는 함수
     bool TryAddProduct(AProductBase* Product);
 
+    UFUNCTION(BlueprintCallable)
+    void RequestDropProduct(float Impulse);
+
     // 받은 충격량에 따라 상품을 떨어뜨리는 함수
     UFUNCTION(BlueprintCallable)
     void DropProducts(float Impulse);
@@ -51,6 +54,8 @@ public:
     int32 GetTotalValue() const;
 
     int32 GetCurrentLoadedCount() const;
+
+    float GetLoadRatio() const;
 
     // 계산대에서 상품 정산 시 호출하는 함수
     // 상품 정보 구조체 배열을 채우고, 현재 적재된 상품을 전부 제거함
@@ -74,6 +79,10 @@ private:
 
     // 적재 정보를 갱신하는 함수
     void UpdateLoadInfo();
+
+    // 서버 RPC, 클라이언트에서 테스트 용도
+    UFUNCTION(Server, Reliable)
+    void Server_RequestDropProducts(float Impulse);
 
 private:
     // TArray를 복제할지, 무게, 적재량을 복제할지
