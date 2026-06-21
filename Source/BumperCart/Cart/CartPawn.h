@@ -5,7 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Cart/Component/CartLoadComponent.h" //(추가) FLoadInfo / UCartLoadComponent 타입 사용
+#include "Cart/Component/CartLoadComponent.h" //FLoadInfo / UCartLoadComponent 타입 사용
 #include "CartPawn.generated.h"
 
 class USpringArmComponent;
@@ -39,6 +39,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	//B4: 카트가 무언가에 부딪혔을 때 호출 (충돌 => 상품 드롭 판정)
+	virtual void NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit) override;
+
 	//---------- 카메라 ----------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
@@ -60,7 +63,7 @@ protected:
 	UInputAction* BoostAction; //Shift (Bool)
 
 	//---------- 전후진 ----------
-	// 후진 최고 속도 = 전진 최고 속도 * MaxReverseSpeedRatio (쇼핑카트는 후진이 느리다)
+	//후진 최고 속도 = 전진 최고 속도 * MaxReverseSpeedRatio (쇼핑카트는 후진이 느리다)
 	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0", ClampMax = "1"))
 	float MaxReverseSpeedRatio = 0.5f;
 
@@ -93,7 +96,7 @@ protected:
 	float BoostCooldown = 2.5f;
 
 	//---------- 적재 (C 상품 시스템 연동) ----------
-	//(추가) C가 만든 적재 컴포넌트. 생성자에서 부착, BeginPlay에서 적재 변경 이벤트에 바인딩
+	//C가 만든 적재 컴포넌트. 생성자에서 부착, BeginPlay에서 적재 변경 이벤트에 바인딩
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
 	UCartLoadComponent* LoadComponent;
 
@@ -114,6 +117,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
 	float LoadBrakeScale = 0.7f;
 
+	//---------- 충돌 드롭 (B4) ----------
+	//충격속도(cm/s)를 C 드롭 충격량으로 환산하는 배율. C 임계(300/700/1200)에 맞춰 튜닝
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpImpulseScale = 1.0f;
+
+	//이 충격속도(cm/s) 미만의 약한 접촉은 무시 (살짝 스침엔 안 쏟음 + RPC 낭비 방지)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float MinBumpSpeed = 200.f;
+
+	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초). 지속 접촉 시 매 프레임 드롭 방지
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpDropCooldown = 0.5f;
+
 protected:
 	//---------- 입력 핸들러 ----------
 	void OnThrottle(const FInputActionValue& Value);
@@ -127,7 +143,7 @@ protected:
 	void EndBoost();
 	void ResetBoostCooldown();
 
-	//(추가) C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용이라 UFUNCTION 필수
+	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용이라 UFUNCTION 필수
 	UFUNCTION()
 	void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
 
@@ -148,4 +164,7 @@ private:
 
 	FTimerHandle BoostTimerHandle;
 	FTimerHandle BoostCooldownTimerHandle;
+
+	//마지막으로 충돌 드롭을 요청한 시각 (BumpDropCooldown 용)
+	float LastBumpDropTime = -1000.f;
 };

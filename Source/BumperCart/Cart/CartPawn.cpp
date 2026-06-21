@@ -235,3 +235,42 @@ void ACartPawn::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadI
 		SetLoadRatio(LoadComponent->GetLoadRatio());
 	}
 }
+
+//B4: 카트끼리 부딪히면 충격 세기만큼 상품을 쏟는다 (비물리라 속도로 의사 충격량 계산)
+void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
+{
+	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
+
+	//서버에서만 판정 (NotifyHit은 서버·소유클라 양쪽에서 떠서, 안 막으면 더블 드롭)
+	if (!HasAuthority() || !LoadComponent)
+	{
+		return;
+	}
+
+	//카트끼리만: 상대가 다른 카트일 때만 (벽/장애물은 무시)
+	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
+	if (!OtherCart || OtherCart == this)
+	{
+		return;
+	}
+
+	//충돌 노멀 반대방향으로의 상대 접근 속도 = 정면으로 부딪힐수록 큼
+	const FVector RelativeVelocity = GetVelocity() - OtherCart->GetVelocity();
+	const float ClosingSpeed = FVector::DotProduct(RelativeVelocity, -HitNormal);
+	if (ClosingSpeed < MinBumpSpeed)
+	{
+		return; //약하게 스치는 접촉은 무시
+	}
+
+	//쿨다운: 붙어서 미는 동안 매 프레임 쏟지 않게
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastBumpDropTime < BumpDropCooldown)
+	{
+		return;
+	}
+	LastBumpDropTime = Now;
+
+	//속도를 충격량으로 환산해 C에 드롭 요청 (떨어뜨릴 개수 판정은 C가 임계값으로)
+	const float Impulse = ClosingSpeed * BumpImpulseScale;
+	LoadComponent->RequestDropProduct(Impulse);
+}
