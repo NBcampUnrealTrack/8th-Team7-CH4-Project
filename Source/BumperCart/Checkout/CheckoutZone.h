@@ -9,6 +9,8 @@ class USceneComponent;
 class UStaticMeshComponent;
 class UBoxComponent;
 
+struct FLoadedProductInfo;
+
 UCLASS(Blueprintable)
 class BUMPERCART_API ACheckoutZone : public AActor
 {
@@ -96,7 +98,7 @@ private:
     UFUNCTION()
     void OnRep_CurrentCounterState();
 
-private:
+public:
     // 현재 계산대 오픈 상태
     // 복제 데이터
     UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCounterState, Category = "_Checkout|Condition")
@@ -172,8 +174,25 @@ private:
 // ------------------------------------------------------------
 private:
     // 최종 점수 계산
-    int32 CalculateCheckoutScore() const;
+    int32 CalculateCheckoutScore(const TArray<FLoadedProductInfo>& Products) const;
 
 public:
     int32 CheckoutScore = 0;
+
+// ------------------------------------------------------------
+// Getter
+// ------------------------------------------------------------
+public:
+    // 서버 시간 기준 정산 진행도 리턴
+    UFUNCTION(BlueprintPure, Category = "_Checkout|Progress")
+    float GetCheckoutProgress() const;
+
+    // 정산 중인지 리턴
+    UFUNCTION(BlueprintPure, Category = "_Checkout|Progress")
+    bool IsCheckoutInProgress() const;
+
+    // 현재 정산중인 플레이어 리턴
+    UFUNCTION(BlueprintPure, Category = "_Checkout|Progress")
+    ACharacter* GetCurrentCheckoutPlayer() const;
+
 };
