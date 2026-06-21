@@ -400,12 +400,16 @@ void ACheckoutZone::CompleteCheckout()
     // 계산대 세팅 초기화
     ResetCheckout();
 
+    // 정산 완료 후 계산대 폐쇄 안할 경우 다음 플레이어가 정산 시도
+    // TryStartCheckout();
+
+
     // 정산 완료 후 계산대 폐쇄
-    CurrentCounterState = ECounterState::Closed;
+    //CurrentCounterState = ECounterState::Closed;
 
-    OnRep_CurrentCounterState();
+    //OnRep_CurrentCounterState();
 
-    UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Close"));
+    //UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Close"));
 }
 
 void ACheckoutZone::CancelCheckout()
@@ -497,4 +501,37 @@ bool ACheckoutZone::IsCheckoutInProgress() const
 ACharacter* ACheckoutZone::GetCurrentCheckoutPlayer() const
 {
     return CurrentCheckoutPlayer;
+}
+
+ECounterState ACheckoutZone::GetCounterState() const
+{
+    return CurrentCounterState;
+}
+
+// ------------------------------------------------------------
+// Setter
+// ------------------------------------------------------------
+
+int32 ACheckoutZone::GetCounterID() const
+{
+    return CounterID;
+}
+
+void ACheckoutZone::SetCounterState(ECounterState NewState)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (CurrentCounterState == NewState)
+    {
+        return;
+    }
+
+    CurrentCounterState = NewState;
+
+    // 콜백 함수 호출
+    // 계산대 상태에 따른 색상, UI 등 변경
+    OnRep_CurrentCounterState();
 }

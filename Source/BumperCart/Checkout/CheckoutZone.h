@@ -60,6 +60,16 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
     TObjectPtr<UBoxComponent> CheckoutTrigger;
 
+
+// ------------------------------------------------------------
+// 계산대 정보
+// ------------------------------------------------------------
+
+private:
+    // 계산대 ID
+    UPROPERTY(EditInstanceOnly, Category = "_Checkout|Identity")
+    int32 CounterID = INDEX_NONE;
+
 // ------------------------------------------------------------
 // 구역 내 플레이어
 // ------------------------------------------------------------
@@ -98,7 +108,7 @@ private:
     UFUNCTION()
     void OnRep_CurrentCounterState();
 
-public:
+private:
     // 현재 계산대 오픈 상태
     // 복제 데이터
     UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCounterState, Category = "_Checkout|Condition")
@@ -195,4 +205,17 @@ public:
     UFUNCTION(BlueprintPure, Category = "_Checkout|Progress")
     ACharacter* GetCurrentCheckoutPlayer() const;
 
+    // 현재 계산대 상태 리턴
+    UFUNCTION(BlueprintPure, Category = "_Checkout|Condition")
+    ECounterState GetCounterState() const;
+
+// ------------------------------------------------------------
+// Setter
+// ------------------------------------------------------------
+public:
+    UFUNCTION(BlueprintPure, Category = "_Checkout|Identity")
+    int32 GetCounterID() const;
+
+    // 계산대 상태 변경
+    void SetCounterState(ECounterState NewState);
 };
