@@ -35,7 +35,7 @@ void UCartLoadComponent::Initialize()
     LoadInfo.CurrentLoadedCount = 0;
     LoadInfo.CurrentWeight = 0;
 
-    LoadedProducts.Empty();
+    LoadedProducts.Reset();
 }
 
 bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
@@ -59,9 +59,26 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
     // 적재 정보 갱신
     UpdateLoadInfo();
 
-    Product->AttachToActor(GetOwner(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+    // Owner에 부착
+    //Product->AttachToActor(GetOwner(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 
     return true;
+}
+
+void UCartLoadComponent::RequestDropProduct(float Impulse)
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    // 서버라면 즉시 실행
+    if (OwnerActor->HasAuthority())
+    {
+        DropProducts(Impulse);
+        return;
+    }
+
+    // 클라이언트면 서버로 요청
+    Server_RequestDropProducts(Impulse);
 }
 
 void UCartLoadComponent::DropProducts(float Impulse)
@@ -93,9 +110,8 @@ void UCartLoadComponent::DropProducts(float Impulse)
 
 int32 UCartLoadComponent::GetTotalValue() const
 {
-    if (LoadInfo.CurrentLoadedCount == 0) return 0;
-
     int32 TotalValue = 0;
+
     for (const AProductBase* Product : LoadedProducts)
     {
         if (IsValid(Product))
@@ -107,21 +123,40 @@ int32 UCartLoadComponent::GetTotalValue() const
     return TotalValue;
 }
 
-void UCartLoadComponent::ClearProducts()
+int32 UCartLoadComponent::GetCurrentLoadedCount() const
 {
-    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return;
+    return LoadInfo.CurrentLoadedCount;
+}
 
+float UCartLoadComponent::GetLoadRatio() const
+{
+    return MaxWeight > 0 ? (float)LoadInfo.CurrentWeight / MaxWeight : 0.f;
+}
+
+bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProducts)
+{
+    OutProducts.Empty();
+
+    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return false;
+    if (LoadedProducts.IsEmpty()) return false;
+
+    // 정산에 필요한 데이터를 Out 배열에 넣고, 정산 상태로 변경한뒤 삭제
     for (int32 i = LoadedProducts.Num() - 1; i >= 0; --i)
     {
-        if (IsValid(LoadedProducts[i]))
-        {
-            LoadedProducts[i]->Destroy();
-        }
+        if (!IsValid(LoadedProducts[i])) continue;
+
+        OutProducts.Add(LoadedProducts[i]->GetLoadedProductInfo());
+
+        LoadedProducts[i]->SetProductState(EProductState::Paid);
+
+        LoadedProducts[i]->Destroy();
     }
 
     LoadedProducts.Empty();
 
     UpdateLoadInfo();
+
+    return OutProducts.Num() > 0;
 }
 
 int32 UCartLoadComponent::CalculateDropCount(float Impulse) const
@@ -171,6 +206,11 @@ void UCartLoadComponent::UpdateLoadInfo()
     {
         OnRep_LoadInfo();
     }
+}
+
+void UCartLoadComponent::Server_RequestDropProducts_Implementation(float Impulse)
+{
+    DropProducts(Impulse);
 }
 
 void UCartLoadComponent::OnRep_LoadInfo()

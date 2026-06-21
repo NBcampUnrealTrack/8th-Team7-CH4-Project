@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -10,6 +10,8 @@
 class UProductDataAsset;
 class UStaticMeshComponent;
 class USphereComponent;
+class UProductDropConfig;
+
 
 UCLASS()
 class BUMPERCART_API AProductBase : public AActor
@@ -39,6 +41,9 @@ public:
 
     UFUNCTION(BlueprintPure)
     EProductState GetProductState() const;
+
+    UFUNCTION(BlueprintPure)
+    FLoadedProductInfo GetLoadedProductInfo() const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -84,11 +89,22 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
     TObjectPtr<UProductDataAsset> ProductDataAsset;
 
+    // Drop 관련 설정
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Drop")
+    TObjectPtr<UProductDropConfig> DropConfig;
+
     // 상품 정보
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     FProductData ProductData;
 
-    // 상품의 현재 상태
+    // 상품의 현재 상태, 드롭 위치를 저장하는 구조체
     UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
-    EProductState ProductState;
+    FProductRepState ProductState;
+
+private:
+    UFUNCTION()
+    void HandleReturnDisplay();
+
+private:
+    FTimerHandle ReturnDisplayTimer;
 };

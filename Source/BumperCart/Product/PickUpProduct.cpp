@@ -13,6 +13,4 @@ void APickUpProduct::ProcessBeginOverlap(AActor* OtherActor)
 
     // 적재 실패시 반환
     if (!LoadedComponent->TryAddProduct(this)) return;
-
-    UE_LOG(LogTemp, Warning, TEXT("상품 적재 성공!!"));
 }
