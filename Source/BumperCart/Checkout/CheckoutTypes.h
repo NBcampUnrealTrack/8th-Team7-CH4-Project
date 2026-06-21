@@ -5,7 +5,7 @@
 
 
 UENUM(BlueprintType)
-enum class ECounterState : uint8
+enum class ECheckoutZoneState : uint8
 {
     None,
     Open,           // 계산대 열림

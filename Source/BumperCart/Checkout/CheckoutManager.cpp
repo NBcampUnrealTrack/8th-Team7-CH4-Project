@@ -30,7 +30,7 @@ void ACheckoutManager::BeginPlay()
 
     for (ACheckoutZone* CheckoutZone : CheckoutZones)
     {
-        UE_LOG(LogTemp, Warning, TEXT("계산대 ID: %d"), CheckoutZone->GetCounterID());
+        UE_LOG(LogTemp, Warning, TEXT("계산대 ID: %d"), CheckoutZone->GetCheckoutZoneID());
     }
 }
 
@@ -58,7 +58,7 @@ bool ACheckoutManager::InitializeCheckoutZones()
     // 게임 시작 시, 모든 계산대 오픈
     for (ACheckoutZone* CheckoutZone : CheckoutZones)
     {
-        CheckoutZone->SetCounterState(ECounterState::Open);
+        CheckoutZone->SetCheckoutZoneState(ECheckoutZoneState::Open);
     }
 
     return true;

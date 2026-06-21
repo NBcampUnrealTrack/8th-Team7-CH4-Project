@@ -55,7 +55,7 @@ private:
     TObjectPtr<USceneComponent> SceneRoot;
 
     UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
-    TObjectPtr<UStaticMeshComponent> CounterMesh;
+    TObjectPtr<UStaticMeshComponent> CheckoutZoneMesh;
 
     UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
     TObjectPtr<UBoxComponent> CheckoutTrigger;
@@ -68,7 +68,7 @@ private:
 private:
     // 계산대 ID
     UPROPERTY(EditInstanceOnly, Category = "_Checkout|Identity")
-    int32 CounterID = INDEX_NONE;
+    int32 CheckoutZoneID = INDEX_NONE;
 
 // ------------------------------------------------------------
 // 구역 내 플레이어
@@ -106,13 +106,13 @@ private:
     // 클라이언트에서 값을 복제 받을 때 호출되는 콜백 함수
     // 색상, UI 표시용
     UFUNCTION()
-    void OnRep_CurrentCounterState();
+    void OnRep_CurrentCheckoutZoneState();
 
 private:
     // 현재 계산대 오픈 상태
     // 복제 데이터
-    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCounterState, Category = "_Checkout|Condition")
-    ECounterState CurrentCounterState = ECounterState::Open;
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCheckoutZoneState, Category = "_Checkout|Condition")
+    ECheckoutZoneState CurrentCheckoutZoneState = ECheckoutZoneState::Open;
 
     // 현재 계산 진행 중인지
     // 복제 데이터
@@ -207,15 +207,15 @@ public:
 
     // 현재 계산대 상태 리턴
     UFUNCTION(BlueprintPure, Category = "_Checkout|Condition")
-    ECounterState GetCounterState() const;
+    ECheckoutZoneState GetCheckoutZoneState() const;
 
 // ------------------------------------------------------------
 // Setter
 // ------------------------------------------------------------
 public:
     UFUNCTION(BlueprintPure, Category = "_Checkout|Identity")
-    int32 GetCounterID() const;
+    int32 GetCheckoutZoneID() const;
 
     // 계산대 상태 변경
-    void SetCounterState(ECounterState NewState);
+    void SetCheckoutZoneState(ECheckoutZoneState NewState);
 };

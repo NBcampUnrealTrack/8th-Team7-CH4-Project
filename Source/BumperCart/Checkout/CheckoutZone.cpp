@@ -20,8 +20,8 @@ ACheckoutZone::ACheckoutZone()
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     SetRootComponent(SceneRoot);
 
-    CounterMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CounterMesh"));
-    CounterMesh->SetupAttachment(SceneRoot);
+    CheckoutZoneMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneMesh"));
+    CheckoutZoneMesh->SetupAttachment(SceneRoot);
 
     CheckoutTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("CheckoutTrigger"));
     CheckoutTrigger->SetupAttachment(SceneRoot);
@@ -41,7 +41,7 @@ void ACheckoutZone::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(ACheckoutZone, CurrentCounterState);
+    DOREPLIFETIME(ACheckoutZone, CurrentCheckoutZoneState);
     DOREPLIFETIME(ACheckoutZone, CurrentCheckoutPlayer);
     DOREPLIFETIME(ACheckoutZone, bIsCheckoutInProgress);
     DOREPLIFETIME(ACheckoutZone, CheckoutStartTime);
@@ -154,25 +154,25 @@ ACharacter* ACheckoutZone::FindNextCheckoutPlayer()
     return nullptr;
 }
 
-void ACheckoutZone::OnRep_CurrentCounterState()
+void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 {
-    switch (CurrentCounterState)
+    switch (CurrentCheckoutZoneState)
     {
-    case ECounterState::None:
+    case ECheckoutZoneState::None:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: None"));
         break;
 
-    case ECounterState::Open:
+    case ECheckoutZoneState::Open:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Open"));
         // 초록색 색상 로직
         break;
 
-    case ECounterState::ClosingSoon:
+    case ECheckoutZoneState::ClosingSoon:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: ClosingSoon"));
         // 노란색 색상 로직
         break;
 
-    case ECounterState::Closed:
+    case ECheckoutZoneState::Closed:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Closed"));
         // 빨간색 색상 로직
         break;
@@ -194,7 +194,7 @@ bool ACheckoutZone::CanStartCheckout(ACharacter* PlayerCharacter) const
     }
 
     // 계산대 오픈 중인지
-    if (CurrentCounterState == ECounterState::Closed)
+    if (CurrentCheckoutZoneState == ECheckoutZoneState::Closed)
     {
         return false;
     }
@@ -405,9 +405,9 @@ void ACheckoutZone::CompleteCheckout()
 
 
     // 정산 완료 후 계산대 폐쇄
-    //CurrentCounterState = ECounterState::Closed;
+    //CurrentCheckoutZoneState = ECheckoutZoneState::Closed;
 
-    //OnRep_CurrentCounterState();
+    //OnRep_CurrentCheckoutZoneState();
 
     //UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Close"));
 }
@@ -503,35 +503,35 @@ ACharacter* ACheckoutZone::GetCurrentCheckoutPlayer() const
     return CurrentCheckoutPlayer;
 }
 
-ECounterState ACheckoutZone::GetCounterState() const
+ECheckoutZoneState ACheckoutZone::GetCheckoutZoneState() const
 {
-    return CurrentCounterState;
+    return CurrentCheckoutZoneState;
 }
 
 // ------------------------------------------------------------
 // Setter
 // ------------------------------------------------------------
 
-int32 ACheckoutZone::GetCounterID() const
+int32 ACheckoutZone::GetCheckoutZoneID() const
 {
-    return CounterID;
+    return CheckoutZoneID;
 }
 
-void ACheckoutZone::SetCounterState(ECounterState NewState)
+void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
 {
     if (!HasAuthority())
     {
         return;
     }
 
-    if (CurrentCounterState == NewState)
+    if (CurrentCheckoutZoneState == NewState)
     {
         return;
     }
 
-    CurrentCounterState = NewState;
+    CurrentCheckoutZoneState = NewState;
 
     // 콜백 함수 호출
     // 계산대 상태에 따른 색상, UI 등 변경
-    OnRep_CurrentCounterState();
+    OnRep_CurrentCheckoutZoneState();
 }
