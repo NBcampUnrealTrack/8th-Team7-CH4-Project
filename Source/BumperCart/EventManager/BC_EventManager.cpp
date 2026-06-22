@@ -56,13 +56,14 @@ void ABC_EventManager::StartSaleEvent()
     if (!HasAuthority() || !ProductShelfManager)   return;
 
     GetWorldTimerManager().ClearTimer(SaleEventTimerHandle);
+    GetWorldTimerManager().ClearTimer(SaleProductSpawnTimerHandle);
     UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 이벤트 시작"));
 
-    TSubclassOf<APickUpProduct> SelectedSaleProduct = SaleProductSelection();
+    CurrentSaleProduct = SaleProductSelection();
 
-    if (SelectedSaleProduct)
+    if (CurrentSaleProduct)
     {
-        ProductShelfManager->SaleProductSpawn(SelectedSaleProduct);
+        GetWorld()->GetTimerManager().SetTimer(SaleProductSpawnTimerHandle, this, &ABC_EventManager::ExecuteRepeatSpawn, SaleProductSpawnInterval, true, 0.0f);
     }
 
     GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &ABC_EventManager::StopSaleEvent, SaleEventTime, false);
@@ -73,8 +74,19 @@ void ABC_EventManager::StopSaleEvent()
     if (!HasAuthority())   return;
 
     GetWorldTimerManager().ClearTimer(SaleEventTimerHandle);
+    GetWorldTimerManager().ClearTimer(SaleProductSpawnTimerHandle);
 
-    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 이벤트 종료"));
+    CurrentSaleProduct = nullptr;
 
+    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 이벤트 종료, "));
+
+}
+
+void ABC_EventManager::ExecuteRepeatSpawn()
+{
+    if (!HasAuthority() || !ProductShelfManager || !CurrentSaleProduct)   return;
+
+    ProductShelfManager->SaleProductSpawn(CurrentSaleProduct);
+    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일제품 스폰 반복 호출"));
 }
 

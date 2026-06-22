@@ -58,11 +58,11 @@ void AProductShelfManager::DistributeItemsToShelves()
     if (!HasAuthority()) return;
 
     // 에디터에서 값이 변경이 안되서 일단 주석처리
-    if (!bToggleOn)
+    /*if (!bToggleOn)
     {
         UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰 활성화 안됨"));
         return;
-    }
+    }*/
 
     if (MasterProductList.Num() == 0)
     {
@@ -121,13 +121,13 @@ void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProd
         //SpawnedProduct->SetSaleItem(true);
 
         SpawnedItems.Add(SaleProduct);
-        UE_LOG(LogTemp, Error, TEXT("[ProductShelfManager] 세일 제품 스폰 및 세일 마킹 완료."));
+        UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 세일 제품 스폰 및 세일 마킹 완료."));
 
         // 넷 멀티캐스트로 UI 알림 추가해야함
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("[ProductShelfManager] 세일 제품 스폰 실패."));
+        UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 세일 제품 스폰 실패."));
     }
 
 }

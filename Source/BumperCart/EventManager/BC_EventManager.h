@@ -30,6 +30,9 @@ private:
 
 #pragma region SaleEvent
 private:
+    // 세일 이벤트 종료용
+    FTimerHandle SaleEventTimerHandle;
+
     // 세일 이벤트 제한시간
     UPROPERTY(EditAnywhere, Category = "Event Manager | Sale")
     float SaleEventTime = 15.0f;
@@ -37,7 +40,15 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "Event Manager | Sale")
     bool bSaleEvent = false;
 
-    FTimerHandle SaleEventTimerHandle;
+    // 세일 이벤트 중 연속 스폰용
+    FTimerHandle SaleProductSpawnTimerHandle;
+
+    // 세일 제품 스폰 주기
+    UPROPERTY(EditAnywhere, Category = "Event Manager | Sale")
+    float SaleProductSpawnInterval = 3.0f;
+
+    UPROPERTY()
+    TSubclassOf<class APickUpProduct> CurrentSaleProduct;
 
 public:
     // 세일 제품 선택
@@ -48,6 +59,9 @@ public:
 
     // 세일 이벤트 종료
     void StopSaleEvent();
+
+    // 세일 이벤트중 반복 호출될 스폰 함수
+    void ExecuteRepeatSpawn();
 #pragma endregion
 
 
