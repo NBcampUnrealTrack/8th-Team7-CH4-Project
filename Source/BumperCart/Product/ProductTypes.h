@@ -19,6 +19,23 @@ public:
     bool bDamageable = false;
 };
 
+USTRUCT(BlueprintType)
+struct FLoadedProductInfo
+{
+    GENERATED_BODY();
+
+public:
+    // 상품 식별용 ID
+    UPROPERTY(BlueprintReadOnly)
+    FName ProductId = NAME_None;
+
+    UPROPERTY(BlueprintReadOnly)
+    int32 Value = 0;
+
+    UPROPERTY(BlueprintReadOnly)
+    int32 Weight = 0;
+};
+
 UENUM(BlueprintType)
 enum class EProductState : uint8
 {
@@ -27,4 +44,19 @@ enum class EProductState : uint8
     Loaded      UMETA(DisplayName = "적재"),
     Falling     UMETA(DisplayName = "낙하"),
     Paid        UMETA(DisplayName = "결제완료"),
+};
+
+USTRUCT(BlueprintType)
+struct FProductRepState
+{
+    GENERATED_BODY()
+
+public:
+    // 상품 상태
+    UPROPERTY(BlueprintReadOnly)
+    EProductState State = EProductState::None;
+
+    // 서버가 계산한 드롭 시작하는 위치
+    UPROPERTY(BlueprintReadOnly)
+    FVector_NetQuantize10 DropLocation = FVector::ZeroVector;
 };
