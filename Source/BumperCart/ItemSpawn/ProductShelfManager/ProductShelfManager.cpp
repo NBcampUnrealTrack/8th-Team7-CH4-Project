@@ -25,13 +25,17 @@ void AProductShelfManager::BeginPlay()
         AProductShelf* Shelf = Cast<AProductShelf>(Actor);
         if (Shelf)
         {
-            // 일단 중앙 가판대는 따로 관리
+            // 세일, 한정판 선반은 따로 관리
             if (Shelf == CenterSaleShelf)
             {
+                UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 중앙 세일 선반은 따로 관리"));
+
                 continue;
             }
             else if (Shelf == LimitedProductShelf)
             {
+                UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 한정판 선반은 따로 관리"));
+
                 continue;
             }
 
@@ -39,9 +43,9 @@ void AProductShelfManager::BeginPlay()
         }
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 모든 일반 가판대 등록 - 등록 갯수 : %d"), AllProductShelfs.Num());
+    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 모든 일반 선반 등록 - 등록 갯수 : %d"), AllProductShelfs.Num());
 
-    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelfManager::DistributeItemsToShelves, RespawnDelay, true);
+    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelfManager::ProductSpawnCall, RespawnDelay, true);
 }
 
 void AProductShelfManager::SetAllShelvesOpen(bool bToggle)
@@ -67,11 +71,6 @@ void AProductShelfManager::DistributeItemsToShelves()
         UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰 활성화 안됨"));
         return;
     }*/
-
-    if (MasterProductList.Num() == 0)
-    {
-        return;
-    }
 
     for (AProductShelf* Shelf : AllProductShelfs)
     {
@@ -102,9 +101,34 @@ void AProductShelfManager::DistributeItemsToShelves()
     UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰된 아이템 수 : %d"), SpawnedItems.Num());
 }
 
-TArray<TSubclassOf<APickUpProduct>> AProductShelfManager::GetMasterProductList()
+void AProductShelfManager::ProductSpawnCall()
 {
-    return MasterProductList;
+    if (!HasAuthority()) return;
+
+    for (AProductShelf* Shelf : AllProductShelfs)
+    {
+        if (Shelf)
+        {
+            int32 RandomCount = FMath::RandRange(1, MaxSpawnCount);
+
+            for (int32 i = 0; i < RandomCount; i++)
+            {
+                if (SpawnedItems.Num() >= MaxItemCount)
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 맵의 제품이 최대로 스폰되었습니다."));
+                    return;
+                }
+
+                APickUpProduct* SpawnedProduct = Shelf->SpawnRandomProduct();
+
+                if (SpawnedProduct)
+                {
+                    SpawnedItems.Add(SpawnedProduct->GetClass());
+                }
+            }
+        }
+    }
+    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰된 제품 수 : %d"), SpawnedItems.Num());
 }
 
 void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProduct)
@@ -162,10 +186,5 @@ void AProductShelfManager::LimitedProductSpawn(TSubclassOf<APickUpProduct> Limit
     {
         UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 한정 제품 스폰 실패."));
     }
-}
-
-TArray<TSubclassOf<APickUpProduct>> AProductShelfManager::GetMasterLimitedProductList()
-{
-    return MasterLimitedProductList;
 }
 

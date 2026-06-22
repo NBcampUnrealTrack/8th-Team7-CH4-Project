@@ -30,23 +30,28 @@ private:
 
 #pragma region SaleEvent
 private:
+    // 세일 제품 목록
+    UPROPERTY(EditAnywhere, Category = "Sale Event | Product List")
+    TArray<TSubclassOf<APickUpProduct>> SaleProductList;
+
     // 세일 이벤트 종료용
     FTimerHandle SaleEventTimerHandle;
 
     // 세일 이벤트 제한시간
-    UPROPERTY(EditAnywhere, Category = "Event Manager | Sale")
+    UPROPERTY(EditAnywhere, Category = "Sale Event | Info")
     float SaleEventTime = 15.0f;
 
-    UPROPERTY(VisibleAnywhere, Category = "Event Manager | Sale")
+    UPROPERTY(VisibleAnywhere, Category = "Sale Event | Info")
     bool bSaleEvent = false;
 
     // 세일 이벤트 중 연속 스폰용
     FTimerHandle SaleProductSpawnTimerHandle;
 
     // 세일 제품 스폰 주기
-    UPROPERTY(EditAnywhere, Category = "Event Manager | Sale")
+    UPROPERTY(EditAnywhere, Category = "Sale Event | Info")
     float SaleProductSpawnInterval = 3.0f;
 
+    // 현재 세일 제품
     UPROPERTY()
     TSubclassOf<class APickUpProduct> CurrentSaleProduct;
 
@@ -66,6 +71,10 @@ public:
 
 #pragma region Limited Event
 private:
+    // 한정판 제품 목록
+    UPROPERTY(EditAnywhere, Category = "Limited Event | Product List")
+    TArray<TSubclassOf<APickUpProduct>> LimitedProductList;
+
     // 한정 제품 선택
     TSubclassOf<APickUpProduct> LimitedProductSelection();
 

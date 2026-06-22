@@ -18,7 +18,7 @@ void ABC_EventManager::BeginPlay()
 
     if (!ProductShelfManager)
     {
-        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 안됨 -> 등록"));
+        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 등록 안됨 -> 등록"));
 
         // 제품선반 매니저 등록을 안했을 시 맵에서 찾아서 등록
         ProductShelfManager = Cast<AProductShelfManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass()));
@@ -36,17 +36,15 @@ TSubclassOf<APickUpProduct> ABC_EventManager::SaleProductSelection()
 {
     if (!HasAuthority() || !ProductShelfManager)   return nullptr;
 
-    const TArray<TSubclassOf<APickUpProduct>>& ProductList = ProductShelfManager->GetMasterProductList();
-
-    if (ProductList.Num() == 0)
+    if (SaleProductList.Num() == 0)
     {
-        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반매니저에 등록된 제품리스트가 비어있습니다."));
+        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반매니저에 등록된 제품 목록이 비어있습니다."));
         return nullptr;
     }
 
     // 세일 제품 랜덤 선택
-    int32 RandomIndex = FMath::RandRange(0, ProductList.Num()-1);
-    TSubclassOf<APickUpProduct> SaleProduct = ProductList[RandomIndex];
+    int32 RandomIndex = FMath::RandRange(0, SaleProductList.Num()-1);
+    TSubclassOf<APickUpProduct> SaleProduct = SaleProductList[RandomIndex];
 
     UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 제품 : %s"), *SaleProduct->GetName());
 
@@ -97,11 +95,9 @@ TSubclassOf<APickUpProduct> ABC_EventManager::LimitedProductSelection()
 {
     if (!HasAuthority() || !ProductShelfManager)   return nullptr;
 
-    const TArray<TSubclassOf<APickUpProduct>>& LimitedProductList = ProductShelfManager->GetMasterLimitedProductList();
-
     if (LimitedProductList.Num() == 0)
     {
-        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반매니저에 등록된 한정판 제품리스트가 비어있습니다."));
+        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반매니저에 등록된 한정판 제품 목록이 비어있습니다."));
         return nullptr;
     }
 

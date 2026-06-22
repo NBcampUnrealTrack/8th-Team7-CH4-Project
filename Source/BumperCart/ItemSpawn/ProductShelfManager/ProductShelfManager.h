@@ -20,7 +20,7 @@ protected:
 
 #pragma endregion
 
-#pragma region ProductShelf
+#pragma region Product Shelf
 private:
     // 모든 일반 제품 선반 목록
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Shelf")
@@ -40,34 +40,35 @@ public:
     // 모든 제품 선반 온오프 세팅
     void SetAllShelvesOpen(bool bToggle);
 
-    // 제푼 선반들을 순회하며 아이템을 하나씩 무작위로 배달하는 함수
+    // 제푼 선반들을 순회하며 아이템을 하나씩 무작위로 배달하는 함수 - 기획 변경으로 미사용
     void DistributeItemsToShelves();
-
-    // 제품 리스트 Get() 함수
-    TArray<TSubclassOf<APickUpProduct>> GetMasterProductList();
 
     UFUNCTION(BlueprintCallable)
     bool SetToggleOn(bool bToggle) { return bToggleOn = bToggle; }
 
 #pragma endregion
 
-#pragma region Item Spawn
+#pragma region Product Spawn
 private:
     // 맵에 최대 아이템 갯수 제한
-    UPROPERTY(EditAnywhere, Category = "Manager | Item Spawn")
-    int32 MaxItemCount = 100;
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
+    int32 MaxItemCount = 150;
 
     // 한 번에 스폰되는 최대 갯수
-    UPROPERTY(EditAnywhere, Category = "Manager | Item Spawn")
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
     int32 MaxSpawnCount = 5;
 
     // 아이템 리스폰 시간
-    UPROPERTY(EditAnywhere, Category = "Manager | Item Spawn")
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
     float RespawnDelay = 10.0f;
 
     // 스폰된 아이템 목록
     UPROPERTY()
     TArray<TSubclassOf<APickUpProduct>> SpawnedItems;
+
+public:
+    // 제품 스폰 호출
+    void ProductSpawnCall();
 
 #pragma endregion
 
