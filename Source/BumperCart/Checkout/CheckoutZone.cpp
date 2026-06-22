@@ -12,6 +12,7 @@
 #include "TimerManager.h"
 #include "Engine/Engine.h"
 
+
 ACheckoutZone::ACheckoutZone()
 {
  	PrimaryActorTick.bCanEverTick = false;
@@ -35,6 +36,8 @@ void ACheckoutZone::BeginPlay()
 
     CheckoutTrigger->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneBeginOverlap);
     CheckoutTrigger->OnComponentEndOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneEndOverlap);
+
+    OnRep_CurrentCheckoutZoneState();
 }
 
 void ACheckoutZone::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -164,16 +167,19 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 
     case ECheckoutZoneState::Open:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Open"));
+        CheckoutZoneMesh->SetMaterial(0, OpenMaterial);
         // 초록색 색상 로직
         break;
 
     case ECheckoutZoneState::ClosingSoon:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: ClosingSoon"));
+        CheckoutZoneMesh->SetMaterial(0, ClosingSoonMaterial);
         // 노란색 색상 로직
         break;
 
     case ECheckoutZoneState::Closed:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Closed"));
+        CheckoutZoneMesh->SetMaterial(0, ClosedMaterial);
         // 빨간색 색상 로직
         break;
 
@@ -256,8 +262,8 @@ void ACheckoutZone::StartCheckout(ACharacter* PlayerCharacter)
     {
         return;
     }
+    UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
 
-    UCartLoadComponent* CartLoadComponent = CurrentCheckoutPlayer->FindComponentByClass<UCartLoadComponent>();
 
     if (!IsValid(CartLoadComponent))
     {
@@ -396,18 +402,17 @@ void ACheckoutZone::CompleteCheckout()
     // 정산이 완료되면 플레이어는 대기열에서 제거
     PlayersInZone.Remove(CompletedPlayer);
 
-
     // 계산대 세팅 초기화
     ResetCheckout();
 
-    // 정산 완료 후 계산대 폐쇄 안할 경우 다음 플레이어가 정산 시도
-    // TryStartCheckout();
+    // 정산 완료 후 계산대 상태는 Manager에서 판단
+    OnCheckoutCompleted.Broadcast(this);
 
-
-    // 정산 완료 후 계산대 폐쇄
-    //CurrentCheckoutZoneState = ECheckoutZoneState::Closed;
-
-    //OnRep_CurrentCheckoutZoneState();
+    // Manager에서 계산대를 닫지 않은 경우, 다른 플레이어가 바로 정산 시도
+    if (CurrentCheckoutZoneState == ECheckoutZoneState::Open)
+    {
+        TryStartCheckout();
+    }
 
     //UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Close"));
 }
@@ -534,4 +539,11 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
     // 콜백 함수 호출
     // 계산대 상태에 따른 색상, UI 등 변경
     OnRep_CurrentCheckoutZoneState();
+
+    // 계산대가 닫혔다 다시 열렸을 때,
+    // 이미 구역 안에 대기중이던 플레이어 바로 정산 시작
+    if (CurrentCheckoutZoneState == ECheckoutZoneState::Open)
+    {
+        TryStartCheckout();
+    }
 }

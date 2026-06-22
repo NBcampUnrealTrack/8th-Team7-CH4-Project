@@ -8,6 +8,7 @@
 class USceneComponent;
 class UStaticMeshComponent;
 class UBoxComponent;
+class UMaterialInterface;
 
 struct FLoadedProductInfo;
 
@@ -51,15 +52,24 @@ private:
 // 컴포넌트
 // ------------------------------------------------------------
 private:
-    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
+    UPROPERTY(VisibleAnywhere, Category = " Checkout|Components")
     TObjectPtr<USceneComponent> SceneRoot;
 
-    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
+    UPROPERTY(VisibleAnywhere, Category = " Checkout|Components")
     TObjectPtr<UStaticMeshComponent> CheckoutZoneMesh;
 
-    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Components")
+    UPROPERTY(VisibleAnywhere, Category = " Checkout|Components")
     TObjectPtr<UBoxComponent> CheckoutTrigger;
 
+private:
+    UPROPERTY(EditAnywhere, Category = " Checkout|Material")
+    TObjectPtr<UMaterialInterface> OpenMaterial;
+
+    UPROPERTY(EditAnywhere, Category = " Checkout|Material")
+    TObjectPtr<UMaterialInterface> ClosingSoonMaterial;
+
+    UPROPERTY(EditAnywhere, Category = " Checkout|Material")
+    TObjectPtr<UMaterialInterface> ClosedMaterial;
 
 // ------------------------------------------------------------
 // 계산대 정보
@@ -67,7 +77,7 @@ private:
 
 private:
     // 계산대 ID
-    UPROPERTY(EditInstanceOnly, Category = "_Checkout|Identity")
+    UPROPERTY(EditInstanceOnly, Category = " Checkout|Identity")
     int32 CheckoutZoneID = INDEX_NONE;
 
 // ------------------------------------------------------------
@@ -82,12 +92,12 @@ private:
 
 private:
     // 범위 내 플레이어 배열
-    UPROPERTY(VisibleAnywhere, Category = "_Checkout|Player")
+    UPROPERTY(VisibleAnywhere, Category = " Checkout|Player")
     TArray<TObjectPtr<ACharacter>> PlayersInZone;
 
     // 계산 중인 플레이어
     // 복제 데이터
-    UPROPERTY(VisibleAnywhere, Replicated, Category = "_Checkout|Player")
+    UPROPERTY(VisibleAnywhere, Replicated, Category = " Checkout|Player")
     TObjectPtr<ACharacter> CurrentCheckoutPlayer;
 
 // ------------------------------------------------------------
@@ -111,12 +121,12 @@ private:
 private:
     // 현재 계산대 오픈 상태
     // 복제 데이터
-    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCheckoutZoneState, Category = "_Checkout|Condition")
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCheckoutZoneState, Category = " Checkout|Condition")
     ECheckoutZoneState CurrentCheckoutZoneState = ECheckoutZoneState::Open;
 
     // 현재 계산 진행 중인지
     // 복제 데이터
-    UPROPERTY(VisibleAnywhere, Replicated, Category = "_Checkout|Condition")
+    UPROPERTY(VisibleAnywhere, Replicated, Category = " Checkout|Condition")
     bool bIsCheckoutInProgress = false;
 
 // ------------------------------------------------------------
@@ -131,7 +141,7 @@ private:
 
 private:
     // 계산 진행도
-    UPROPERTY(VisibleInstanceOnly, Category = "_Checkout|Progress")
+    UPROPERTY(VisibleInstanceOnly, Category = " Checkout|Progress")
     float CheckoutProgress = 0.0f;
 
     // 계산 시간 타이머
@@ -139,7 +149,7 @@ private:
 
     // 현재 월드 시간 기준 계산 시작 시간
     // 복제 데이터
-    UPROPERTY(VisibleInstanceOnly, Replicated, Category = "_Checkout|Progress")
+    UPROPERTY(VisibleInstanceOnly, Replicated, Category = " Checkout|Progress")
     float CheckoutStartTime = 0.0f;
 
     // 계산 경과 시간
@@ -147,7 +157,7 @@ private:
 
     // 목표 계산 시간
     // 복제 데이터
-    UPROPERTY(VisibleInstanceOnly, Replicated, Category = "_Checkout|Progress")
+    UPROPERTY(VisibleInstanceOnly, Replicated, Category = " Checkout|Progress")
     float RequiredCheckoutTime = 0.0f;
 
 // ------------------------------------------------------------
@@ -172,11 +182,11 @@ private:
 
 private:
     // 기본 정산 시간
-    UPROPERTY(EditAnywhere, Category = "_Checkout|Time")
+    UPROPERTY(EditAnywhere, Category = " Checkout|Time")
     float BaseCheckoutTime = 2.0f;
 
     // 추가 정산 시간
-    UPROPERTY(EditAnywhere, Category = "_Checkout|Time")
+    UPROPERTY(EditAnywhere, Category = " Checkout|Time")
     float AdditionalCheckoutTime = 1.0f;
 
 // ------------------------------------------------------------
@@ -194,28 +204,37 @@ public:
 // ------------------------------------------------------------
 public:
     // 서버 시간 기준 정산 진행도 리턴
-    UFUNCTION(BlueprintPure, Category = "_Checkout|Progress")
+    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
     float GetCheckoutProgress() const;
 
     // 정산 중인지 리턴
-    UFUNCTION(BlueprintPure, Category = "_Checkout|Progress")
+    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
     bool IsCheckoutInProgress() const;
 
     // 현재 정산중인 플레이어 리턴
-    UFUNCTION(BlueprintPure, Category = "_Checkout|Progress")
+    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
     ACharacter* GetCurrentCheckoutPlayer() const;
 
     // 현재 계산대 상태 리턴
-    UFUNCTION(BlueprintPure, Category = "_Checkout|Condition")
+    UFUNCTION(BlueprintPure, Category = " Checkout|Condition")
     ECheckoutZoneState GetCheckoutZoneState() const;
 
 // ------------------------------------------------------------
 // Setter
 // ------------------------------------------------------------
 public:
-    UFUNCTION(BlueprintPure, Category = "_Checkout|Identity")
+    UFUNCTION(BlueprintPure, Category = " Checkout|Identity")
     int32 GetCheckoutZoneID() const;
 
     // 계산대 상태 변경
     void SetCheckoutZoneState(ECheckoutZoneState NewState);
+
+// ------------------------------------------------------------
+// 델리게이트
+// ------------------------------------------------------------
+
+public:
+    // 정산 완료 사실을 Manager에게 전달하기 위한 Delegate
+    DECLARE_MULTICAST_DELEGATE_OneParam(FOnCheckoutCompleted, ACheckoutZone*);
+    FOnCheckoutCompleted OnCheckoutCompleted;
 };
