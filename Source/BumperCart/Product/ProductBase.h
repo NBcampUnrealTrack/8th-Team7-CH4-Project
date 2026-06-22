@@ -45,6 +45,12 @@ public:
     UFUNCTION(BlueprintPure)
     FLoadedProductInfo GetLoadedProductInfo() const;
 
+    UFUNCTION(BlueprintCallable)
+    void SetIsSaled(bool NewValue);
+
+    UFUNCTION(BlueprintPure)
+    bool IsSaled() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -100,6 +106,9 @@ protected:
     // 상품의 현재 상태, 드롭 위치를 저장하는 구조체
     UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     FProductRepState ProductState;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
+    bool bIsSaled;
 
 private:
     UFUNCTION()

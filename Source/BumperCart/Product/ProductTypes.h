@@ -33,7 +33,7 @@ public:
     int32 Value = 0;
 
     UPROPERTY(BlueprintReadOnly)
-    int32 Weight = 0;
+    bool bIsSaled = false;
 };
 
 UENUM(BlueprintType)
