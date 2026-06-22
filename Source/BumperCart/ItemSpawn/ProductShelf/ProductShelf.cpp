@@ -108,7 +108,8 @@ APickUpProduct* AProductShelf::SpawnSpecificItem(TSubclassOf<APickUpProduct> Ite
     // 스폰시 충돌 처리 규칙
     // 가능하면 위치를 조정하고, 계속 부딪치면 스폰x
     FActorSpawnParameters SpawnParams;
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+    //SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     APickUpProduct* SpawnedProduct = GetWorld()->SpawnActor<APickUpProduct>(ItemClass, SpawnLocation, SpawnRotation, SpawnParams);
 
@@ -130,6 +131,8 @@ APickUpProduct* AProductShelf::SpawnSpecificItem(TSubclassOf<APickUpProduct> Ite
 
             SpawnedProduct->SetLifeSpan(30.0f);
         }
+
+        UE_LOG(LogTemp, Log, TEXT("[ProductShelf] 제품 스폰."));
 
         return SpawnedProduct;
     }

@@ -29,6 +29,7 @@ void ABC_EventManager::BeginPlay()
     }
 
     GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &ABC_EventManager::StartSaleEvent, 20.0f,false);
+    GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &ABC_EventManager::StartLimitedEvent, 30.0f, false);
 }
 
 TSubclassOf<APickUpProduct> ABC_EventManager::SaleProductSelection()
@@ -40,6 +41,7 @@ TSubclassOf<APickUpProduct> ABC_EventManager::SaleProductSelection()
     if (ProductList.Num() == 0)
     {
         UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반매니저에 등록된 제품리스트가 비어있습니다."));
+        return nullptr;
     }
 
     // 세일 제품 랜덤 선택
@@ -59,6 +61,7 @@ void ABC_EventManager::StartSaleEvent()
     GetWorldTimerManager().ClearTimer(SaleProductSpawnTimerHandle);
     UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 이벤트 시작"));
 
+    // 세일 제품 저장
     CurrentSaleProduct = SaleProductSelection();
 
     if (CurrentSaleProduct)
@@ -87,6 +90,44 @@ void ABC_EventManager::ExecuteRepeatSpawn()
     if (!HasAuthority() || !ProductShelfManager || !CurrentSaleProduct)   return;
 
     ProductShelfManager->SaleProductSpawn(CurrentSaleProduct);
-    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일제품 스폰 반복 호출"));
+    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 호출 -> 세일제품 스폰 반복 호출"));
+}
+
+TSubclassOf<APickUpProduct> ABC_EventManager::LimitedProductSelection()
+{
+    if (!HasAuthority() || !ProductShelfManager)   return nullptr;
+
+    const TArray<TSubclassOf<APickUpProduct>>& LimitedProductList = ProductShelfManager->GetMasterLimitedProductList();
+
+    if (LimitedProductList.Num() == 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반매니저에 등록된 한정판 제품리스트가 비어있습니다."));
+        return nullptr;
+    }
+
+    // 한정 제품 랜덤 선택
+    int32 RandomIndex = FMath::RandRange(0, LimitedProductList.Num() - 1);
+    TSubclassOf<APickUpProduct> LimitedProduct = LimitedProductList[RandomIndex];
+
+    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 한정판 제품 : %s"), *LimitedProduct->GetName());
+
+    return LimitedProduct;
+}
+
+void ABC_EventManager::StartLimitedEvent()
+{
+    if (!HasAuthority() || !ProductShelfManager)   return;
+
+    GetWorldTimerManager().ClearTimer(TestLimitedEventTimerHandle);
+
+    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 한정판 이벤트 시작."));
+
+    TSubclassOf<APickUpProduct> LimitedProduct = LimitedProductSelection();
+
+    if (LimitedProduct)
+    {
+        ProductShelfManager->LimitedProductSpawn(LimitedProduct);
+        UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 호출 -> 한정판 제품 스폰 호출."));
+    }
 }
 

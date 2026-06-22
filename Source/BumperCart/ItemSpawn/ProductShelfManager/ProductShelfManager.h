@@ -83,4 +83,21 @@ public:
 
 #pragma endregion
 
+#pragma region Limited Product
+private:
+    // 한정 제품 선반
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
+    AProductShelf* LimitedProductShelf;
+
+    // 한정 제품 리스트
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
+    TArray<TSubclassOf<APickUpProduct>> MasterLimitedProductList;
+
+public:
+    // 한정 제품 스폰
+    void LimitedProductSpawn(TSubclassOf<APickUpProduct> LimitedProduct);
+
+    TArray<TSubclassOf<APickUpProduct>> GetMasterLimitedProductList();
+#pragma endregion
+
 };

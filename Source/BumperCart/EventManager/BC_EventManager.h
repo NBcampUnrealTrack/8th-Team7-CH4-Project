@@ -54,7 +54,7 @@ public:
     // 세일 제품 선택
     TSubclassOf<APickUpProduct> SaleProductSelection();
 
-    // 세일 이벤트시작
+    // 세일 이벤트 시작
     void StartSaleEvent();
 
     // 세일 이벤트 종료
@@ -64,5 +64,16 @@ public:
     void ExecuteRepeatSpawn();
 #pragma endregion
 
+#pragma region Limited Event
+private:
+    // 한정 제품 선택
+    TSubclassOf<APickUpProduct> LimitedProductSelection();
+
+    FTimerHandle TestLimitedEventTimerHandle;
+
+public:
+    // 한정 이벤트 시작
+    void StartLimitedEvent();
+#pragma endregion
 
 };

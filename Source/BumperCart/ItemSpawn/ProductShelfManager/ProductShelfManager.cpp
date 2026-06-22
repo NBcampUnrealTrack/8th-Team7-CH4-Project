@@ -30,6 +30,10 @@ void AProductShelfManager::BeginPlay()
             {
                 continue;
             }
+            else if (Shelf == LimitedProductShelf)
+            {
+                continue;
+            }
 
             AllProductShelfs.Add(Shelf);
         }
@@ -117,11 +121,11 @@ void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProd
 
     if (SpawnedProduct != nullptr)
     {
-        // 세일 아이템 마킹 (변수, 함수 추가 요청)
+        // 세일 아이템 체크 (변수, 함수 추가 요청)
         //SpawnedProduct->SetSaleItem(true);
 
         SpawnedItems.Add(SaleProduct);
-        UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 세일 제품 스폰 및 세일 마킹 완료."));
+        UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 세일 제품 스폰 및 체크 완료."));
 
         // 넷 멀티캐스트로 UI 알림 추가해야함
     }
@@ -130,5 +134,38 @@ void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProd
         UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 세일 제품 스폰 실패."));
     }
 
+}
+
+void AProductShelfManager::LimitedProductSpawn(TSubclassOf<APickUpProduct> LimitedProduct)
+{
+    if (!HasAuthority() || !LimitedProduct || !LimitedProductShelf) return;
+
+    if (!LimitedProductShelf)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[ProductShelfManager] 한정 제품 선반이 에디터에서 지정되지 않았습니다!"));
+        return;
+    }
+
+    APickUpProduct* SpawnedProduct = LimitedProductShelf->SpawnSpecificItem(LimitedProduct);
+
+    if (SpawnedProduct != nullptr)
+    {
+        // 한정 제품 체크 (변수, Set() 함수 추가 요청)
+        // SpawnedProduct->SetLimitedProduct(true);
+
+        SpawnedItems.Add(LimitedProduct);
+        UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 한정 제품 스폰 및 체크 완료."));
+
+        // 넷 멀티캐스트로 UI 알림 추가해야함
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 한정 제품 스폰 실패."));
+    }
+}
+
+TArray<TSubclassOf<APickUpProduct>> AProductShelfManager::GetMasterLimitedProductList()
+{
+    return MasterLimitedProductList;
 }
 
