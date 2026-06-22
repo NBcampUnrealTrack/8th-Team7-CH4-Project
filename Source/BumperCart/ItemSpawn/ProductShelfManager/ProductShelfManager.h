@@ -18,26 +18,23 @@ public:
 protected:
     virtual void BeginPlay() override;
 
-public:
-    virtual void Tick(float DeltaTime) override;
-
 #pragma endregion
 
 #pragma region ProductShelf
 private:
-    // 모든 제품 선반 목록
-    UPROPERTY(VisibleAnywhere)
+    // 모든 일반 제품 선반 목록
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Shelf")
     TArray<AProductShelf*> AllProductShelfs;
 
     // 스폰될 제품 블루프린트 목록
-    UPROPERTY(EditAnywhere, Category = "Manager Config | Product Shelf")
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
     TArray<TSubclassOf<APickUpProduct>> MasterProductList;
 
-    // 제품 선반 아이템 스폰 온오프
-    UPROPERTY(EditAnywhere)
-    bool bToggleOn = false;
-
     FTimerHandle RespawnTimerHandle;
+
+    // 제품 선반 아이템 스폰 온오프
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf", meta = (AllowPrivateAccess = "true"))
+    bool bToggleOn = false;
 
 public:
     // 모든 제품 선반 온오프 세팅
@@ -46,24 +43,43 @@ public:
     // 제푼 선반들을 순회하며 아이템을 하나씩 무작위로 배달하는 함수
     void DistributeItemsToShelves();
 
+    // 제품 리스트 Get() 함수
+    TArray<TSubclassOf<APickUpProduct>> GetMasterProductList();
+
+    UFUNCTION(BlueprintCallable)
+    bool SetToggleOn(bool bToggle) { return bToggleOn = bToggle; }
+
 #pragma endregion
 
 #pragma region Item Spawn
 private:
     // 맵에 최대 아이템 갯수 제한
-    UPROPERTY(EditAnywhere, Category = "Manager Config | Item Spawn")
-    int32 MaxItemCount = 150;
+    UPROPERTY(EditAnywhere, Category = "Manager | Item Spawn")
+    int32 MaxItemCount = 100;
 
-    UPROPERTY(EditAnywhere, Category = "Manager Config | Item Spawn")
+    // 한 번에 스폰되는 최대 갯수
+    UPROPERTY(EditAnywhere, Category = "Manager | Item Spawn")
     int32 MaxSpawnCount = 5;
 
     // 아이템 리스폰 시간
-    UPROPERTY(EditAnywhere, Category = "Manager Config | Item Spawn")
-    float RespawnDelay = 5.0f;
+    UPROPERTY(EditAnywhere, Category = "Manager | Item Spawn")
+    float RespawnDelay = 10.0f;
 
     // 스폰된 아이템 목록
     UPROPERTY()
     TArray<TSubclassOf<APickUpProduct>> SpawnedItems;
+
+#pragma endregion
+
+#pragma region SaleProduct Spawn
+private:
+    // 중앙 세일 선반
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
+    AProductShelf* CenterSaleShelf;
+
+public:
+    // 세일 제품 스폰
+    void SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProduct);
 
 #pragma endregion
 

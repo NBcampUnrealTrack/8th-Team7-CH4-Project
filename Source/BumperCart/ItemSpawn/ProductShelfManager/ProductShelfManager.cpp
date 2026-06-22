@@ -1,16 +1,21 @@
 ﻿#include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
+
 #include "ItemSpawn/ProductShelf/ProductShelf.h"
 #include "Kismet/GameplayStatics.h"
 
 AProductShelfManager::AProductShelfManager()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
+    // 클라이언트로 복제 금지 - 서버에만 존재
+    bNetLoadOnClient = false;
 }
 
 void AProductShelfManager::BeginPlay()
 {
 	Super::BeginPlay();
+
+    if (!HasAuthority()) return;
 
     TArray<AActor*> FoundActors;
     UGameplayStatics::GetAllActorsOfClass(GetWorld(), AProductShelf::StaticClass(), FoundActors);
@@ -20,25 +25,25 @@ void AProductShelfManager::BeginPlay()
         AProductShelf* Shelf = Cast<AProductShelf>(Actor);
         if (Shelf)
         {
+            // 일단 중앙 가판대는 따로 관리
+            if (Shelf == CenterSaleShelf)
+            {
+                continue;
+            }
+
             AllProductShelfs.Add(Shelf);
         }
     }
 
-    UE_LOG(LogTemp, Log, TEXT("모든 가판대 등록 - 등록 갯수 : %d"), AllProductShelfs.Num());
+    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 모든 일반 가판대 등록 - 등록 갯수 : %d"), AllProductShelfs.Num());
 
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelfManager::DistributeItemsToShelves, RespawnDelay, true);
 }
 
-void AProductShelfManager::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-    // 테스트용 후 삭제
-    SetAllShelvesOpen(bToggleOn);
-}
-
 void AProductShelfManager::SetAllShelvesOpen(bool bToggle)
 {
+    if (!HasAuthority()) return;
+
     for (AProductShelf* Shelf : AllProductShelfs)
     {
         if (Shelf)
@@ -50,7 +55,19 @@ void AProductShelfManager::SetAllShelvesOpen(bool bToggle)
 
 void AProductShelfManager::DistributeItemsToShelves()
 {
-    if (!HasAuthority() || MasterProductList.Num() == 0) return;
+    if (!HasAuthority()) return;
+
+    // 에디터에서 값이 변경이 안되서 일단 주석처리
+    if (!bToggleOn)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰 활성화 안됨"));
+        return;
+    }
+
+    if (MasterProductList.Num() == 0)
+    {
+        return;
+    }
 
     for (AProductShelf* Shelf : AllProductShelfs)
     {
@@ -62,20 +79,56 @@ void AProductShelfManager::DistributeItemsToShelves()
             {
                 if (SpawnedItems.Num() >= MaxItemCount)
                 {
-                    UE_LOG(LogTemp, Warning, TEXT("아이템이 최대로 스폰되었습니다."));
+                    UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 아이템이 최대로 스폰되었습니다."));
                     return;
                 }
 
                 // 아이템 리스트에서 랜덤으로 하나 뽑기
                 int32 RandomIndex = FMath::RandRange(0, MasterProductList.Num() - 1);
-                TSubclassOf<APickUpProduct> ChosenItem = MasterProductList[RandomIndex];
-
-                SpawnedItems.Add(ChosenItem);
-
+                TSubclassOf<APickUpProduct> SpawnedItem = MasterProductList[RandomIndex];
+                
                 // 스폰 명령
-                Shelf->SpawnSpecificItem(ChosenItem);
+                if (Shelf->SpawnSpecificItem(SpawnedItem))
+                {
+                    SpawnedItems.Add(SpawnedItem);
+                }
             }
         }
     }
+    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰된 아이템 수 : %d"), SpawnedItems.Num());
+}
+
+TArray<TSubclassOf<APickUpProduct>> AProductShelfManager::GetMasterProductList()
+{
+    return MasterProductList;
+}
+
+void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProduct)
+{
+    if (!HasAuthority() || !SaleProduct) return;
+
+    if (!CenterSaleShelf)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[ProductShelfManager] 중앙 세일 선반(CenterSaleShelf)이 에디터에서 지정되지 않았습니다!"));
+        return;
+    }
+
+    APickUpProduct* SpawnedProduct = CenterSaleShelf->SpawnSpecificItem(SaleProduct);
+
+    if (SpawnedProduct != nullptr)
+    {
+        // 세일 아이템 마킹 (변수, 함수 추가 요청)
+        //SpawnedProduct->SetSaleItem(true);
+
+        SpawnedItems.Add(SaleProduct);
+        UE_LOG(LogTemp, Error, TEXT("[ProductShelfManager] 세일 제품 스폰 및 세일 마킹 완료."));
+
+        // 넷 멀티캐스트로 UI 알림 추가해야함
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("[ProductShelfManager] 세일 제품 스폰 실패."));
+    }
+
 }
 
