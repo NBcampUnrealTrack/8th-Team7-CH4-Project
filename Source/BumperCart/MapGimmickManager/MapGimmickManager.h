@@ -4,8 +4,6 @@
 #include "GameFramework/Actor.h"
 #include "MapGimmickManager.generated.h"
 
-class ATargetPoint;
-
 UCLASS()
 class BUMPERCART_API AMapGimmickManager : public AActor
 {
@@ -20,12 +18,25 @@ protected:
 
 #pragma endregion
 
-#pragma region Water Hole
+#pragma region Target Point
 private:
-    // 물 웅덩이 스폰될 위치 목록
-    UPROPERTY(EditAnywhere, Category = "Water Hole | Spawn")
-    TArray<TObjectPtr<ATargetPoint>> GimmickSpawnPointList;
+    // 기믹 스폰될 위치 목록
+    UPROPERTY()
+    TArray<class ATargetPoint*> GimmickSpawnPointList;
 
+    //UPROPERTY()
+    //TArray<TSubclassOf<ATargetPoint>> GimmickSpawnPointList;
+
+#pragma endregion
+
+#pragma region Water Hole
+protected:
+    UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
+    TSubclassOf<class AWaterHoleGimmick> WaterHoleClass;
+
+    // 물 웅덩이 수
+    UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
+    int32 TotalWaterHoleSpawnCount = 3;
 public:
     // 물 웅덩이 스폰
     void SpawnWaterHole();
