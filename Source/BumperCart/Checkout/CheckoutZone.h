@@ -192,11 +192,22 @@ private:
 // ------------------------------------------------------------
 // 최종 점수 계산
 // ------------------------------------------------------------
-private:
-    // 최종 점수 계산
-    int32 CalculateCheckoutScore(const TArray<FLoadedProductInfo>& Products) const;
 
 public:
+    // 세일 보너스
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
+    float SaleBonusMultiplier = 1.5f;
+
+    // 마지막 계산 보너스
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
+    float LastCheckoutBonusMultiplier = 1.5f;
+
+    // 마지막 보너스 점수 계산 테스트용
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
+    bool bIsApplyLastCheckoutBonusForTest = false;
+
+    // 정산 점수
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
     int32 CheckoutScore = 0;
 
 // ------------------------------------------------------------

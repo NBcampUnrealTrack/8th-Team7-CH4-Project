@@ -2,6 +2,7 @@
 
 #include "Cart/Component/CartLoadComponent.h"
 #include "Product/ProductTypes.h"
+#include "Checkout/CheckoutScoreCalculator.h"
 
 #include "GameFramework/Character.h"
 #include "GameFramework/GameStateBase.h"
@@ -383,10 +384,28 @@ void ACheckoutZone::CompleteCheckout()
         TryStartCheckout();
         return;
     }
-    CheckoutScore = CalculateCheckoutScore(CheckoutProducts);
+
+    // 마지막 정산 시간대인지
+    const bool bIsLastCheckoutBonusApplied = false;
+
+    const FCheckoutScoreResult ScoreResult = UCheckoutScoreCalculator::CalculateCheckoutScore(
+            CheckoutProducts,
+            SaleBonusMultiplier,
+            bIsApplyLastCheckoutBonusForTest,
+            LastCheckoutBonusMultiplier
+        );
+
+    // 정산 실패 시
+    if (!ScoreResult.bIsCalculationCompleted)
+    {
+        CancelCheckout();
+        TryStartCheckout();
+        return;
+    }
+
+    CheckoutScore = ScoreResult.TotalScore;
     //PlayerState->AddScore(CehckoutScore);
     
-
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore);
     if (GEngine)
     {
@@ -397,7 +416,6 @@ void ACheckoutZone::CompleteCheckout()
             FString::Printf(TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore)
         );
     }
-
 
     // 정산이 완료되면 플레이어는 대기열에서 제거
     PlayersInZone.Remove(CompletedPlayer);
@@ -448,19 +466,6 @@ void ACheckoutZone::ResetCheckout()
 float ACheckoutZone::CalculateCheckoutDuration(int32 ProductCount) const
 {
     return BaseCheckoutTime + AdditionalCheckoutTime * ProductCount;
-}
-
-int32 ACheckoutZone::CalculateCheckoutScore(const TArray<FLoadedProductInfo>& Products) const
-{
-    int32 TotalScore = 0;
-
-    // 상품 목록의 점수 합산 및 리턴
-    for (const FLoadedProductInfo& ProductInfo : Products)
-    {
-        TotalScore += ProductInfo.Value;
-    }
-
-    return TotalScore;
 }
 
 // ------------------------------------------------------------
