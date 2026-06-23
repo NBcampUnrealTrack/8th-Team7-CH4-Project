@@ -1,9 +1,10 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
- 
+
 #include "Product/ProductBase.h"
 
 #include "ProductDataAsset.h"
+#include "TimerManager.h"
 #include "Product/DataAsset/ProductDropConfig.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -25,15 +26,15 @@ AProductBase::AProductBase()
     Mesh->SetMobility(EComponentMobility::Movable);
     SetRootComponent(Mesh);
 
-    SphereCollision = CreateDefaultSubobject<USphereComponent>(TEXT("SphereCollision"));
-    SphereCollision->SetupAttachment(Mesh);
-    SphereCollision->SetSphereRadius(150.f);
-    SphereCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    SphereCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
-    SphereCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnBeginOverlapCart);
+    GrabCollision = CreateDefaultSubobject<USphereComponent>(TEXT("GrabCollision"));
+    GrabCollision->SetupAttachment(Mesh);
+    GrabCollision->SetSphereRadius(65.f);
+    GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    GrabCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+    GrabCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+    // 로봇손 전용 콜리전 채널 만들어야할듯?
 
-    bIsSaled = false;
+    bOnSale = false;
 }
 
 void AProductBase::BeginPlay()
@@ -64,20 +65,6 @@ void AProductBase::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& O
     DOREPLIFETIME(ThisClass, ProductState);
 }
 
-void AProductBase::OnBeginOverlapCart(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                      UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-    if (!HasAuthority()) return;
-    if (!IsValid(OtherActor)) return;
-    if (ProductState.State != EProductState::Display) return;
-
-    ProcessBeginOverlap(OtherActor);
-}
-
-void AProductBase::ProcessBeginOverlap(AActor* OtherActor)
-{
-}
-
 void AProductBase::ApplyDataAsset()
 {
     if (!IsValid(ProductDataAsset)) return;
@@ -101,7 +88,7 @@ void AProductBase::ApplyProductState()
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
-        SphereCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         break;
 
     case EProductState::Loaded:
@@ -113,7 +100,7 @@ void AProductBase::ApplyProductState()
         Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        GrabCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
 
     case EProductState::Falling:
@@ -123,7 +110,8 @@ void AProductBase::ApplyProductState()
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
-        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        // 떨어지는 중에도 회수 가능하면 QueryOnly, 아니면 NoCollision
+        GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         break;
 
     case EProductState::Paid:
@@ -134,7 +122,7 @@ void AProductBase::ApplyProductState()
         Mesh->SetCollisionProfileName(TEXT("NoCollision"));
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        GrabCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
 
     case EProductState::None:   // Fall Through
@@ -145,7 +133,7 @@ void AProductBase::ApplyProductState()
         Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-        SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        GrabCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         break;
     }
 }
@@ -166,7 +154,7 @@ bool AProductBase::TrySetLoaded()
 {
     if (!HasAuthority()) return false;
 
-    if (ProductState.State != EProductState::Display) return false;
+    if (!CanLoad()) return false;
 
     SetProductState(EProductState::Loaded);
     ForceNetUpdate();
@@ -240,7 +228,12 @@ void AProductBase::OnRep_ProductState()
 
 void AProductBase::HandleReturnDisplay()
 {
-    SetProductState(EProductState::Display);
+    // 떨어지는 중에 아이템을 먹으면 Loaded이므로 제한함
+    // Falling 일때만 Display로 바꿈
+    if (ProductState.State == EProductState::Falling)
+    {
+        SetProductState(EProductState::Display);
+    }
 }
 
 int32 AProductBase::GetWeight() const
@@ -267,17 +260,23 @@ FLoadedProductInfo AProductBase::GetLoadedProductInfo() const
         Info.ProductId = ProductDataAsset->ProductId;
     }
     Info.Value = ProductData.Value;
-    Info.bIsSaled = bIsSaled;
+    Info.bOnSale = bOnSale;
 
     return Info;
 }
 
-void AProductBase::SetIsSaled(bool NewValue)
+void AProductBase::SetOnSale(bool NewValue)
 {
-    bIsSaled = NewValue;
+    bOnSale = NewValue;
 }
 
-bool AProductBase::IsSaled() const
+bool AProductBase::IsOnSale() const
 {
-    return bIsSaled;
+    return bOnSale;
+}
+
+bool AProductBase::CanLoad() const
+{
+    return ProductState.State == EProductState::Display ||
+        ProductState.State == EProductState::Falling;
 }
