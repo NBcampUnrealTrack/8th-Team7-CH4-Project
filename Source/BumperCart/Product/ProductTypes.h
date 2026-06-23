@@ -33,7 +33,7 @@ public:
     int32 Value = 0;
 
     UPROPERTY(BlueprintReadOnly)
-    bool bIsSaled = false;
+    bool bOnSale = false;
 };
 
 UENUM(BlueprintType)
