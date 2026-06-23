@@ -45,25 +45,18 @@ public:
     UFUNCTION(BlueprintPure)
     FLoadedProductInfo GetLoadedProductInfo() const;
 
+    UFUNCTION(BlueprintCallable)
+    void SetOnSale(bool NewValue);
+
+    UFUNCTION(BlueprintPure)
+    bool IsOnSale() const;
+
 protected:
 	virtual void BeginPlay() override;
 
     virtual void OnConstruction(const FTransform& Transform) override;
 
     void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
-
-    // SphereCollision과 충돌 감지하는 함수
-    UFUNCTION()
-    void OnBeginOverlapCart(
-        UPrimitiveComponent* OverlappedComponent,
-        AActor* OtherActor,
-        UPrimitiveComponent* OtherComp,
-        int32 OtherBodyIndex,
-        bool bFromSweep,
-        const FHitResult& SweepResult);
-
-    // BeginOverlap 내부에서 호출될 가상 함수
-    virtual void ProcessBeginOverlap(AActor* OtherActor);
 
     // 데이터 에셋을 적용하는 함수
     void ApplyDataAsset();
@@ -80,7 +73,7 @@ protected:
     TObjectPtr<UStaticMeshComponent> Mesh;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
-    TObjectPtr<USphereComponent> SphereCollision;
+    TObjectPtr<USphereComponent> GrabCollision;
 
 
     /* Product 기본 변수 */
@@ -101,9 +94,15 @@ protected:
     UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     FProductRepState ProductState;
 
+    // 이벤트 대상 상품인지 확인하는 변수
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
+    bool bOnSale;
+
 private:
     UFUNCTION()
     void HandleReturnDisplay();
+
+    bool CanLoad() const;
 
 private:
     FTimerHandle ReturnDisplayTimer;

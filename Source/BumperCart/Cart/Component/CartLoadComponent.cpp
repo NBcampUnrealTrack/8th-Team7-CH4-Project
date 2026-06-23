@@ -12,6 +12,18 @@ UCartLoadComponent::UCartLoadComponent()
 
     SetIsReplicatedByDefault(true);
 
+    MaxWeight = 20;
+    WeightScaling = 0.5f;
+
+    BoosterInstigatorDropMultiplier = 0.4f;
+    BoostedTargetDropMultiplier = 1.4f;
+
+    DropCountRules.Add({ 300.f, 0, 1, 0.5f });
+    DropCountRules.Add({ 700.f, 1, 2, 1.f });
+    DropCountRules.Add({ 1200.f, 2, 3, 1.f });
+    DropCountRules.Add({ 1800.f, 3, 4, 1.f });
+    DropCountRules.Add({ 2500.f, 4, 5, 1.f });
+
     Initialize();
 }
 
@@ -29,9 +41,6 @@ void UCartLoadComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 void UCartLoadComponent::Initialize()
 {
-    MaxLoadedCount = 10;
-    MaxWeight = 20;
-
     LoadInfo.CurrentLoadedCount = 0;
     LoadInfo.CurrentWeight = 0;
 
@@ -44,11 +53,6 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
 
     // Owner 확인, Owner 권한 확인
     if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return false;
-
-    // 상품이 진열 상태인지 확인, 무게 확인, 적재 개수 확인
-    if (Product->GetProductState() != EProductState::Display) return false;
-    if (LoadInfo.CurrentWeight + Product->GetWeight() > MaxWeight) return false;
-    if (LoadInfo.CurrentLoadedCount >= MaxLoadedCount) return false;
 
     // Loaded 상태로 변경가능한지 확인하면서 변경
     if (!Product->TrySetLoaded()) return false;
@@ -65,7 +69,7 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
     return true;
 }
 
-void UCartLoadComponent::RequestDropProduct(float Impulse)
+void UCartLoadComponent::RequestDropProduct(float Impulse, EDropCollisionRole Role)
 {
     AActor* OwnerActor = GetOwner();
     if (!IsValid(OwnerActor)) return;
@@ -73,27 +77,27 @@ void UCartLoadComponent::RequestDropProduct(float Impulse)
     // 서버라면 즉시 실행
     if (OwnerActor->HasAuthority())
     {
-        DropProducts(Impulse);
+        DropProducts(Impulse, Role);
         return;
     }
 
     // 클라이언트면 서버로 요청
-    Server_RequestDropProducts(Impulse);
+    Server_RequestDropProducts(Impulse, Role);
 }
 
-void UCartLoadComponent::DropProducts(float Impulse)
+void UCartLoadComponent::DropProducts(float Impulse, EDropCollisionRole Role)
 {
     if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return;
     if (LoadedProducts.IsEmpty()) return;
 
 
     // 충격량만큼 떨어뜨릴 개수 판정
-    int32 DropCount = CalculateDropCount(Impulse);
-    if (DropCount <= 0) return;
+    int32 DropCount = CalculateDropCount(Impulse, Role);
+    int32 ActualDropCount = FMath::Min(DropCount, LoadedProducts.Num());
+    if (ActualDropCount <= 0) return;
 
     // 현재 적재중인 상품에서 랜덤 인덱스 선택
     // 적재 상품 배열에서 제거, Falling 상태로 전환
-    int32 ActualDropCount = FMath::Min(DropCount, LoadedProducts.Num());
     for (int32 i = 0; i < ActualDropCount; ++i)
     {
         int32 RandomIndex = FMath::RandRange(0, LoadedProducts.Num() - 1);
@@ -105,6 +109,7 @@ void UCartLoadComponent::DropProducts(float Impulse)
 
         DroppedProduct->DropFromCart(GetOwner());
     }
+
     UpdateLoadInfo();
 }
 
@@ -159,27 +164,68 @@ bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProduct
     return OutProducts.Num() > 0;
 }
 
-int32 UCartLoadComponent::CalculateDropCount(float Impulse) const
+int32 UCartLoadComponent::CalculateDropCount(float Impulse, EDropCollisionRole Role) const
 {
-    // 적재량에 따라 보정 필요함
+    if (LoadedProducts.IsEmpty()) return 0;
+    if (MaxWeight <= 0) return 0;
 
-    // 최소 기준값
-    if (Impulse < 300.f)
+    // 적재 비율 확인
+    float LoadRatio = FMath::Clamp(static_cast<float>(LoadInfo.CurrentWeight) / MaxWeight, 0.f, 1.f);
+
+    // 무게 보정치, 부스터 사용에따른 보정치
+    float WeightMultiplier = 1.f + LoadRatio * WeightScaling;
+    float RoleMultiplier = GetCollisionRoleMultiplier(Role);
+
+    float FinalImpulse = Impulse * WeightMultiplier * RoleMultiplier;
+
+    // 어느 구간인지 확인
+    const FDropCountRule* SelectedRule = nullptr;
+    for (const FDropCountRule& Rule : DropCountRules)
+    {
+        // 요구 충격량을 만족하면
+        if (FinalImpulse >= Rule.RequiredImpulse)
+        {
+            // 현재 요구 충격량이 기존보다 클 경우에만 선택
+            // 오름차순으로 정렬을 보장하면 필요없음
+            if (!SelectedRule || Rule.RequiredImpulse > SelectedRule->RequiredImpulse)
+            {
+                SelectedRule = &Rule;
+            }
+        }
+    }
+
+    // 어느 구간에도 속하지 않으면 충격량이 낮으므로 0개 떨어뜨리도록
+    if (!SelectedRule)
     {
         return 0;
     }
 
-    if (Impulse < 700.f)
+    // 1 - DropChance 확률로 안떨어뜨림
+    if (FMath::FRand() > SelectedRule->DropChance)
     {
-        return FMath::RandRange(0, 1);
+        return 0;
     }
 
-    if (Impulse < 1200.f)
-    {
-        return FMath::RandRange(1, 2);
-    }
+    int32 MinCount = FMath::Max(0, SelectedRule->MinDropCount);
+    int32 MaxCount = FMath::Max(MinCount, SelectedRule->MaxDropCount);
 
-    return FMath::RandRange(2, 3);
+    return FMath::RandRange(MinCount, MaxCount);
+}
+
+float UCartLoadComponent::GetCollisionRoleMultiplier(EDropCollisionRole Role) const
+{
+    switch (Role)
+    {
+    case EDropCollisionRole::BoosterInstigator:
+        return BoosterInstigatorDropMultiplier;
+
+    case EDropCollisionRole::BoostedTarget:
+        return BoostedTargetDropMultiplier;
+
+    case EDropCollisionRole::Normal:    // FallThrough
+    default:
+        return 1.f;
+    }
 }
 
 void UCartLoadComponent::UpdateLoadInfo()
@@ -208,9 +254,9 @@ void UCartLoadComponent::UpdateLoadInfo()
     }
 }
 
-void UCartLoadComponent::Server_RequestDropProducts_Implementation(float Impulse)
+void UCartLoadComponent::Server_RequestDropProducts_Implementation(float Impulse, EDropCollisionRole Role)
 {
-    DropProducts(Impulse);
+    DropProducts(Impulse, Role);
 }
 
 void UCartLoadComponent::OnRep_LoadInfo()
