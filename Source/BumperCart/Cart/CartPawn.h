@@ -27,7 +27,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBoosting() const { return bIsBoosting; }
 
-	//현재 적재율(0~1). C(상품 담당)가 SetLoadRatio로 갱신
+	//현재 적재율(0~1). SetLoadRatio로 갱신
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	float GetLoadRatio() const { return LoadRatio; }
 
@@ -51,16 +51,16 @@ protected:
 
 	//---------- 입력 액션 (BP_CartPawn에서 지정) ----------
 	UPROPERTY(EditAnywhere, Category = "Input")
-	UInputAction* ThrottleAction; //W/S (Axis1D)
+	UInputAction* ThrottleAction; //W/S
 
 	UPROPERTY(EditAnywhere, Category = "Input")
-	UInputAction* SteerAction; //A/D (Axis1D)
+	UInputAction* SteerAction; //A/D
 
 	UPROPERTY(EditAnywhere, Category = "Input")
-	UInputAction* BrakeAction; //Space (Bool)
+	UInputAction* BrakeAction; //Space
 
 	UPROPERTY(EditAnywhere, Category = "Input")
-	UInputAction* BoostAction; //Shift (Bool)
+	UInputAction* BoostAction; //Shift
 
 	//---------- 전후진 ----------
 	//후진 최고 속도 = 전진 최고 속도 * MaxReverseSpeedRatio (쇼핑카트는 후진이 느리다)
@@ -101,7 +101,7 @@ protected:
 	UCartLoadComponent* LoadComponent;
 
 	//---------- 적재 무게감 ----------
-	//현재 적재율 0~1 (테스트는 BP에서 직접 설정, 실제론 C가 SetLoadRatio로 갱신)
+	//현재 적재율 0~1
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
 	float LoadRatio = 0.f;
 
@@ -117,18 +117,26 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
 	float LoadBrakeScale = 0.7f;
 
-	//---------- 충돌 드롭 (B4) ----------
-	//충격속도(cm/s)를 C 드롭 충격량으로 환산하는 배율. C 임계(300/700/1200)에 맞춰 튜닝
+	//---------- 충돌/스필 드롭 (B4/B5) ----------
+	//충격속도(cm/s)를 C 드롭 충격량으로 환산하는 배율 (충돌용)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BumpImpulseScale = 1.0f;
 
-	//이 충격속도(cm/s) 미만의 약한 접촉은 무시 (살짝 스침엔 안 쏟음 + RPC 낭비 방지)
+	//이 충격속도(cm/s) 미만의 약한 접촉은 무시 (충돌용)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float MinBumpSpeed = 200.f;
 
-	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초). 지속 접촉 시 매 프레임 드롭 방지
+	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초) — 모든 스필(충돌·부스터오용) 공통
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BumpDropCooldown = 0.5f;
+
+	//[B5] 부스터 오용(브레이크/급회전)으로 쏟을 때의 충격량
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BoostMisuseImpulse = 800.f;
+
+	//[B5] 부스터 중 누적 회전각(도)이 이 값을 넘으면 쏟음
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BoostTurnSpillAngle = 60.f;
 
 protected:
 	//---------- 입력 핸들러 ----------
@@ -143,7 +151,10 @@ protected:
 	void EndBoost();
 	void ResetBoostCooldown();
 
-	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용이라 UFUNCTION 필수
+	//스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청
+	void RequestSpill(float Impulse, EDropCollisionRole DropRole);
+
+	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용
 	UFUNCTION()
 	void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
 
@@ -165,6 +176,9 @@ private:
 	FTimerHandle BoostTimerHandle;
 	FTimerHandle BoostCooldownTimerHandle;
 
-	//마지막으로 충돌 드롭을 요청한 시각 (BumpDropCooldown 용)
+	//마지막으로 스필(드롭)을 요청한 시각 — BumpDropCooldown 공통 적용
 	float LastBumpDropTime = -1000.f;
+
+	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
+	float BoostTurnAccumDeg = 0.f;
 };

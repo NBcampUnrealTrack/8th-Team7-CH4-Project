@@ -128,6 +128,25 @@ void ACartPawn::Tick(float DeltaSeconds)
 		const float YawDelta = CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
 		AddActorWorldRotation(FRotator(0.f, YawDelta, 0.f));
 	}
+
+	//--- B5: 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
+	//입력 기반이라 서버가 모름 => 내 카트(소유 클라)에서 판정, RequestSpill이 서버로 전달
+	if (bIsBoosting && IsLocallyControlled())
+	{
+		//부스터 중 브레이크
+		if (bIsBraking)
+		{
+			RequestSpill(BoostMisuseImpulse, EDropCollisionRole::Normal);
+		}
+
+		//부스터 중 누적 회전각이 임계를 넘으면 (살짝 보정은 OK, 확 꺾으면 쏟음)
+		BoostTurnAccumDeg += FMath::Abs(CurrentSteer) * TurnRateDegPerSec * DeltaSeconds;
+		if (BoostTurnAccumDeg >= BoostTurnSpillAngle)
+		{
+			RequestSpill(BoostMisuseImpulse, EDropCollisionRole::Normal);
+			BoostTurnAccumDeg = 0.f;
+		}
+	}
 }
 
 void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -199,6 +218,7 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 
 	bIsBoosting = true;
 	bBoostOnCooldown = true;
+	BoostTurnAccumDeg = 0.f; //새 부스터마다 누적 회전 리셋
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
@@ -241,8 +261,8 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 {
 	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
 
-	//서버에서만 판정 (NotifyHit은 서버·소유클라 양쪽에서 떠서, 안 막으면 더블 드롭)
-	if (!HasAuthority() || !LoadComponent)
+	//충돌은 서버가 판정 (NotifyHit은 서버·소유클라 양쪽에서 떠서, 안 막으면 더블 드롭)
+	if (!HasAuthority())
 	{
 		return;
 	}
@@ -262,15 +282,26 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		return; //약하게 스치는 접촉은 무시
 	}
 
-	//쿨다운: 붙어서 미는 동안 매 프레임 쏟지 않게
-	const float Now = GetWorld()->GetTimeSeconds();
+	//TODO(B5-②): 부스터 상태 복제되면 Instigator/Target 역할 판정. 지금은 Normal.
+	RequestSpill(ClosingSpeed * BumpImpulseScale, EDropCollisionRole::Normal);
+}
+
+//스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청 (충돌·부스터오용 공용)
+void ACartPawn::RequestSpill(float Impulse, EDropCollisionRole DropRole)
+{
+	if (!LoadComponent)
+	{
+		return;
+	}
+
+	//모든 스필 공통 쿨다운
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	if (Now - LastBumpDropTime < BumpDropCooldown)
 	{
 		return;
 	}
 	LastBumpDropTime = Now;
 
-	//속도를 충격량으로 환산해 C에 드롭 요청 (떨어뜨릴 개수 판정은 C가 임계값으로)
-	const float Impulse = ClosingSpeed * BumpImpulseScale;
-	LoadComponent->RequestDropProduct(Impulse);
+	//C가 개수 판정 + 실제 드롭 (서버=즉시, 클라=서버 RPC)
+	LoadComponent->RequestDropProduct(Impulse, DropRole);
 }
