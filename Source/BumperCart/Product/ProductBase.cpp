@@ -33,6 +33,7 @@ AProductBase::AProductBase()
     SphereCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     SphereCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnBeginOverlapCart);
 
+    bIsSaled = false;
 }
 
 void AProductBase::BeginPlay()
@@ -266,7 +267,17 @@ FLoadedProductInfo AProductBase::GetLoadedProductInfo() const
         Info.ProductId = ProductDataAsset->ProductId;
     }
     Info.Value = ProductData.Value;
-    Info.Weight = ProductData.Weight;
+    Info.bIsSaled = bIsSaled;
 
     return Info;
+}
+
+void AProductBase::SetIsSaled(bool NewValue)
+{
+    bIsSaled = NewValue;
+}
+
+bool AProductBase::IsSaled() const
+{
+    return bIsSaled;
 }

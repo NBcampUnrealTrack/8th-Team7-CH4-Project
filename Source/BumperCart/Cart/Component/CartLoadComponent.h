@@ -23,6 +23,29 @@ public:
     int32 CurrentWeight = 0;
 };
 
+USTRUCT(BlueprintType)
+struct FDropCountRule
+{
+    GENERATED_BODY()
+
+public:
+    // 규칙을 적용할 최소 충격량
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cart|Drop")
+    float RequiredImpulse;
+
+    // 떨어뜨릴 최소 개수
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cart|Drop")
+    int32 MinDropCount = 0;
+
+    // 떨어뜨릴 최대 개수
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cart|Drop")
+    int32 MaxDropCount = 1;
+
+    // 규칙이 적용될 확률
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cart|Drop")
+    float DropChance = 1.f;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnLoadInfoChanged,
     AActor*, OwnerActor,
@@ -90,13 +113,20 @@ private:
     UPROPERTY()
     TArray<TObjectPtr<AProductBase>> LoadedProducts;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
     int32 MaxLoadedCount;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
     int32 MaxWeight;
 
     // 현재 무게, 적재 개수를 구조체로 관리
-    UPROPERTY(ReplicatedUsing = OnRep_LoadInfo, VisibleAnywhere, BlueprintReadOnly, Category = "Cart", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(ReplicatedUsing = OnRep_LoadInfo, VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
     FLoadInfo LoadInfo;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Drop", meta = (AllowPrivateAccess = "true"))
+    TArray<FDropCountRule> DropCountRules;
+   
+    // 무게 비례 보정치, 현재 무게/최대 무게 비율을 최종 곱에 얼만큼 적용할건지
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
+    float WeightScaling;
 };

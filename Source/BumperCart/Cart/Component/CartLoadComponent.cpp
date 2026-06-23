@@ -12,6 +12,14 @@ UCartLoadComponent::UCartLoadComponent()
 
     SetIsReplicatedByDefault(true);
 
+    MaxLoadedCount = 10;
+    MaxWeight = 20;
+    WeightScaling = 0.5f;
+
+    DropCountRules.Add({ 300.f, 0, 1, 0.5f });
+    DropCountRules.Add({ 700.f, 1, 2, 1.f });
+    DropCountRules.Add({ 1200.f, 2, 3, 1.f });
+
     Initialize();
 }
 
@@ -29,9 +37,6 @@ void UCartLoadComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 void UCartLoadComponent::Initialize()
 {
-    MaxLoadedCount = 10;
-    MaxWeight = 20;
-
     LoadInfo.CurrentLoadedCount = 0;
     LoadInfo.CurrentWeight = 0;
 
@@ -161,25 +166,45 @@ bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProduct
 
 int32 UCartLoadComponent::CalculateDropCount(float Impulse) const
 {
-    // 적재량에 따라 보정 필요함
+    if (LoadedProducts.IsEmpty()) return 0;
+    if (MaxWeight <= 0) return 0;
 
-    // 최소 기준값
-    if (Impulse < 300.f)
+    // 적재량에 따라 보정 필요함
+    float LoadRatio = FMath::Clamp(static_cast<float>(LoadInfo.CurrentWeight) / MaxWeight, 0.f, 1.f);
+    float FinalImpulse = Impulse * (1.f + LoadRatio * WeightScaling);
+
+    // 어느 구간인지 확인
+    const FDropCountRule* SelectedRule = nullptr;
+    for (const FDropCountRule& Rule : DropCountRules)
+    {
+        // 요구 충격량을 만족하면
+        if (FinalImpulse >= Rule.RequiredImpulse)
+        {
+            // 현재 요구 충격량이 기존보다 클 경우에만 선택
+            // 오름차순으로 정렬을 보장하면 필요없음
+            if (!SelectedRule || Rule.RequiredImpulse > SelectedRule->RequiredImpulse)
+            {
+                SelectedRule = &Rule;
+            }
+        }
+    }
+
+    // 어느 구간에도 속하지 않으면 충격량이 낮으므로 빠져나오기
+    if (!SelectedRule)
     {
         return 0;
     }
 
-    if (Impulse < 700.f)
+    // 1 - DropChance 확률로 안떨어뜨림
+    if (FMath::FRand() > SelectedRule->DropChance)
     {
-        return FMath::RandRange(0, 1);
+        return 0;
     }
 
-    if (Impulse < 1200.f)
-    {
-        return FMath::RandRange(1, 2);
-    }
+    int32 MinCount = FMath::Max(0, SelectedRule->MinDropCount);
+    int32 MaxCount = FMath::Max(MinCount, SelectedRule->MaxDropCount);
 
-    return FMath::RandRange(2, 3);
+    return FMath::RandRange(MinCount, MaxCount);
 }
 
 void UCartLoadComponent::UpdateLoadInfo()
