@@ -30,6 +30,34 @@
 		{
 			"Name": "GameplayStateTree",
 			"Enabled": true
-		}
-	]
+		},
+		{
+			"Name": "EOSOverlayInputProvider",
+			"Enabled": true
+		},
+		{
+			"Name": "OnlineServicesEOS",
+			"Enabled": false
+		},
+		{
+			"Name": "OnlineServicesEOSGS",
+			"Enabled": false
+		},
+		{
+			"Name": "OnlineSubsystemEOS",
+			"Enabled": true
+		},
+		{
+			"Name": "SocketSubsystemEOS",
+			"Enabled": true
+		},
+        {
+            "Name": "OnlineSubsystem",
+            "Enabled": true
+        },
+        {
+            "Name": "OnlineSubsystemUtils",
+            "Enabled": true
+        }
+    ]
 }
