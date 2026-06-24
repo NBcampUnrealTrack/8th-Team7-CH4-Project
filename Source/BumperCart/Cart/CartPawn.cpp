@@ -8,6 +8,7 @@
 #include "InputActionValue.h"
 #include "TimerManager.h"
 #include "BumperCart.h"
+#include "Net/UnrealNetwork.h"
 
 ACartPawn::ACartPawn()
 {
@@ -219,6 +220,7 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 	bIsBoosting = true;
 	bBoostOnCooldown = true;
 	BoostTurnAccumDeg = 0.f; //새 부스터마다 누적 회전 리셋
+	ServerSetBoosting(true); //서버에도 부스터 상태 통지 (충돌 역할용)
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
@@ -233,12 +235,32 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 void ACartPawn::EndBoost()
 {
 	bIsBoosting = false;
+	ServerSetBoosting(false); //부스터 종료 서버에 통지
 	GetWorldTimerManager().SetTimer(BoostCooldownTimerHandle, this, &ACartPawn::ResetBoostCooldown, BoostCooldown, false);
 }
 
 void ACartPawn::ResetBoostCooldown()
 {
 	bBoostOnCooldown = false;
+}
+
+void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	//소유 클라는 로컬값 유지, 서버/타 클라만 복제 (충돌 역할 판정·연출용)
+	DOREPLIFETIME_CONDITION(ACartPawn, bIsBoosting, COND_SkipOwner);
+}
+
+//[B5-②] 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
+bool ACartPawn::ServerSetBoosting_Validate(bool bNewBoosting)
+{
+	return true;
+}
+
+void ACartPawn::ServerSetBoosting_Implementation(bool bNewBoosting)
+{
+	bIsBoosting = bNewBoosting;
 }
 
 void ACartPawn::SetLoadRatio(float InLoadRatio)
@@ -282,8 +304,17 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		return; //약하게 스치는 접촉은 무시
 	}
 
-	//TODO(B5-②): 부스터 상태 복제되면 Instigator/Target 역할 판정. 지금은 Normal.
-	RequestSpill(ClosingSpeed * BumpImpulseScale, EDropCollisionRole::Normal);
+	//[B5-②] 충돌 역할 판정 (서버 기준 부스터 상태로)
+	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
+	if (bIsBoosting)
+	{
+		DropRole = EDropCollisionRole::BoosterInstigator;   //내가 부스터로 박음 => 덜 흘림
+	}
+	else if (OtherCart->bIsBoosting)
+	{
+		DropRole = EDropCollisionRole::BoostedTarget;        //부스터한테 박힘 => 더 흘림
+	}
+	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
 }
 
 //스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청 (충돌·부스터오용 공용)
@@ -301,6 +332,9 @@ void ACartPawn::RequestSpill(float Impulse, EDropCollisionRole DropRole)
 		return;
 	}
 	LastBumpDropTime = Now;
+
+	//[임시] B5-② 역할 확인용 - 검증 후 제거
+	UE_LOG(LogBumperCart, Log, TEXT("Spill role=%d impulse=%.0f"), (int32)DropRole, Impulse);
 
 	//C가 개수 판정 + 실제 드롭 (서버=즉시, 클라=서버 RPC)
 	LoadComponent->RequestDropProduct(Impulse, DropRole);

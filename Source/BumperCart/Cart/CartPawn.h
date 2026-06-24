@@ -42,6 +42,12 @@ protected:
 	//B4: 카트가 무언가에 부딪혔을 때 호출 (충돌 => 상품 드롭 판정)
 	virtual void NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit) override;
 
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	//[B5-②] 부스터 상태를 서버에 통지 (서버가 충돌 역할 판정에 사용)
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerSetBoosting(bool bNewBoosting);
+
 	//---------- 카메라 ----------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
@@ -165,7 +171,8 @@ private:
 	float CurrentSteer = 0.f; //부드럽게 보간된 조향값
 	bool bIsBraking = false;
 
-	//부스터 상태
+	//부스터 상태 (bIsBoosting: 충돌 역할 판정 위해 서버 통지 + 타 클라 복제)
+	UPROPERTY(Replicated)
 	bool bIsBoosting = false;
 	bool bBoostOnCooldown = false;
 
