@@ -30,6 +30,9 @@ public:
     // Loaded 상태로 변환 시도하는 함수
     bool TrySetLoaded();
 
+    // Grabbed 상태로 변환 시도하는 함수
+    bool TrySetGrabbed();
+
     // 카트에서 해당 상품을 떨어뜨리는 함수
     void DropFromCart(AActor* CartActor);
 
@@ -103,6 +106,8 @@ private:
     void HandleReturnDisplay();
 
     bool CanLoad() const;
+
+    bool CanGrab() const;
 
 private:
     FTimerHandle ReturnDisplayTimer;
