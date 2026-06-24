@@ -47,7 +47,7 @@ private:
     void UpdateGrabAim();
 
     // 마우스 에임을 시각화 하는 함수
-    void ShowMouseAim(const FVector& Start, const FVector& End);
+    void ShowMouseAim(const FVector& Start);
 
     // Grab Action에 바인딩되어 호출하는 함수
     // 그랩 방향을 구해 서버로 요청 준비
@@ -66,6 +66,8 @@ private:
 
     // 게임 종료 시 마우스 조준선 타이머 끄는 함수
     void StopAimTimer();
+
+    void SetGrabCooldown(float Duration);
 
 private:
     // 붙잡은 상품 관찰용 포인터
