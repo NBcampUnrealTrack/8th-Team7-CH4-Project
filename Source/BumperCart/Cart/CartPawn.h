@@ -1,0 +1,191 @@
+//BumperCart - B(카트/플레이어 조작) 파트
+//CartPawn: 쇼핑카트 플레이어 폰. ACharacter 기반 직접 제어(완전 물리 X).
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Character.h"
+#include "Cart/Component/CartLoadComponent.h" //FLoadInfo / UCartLoadComponent 타입 사용
+#include "CartPawn.generated.h"
+
+class USpringArmComponent;
+class UCameraComponent;
+class UInputAction;
+struct FInputActionValue;
+
+UCLASS(abstract)
+class ACartPawn : public ACharacter
+{
+	GENERATED_BODY()
+
+public:
+	ACartPawn();
+
+	virtual void Tick(float DeltaSeconds) override;
+
+	//부스터 진행 중인지
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	bool IsBoosting() const { return bIsBoosting; }
+
+	//현재 적재율(0~1). SetLoadRatio로 갱신
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	float GetLoadRatio() const { return LoadRatio; }
+
+	//적재율 설정 (C 연동 진입점). 0~1로 clamp
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	void SetLoadRatio(float InLoadRatio);
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	//B4: 카트가 무언가에 부딪혔을 때 호출 (충돌 => 상품 드롭 판정)
+	virtual void NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit) override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	//[B5-②] 부스터 상태를 서버에 통지 (서버가 충돌 역할 판정에 사용)
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerSetBoosting(bool bNewBoosting);
+
+	//---------- 카메라 ----------
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
+	USpringArmComponent* CameraBoom;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
+	UCameraComponent* FollowCamera;
+
+	//---------- 입력 액션 (BP_CartPawn에서 지정) ----------
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* ThrottleAction; //W/S
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* SteerAction; //A/D
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* BrakeAction; //Space
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* BoostAction; //Shift
+
+	//---------- 전후진 ----------
+	//후진 최고 속도 = 전진 최고 속도 * MaxReverseSpeedRatio (쇼핑카트는 후진이 느리다)
+	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0", ClampMax = "1"))
+	float MaxReverseSpeedRatio = 0.5f;
+
+	//---------- 조향 튜닝 ----------
+	//초당 회전 각도(도)
+	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0"))
+	float TurnRateDegPerSec = 130.f;
+
+	//정지 상태에서의 최소 조향 배율
+	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0", ClampMax = "1"))
+	float MinSteerSpeedFactor = 0.35f;
+
+	//조향 입력을 따라가는 속도. 낮을수록 묵직하게 늦게 먹는다(회전 지연)
+	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0.1"))
+	float SteerInterpSpeed = 3.f;
+
+	//---------- 브레이크 ----------
+	//브레이크 시 감속도
+	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
+	float BrakeDeceleration = 2000.f;
+
+	//---------- 부스터 ----------
+	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "1"))
+	float BoostSpeedMultiplier = 1.8f;
+
+	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
+	float BoostDuration = 0.6f;
+
+	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
+	float BoostCooldown = 2.5f;
+
+	//---------- 적재 (C 상품 시스템 연동) ----------
+	//C가 만든 적재 컴포넌트. 생성자에서 부착, BeginPlay에서 적재 변경 이벤트에 바인딩
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
+	UCartLoadComponent* LoadComponent;
+
+	//---------- 적재 무게감 ----------
+	//현재 적재율 0~1
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadRatio = 0.f;
+
+	//가득 실었을 때 최고 속도 배율 (낮을수록 무거우면 느림)
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadMaxSpeedScale = 0.6f;
+
+	//가득 실었을 때 회전 배율
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadTurnScale = 0.6f;
+
+	//가득 실었을 때 브레이크 배율 (낮을수록 무거우면 잘 안 멈춤)
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float LoadBrakeScale = 0.7f;
+
+	//---------- 충돌/스필 드롭 (B4/B5) ----------
+	//충격속도(cm/s)를 C 드롭 충격량으로 환산하는 배율 (충돌용)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpImpulseScale = 1.0f;
+
+	//이 충격속도(cm/s) 미만의 약한 접촉은 무시 (충돌용)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float MinBumpSpeed = 200.f;
+
+	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초) — 모든 스필(충돌·부스터오용) 공통
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpDropCooldown = 0.5f;
+
+	//[B5] 부스터 오용(브레이크/급회전)으로 쏟을 때의 충격량
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BoostMisuseImpulse = 800.f;
+
+	//[B5] 부스터 중 누적 회전각(도)이 이 값을 넘으면 쏟음
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BoostTurnSpillAngle = 60.f;
+
+protected:
+	//---------- 입력 핸들러 ----------
+	void OnThrottle(const FInputActionValue& Value);
+	void OnThrottleReleased(const FInputActionValue& Value);
+	void OnSteer(const FInputActionValue& Value);
+	void OnSteerReleased(const FInputActionValue& Value);
+	void OnBrakeStart(const FInputActionValue& Value);
+	void OnBrakeStop(const FInputActionValue& Value);
+	void OnBoost(const FInputActionValue& Value);
+
+	void EndBoost();
+	void ResetBoostCooldown();
+
+	//스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청
+	void RequestSpill(float Impulse, EDropCollisionRole DropRole);
+
+	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용
+	UFUNCTION()
+	void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
+
+private:
+	//현재 프레임 입력값
+	float ThrottleInput = 0.f;
+	float SteerInput = 0.f;
+	float CurrentSteer = 0.f; //부드럽게 보간된 조향값
+	bool bIsBraking = false;
+
+	//부스터 상태 (bIsBoosting: 충돌 역할 판정 위해 서버 통지 + 타 클라 복제)
+	UPROPERTY(Replicated)
+	bool bIsBoosting = false;
+	bool bBoostOnCooldown = false;
+
+	//기본값 백업(부스터/브레이크 후 복구용)
+	float DefaultMaxWalkSpeed = 0.f;
+	float DefaultBrakingDeceleration = 0.f;
+
+	FTimerHandle BoostTimerHandle;
+	FTimerHandle BoostCooldownTimerHandle;
+
+	//마지막으로 스필(드롭)을 요청한 시각 — BumpDropCooldown 공통 적용
+	float LastBumpDropTime = -1000.f;
+
+	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
+	float BoostTurnAccumDeg = 0.f;
+};
