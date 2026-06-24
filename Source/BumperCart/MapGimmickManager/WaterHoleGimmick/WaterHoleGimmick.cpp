@@ -3,6 +3,7 @@
 #include "Components/BoxComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Cart/CartPawn.h"
 
 AWaterHoleGimmick::AWaterHoleGimmick()
 {
@@ -34,35 +35,13 @@ void AWaterHoleGimmick::BeginPlay()
 
 void AWaterHoleGimmick::OnWaterHoleBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-    if (IsValid(SpinningCharacter)) return;
-
-    ACharacter* TargetCharacter = Cast<ACharacter>(OtherActor);
-    if (IsValid(TargetCharacter))
+    if(!OtherActor || !OtherActor->Implements<USlideAffectable>())
     {
-        UCharacterMovementComponent* MoveComp = TargetCharacter->GetCharacterMovement();
-        if (IsValid(MoveComp))
-        {
-            SpinningCharacter = TargetCharacter;
-            SpinElapsed = 0.0f;
-
-            OriginalGroundFriction = MoveComp->GroundFriction;
-            OriginalBrakingDeceleration = MoveComp->BrakingDecelerationWalking;
-            MoveComp->GroundFriction = 0.0f;
-            MoveComp->BrakingDecelerationWalking = 0.0f;
-
-            FRotator CurrentRot = SpinningCharacter->GetActorRotation();
-            float RandomYawOffset = FMath::RandRange(0, 1) == 0 ? 60.0f : -60.0f;
-            TargetRotation = CurrentRot;
-            TargetRotation.Yaw += RandomYawOffset;
-
-            TargetCharacter->bUseControllerRotationYaw = false;
-            MoveComp->bOrientRotationToMovement = false;
-
-            GetWorldTimerManager().SetTimer(SpinTimerHandle, this, &AWaterHoleGimmick::UpdateCharacterSpin, 0.01f, true);
-
-            UE_LOG(LogTemp, Log, TEXT("[WaterHoleGimmick] %s 캐릭터가 회전 시작"), *SpinningCharacter->GetName());
-        }
+        return;
     }
+
+    const float Yaw = FMath::RandBool() ? 60.f : -60.f;
+    ISlideAffectable::Execute_ApplySlip(OtherActor, EffectDuration, Yaw);
 }
 
 void AWaterHoleGimmick::OnWaterHoleEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
