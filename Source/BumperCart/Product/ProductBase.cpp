@@ -91,6 +91,18 @@ void AProductBase::ApplyProductState()
         GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         break;
 
+    case EProductState::Grabbed:
+        SetActorHiddenInGame(false);
+        SetNetUpdateFrequency(1.f);
+
+        Mesh->SetSimulatePhysics(false);
+        Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+        Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+        GrabCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        break;
+
     case EProductState::Loaded:
         SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
@@ -157,6 +169,17 @@ bool AProductBase::TrySetLoaded()
     if (!CanLoad()) return false;
 
     SetProductState(EProductState::Loaded);
+    ForceNetUpdate();
+    return true;
+}
+
+bool AProductBase::TrySetGrabbed()
+{
+    if (!HasAuthority()) return false;
+
+    if (!CanGrab()) return false;
+
+    SetProductState(EProductState::Grabbed);
     ForceNetUpdate();
     return true;
 }
@@ -276,6 +299,11 @@ bool AProductBase::IsOnSale() const
 }
 
 bool AProductBase::CanLoad() const
+{
+    return ProductState.State == EProductState::Grabbed;
+}
+
+bool AProductBase::CanGrab() const
 {
     return ProductState.State == EProductState::Display ||
         ProductState.State == EProductState::Falling;

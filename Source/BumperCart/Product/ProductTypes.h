@@ -39,11 +39,12 @@ public:
 UENUM(BlueprintType)
 enum class EProductState : uint8
 {
-    None        UMETA(DisplayName = "None"),
-    Display     UMETA(DisplayName = "진열"),
-    Loaded      UMETA(DisplayName = "적재"),
-    Falling     UMETA(DisplayName = "낙하"),
-    Paid        UMETA(DisplayName = "결제완료"),
+    None,
+    Display,
+    Grabbed,
+    Loaded,
+    Falling,
+    Paid,
 };
 
 USTRUCT(BlueprintType)

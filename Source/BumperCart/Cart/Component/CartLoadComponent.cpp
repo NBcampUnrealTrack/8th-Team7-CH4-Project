@@ -63,9 +63,6 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
     // 적재 정보 갱신
     UpdateLoadInfo();
 
-    // Owner에 부착
-    //Product->AttachToActor(GetOwner(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-
     return true;
 }
 
