@@ -5,7 +5,9 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "InputMappingContext.h"
 #include "TimerManager.h"
 #include "BumperCart.h"
 #include "Net/UnrealNetwork.h"
@@ -173,6 +175,18 @@ void ACartPawn::Tick(float DeltaSeconds)
 
 void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
+	//카트가 자기 입력매핑(IMC)을 직접 등록 — 어떤 PlayerController가 빙의하든 동작 (PC 의존 제거)
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			if (DefaultMappingContext)
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, MappingContextPriority);
+			}
+		}
+	}
+
 	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 	if (!EIC)
 	{
