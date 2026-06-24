@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Cart/Component/CartLoadComponent.h" //FLoadInfo / UCartLoadComponent 타입 사용
+#include "Cart/SlideAffectable.h" //미끄럼 기믹(물웅덩이 등)이 호출하는 인터페이스
 #include "CartPawn.generated.h"
 
 class USpringArmComponent;
@@ -14,7 +15,7 @@ class UInputAction;
 struct FInputActionValue;
 
 UCLASS(abstract)
-class ACartPawn : public ACharacter
+class ACartPawn : public ACharacter, public ISlideAffectable
 {
 	GENERATED_BODY()
 
@@ -35,6 +36,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	void SetLoadRatio(float InLoadRatio);
 
+	//[ISlideAffectable] 외부 기믹(물웅덩이 등)이 호출 => 멀티캐스트로 모든 인스턴스에 미끄럼 전파
+	virtual void ApplySlip_Implementation(float Duration, float SpinAngleDeg) override;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -47,6 +51,10 @@ protected:
 	//[B5-②] 부스터 상태를 서버에 통지 (서버가 충돌 역할 판정에 사용)
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerSetBoosting(bool bNewBoosting);
+
+	//미끄럼(슬립) 효과를 모든 인스턴스에 전파해 각자 로컬 적용 (소유 클라의 예측 이동에도 반영)
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastApplySlip(float Duration, float SpinAngleDeg);
 
 	//---------- 카메라 ----------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
@@ -144,6 +152,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BoostTurnSpillAngle = 60.f;
 
+	//---------- 미끄럼 (F 맵 기믹 연동: 물웅덩이 등) ----------
+	//미끄럼 중 지면 마찰 (낮을수록 더 미끄러짐)
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
+	float SlipGroundFriction = 0.f;
+
+	//미끄럼 중 브레이크 감속도 (0이면 못 멈추고 미끄러짐)
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
+	float SlipBrakingDeceleration = 0.f;
+
+	//미끄럼 시작 시 강제 스핀이 풀리는 속도(도/초)
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
+	float SlipSpinSpeedDeg = 240.f;
+
 protected:
 	//---------- 입력 핸들러 ----------
 	void OnThrottle(const FInputActionValue& Value);
@@ -159,6 +180,10 @@ protected:
 
 	//스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청
 	void RequestSpill(float Impulse, EDropCollisionRole DropRole);
+
+	//미끄럼 시작/종료 (로컬 적용) — MulticastApplySlip에서 호출
+	void StartSlip(float Duration, float SpinAngleDeg);
+	void EndSlip();
 
 	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용
 	UFUNCTION()
@@ -188,4 +213,10 @@ private:
 
 	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
 	float BoostTurnAccumDeg = 0.f;
+
+	//미끄럼(슬립) 상태
+	bool bIsSlipping = false;
+	float SlipTimeRemaining = 0.f;     //남은 미끄럼 시간(초)
+	float SlipSpinRemainingDeg = 0.f;  //남은 강제 스핀 각(도)
+	float DefaultGroundFriction = 0.f; //미끄럼 후 마찰 복구용 백업
 };

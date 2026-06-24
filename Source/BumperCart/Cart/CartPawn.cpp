@@ -63,6 +63,7 @@ void ACartPawn::BeginPlay()
 	{
 		DefaultMaxWalkSpeed = Move->MaxWalkSpeed;
 		DefaultBrakingDeceleration = Move->BrakingDecelerationWalking;
+		DefaultGroundFriction = Move->GroundFriction;
 	}
 
 	//C의 적재 정보가 바뀔 때마다 적재율 갱신 (서버/클라 각자 자기 인스턴스에서 반영)
@@ -100,19 +101,30 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 	Move->MaxWalkSpeed = TargetMaxSpeed;
 
+	//--- 미끄럼(슬립) 진행: 남은 시간 경과 처리 ---
+	if (bIsSlipping)
+	{
+		SlipTimeRemaining -= DeltaSeconds;
+		if (SlipTimeRemaining <= 0.f)
+		{
+			EndSlip();
+		}
+	}
+
 	//--- 브레이크 / 추력 ---
-	if (bIsBraking)
+	if (bIsBraking && !bIsSlipping)
 	{
 		//브레이크 중에는 추력을 넣지 않고 감속도를 크게 해서 급정지시킨다. (무거우면 덜 멈춤)
 		Move->BrakingDecelerationWalking = BrakeDeceleration * LoadBrakeMul;
 	}
 	else
 	{
-		Move->BrakingDecelerationWalking = DefaultBrakingDeceleration;
+		//미끄럼 중엔 감속을 거의 없애 미끄러지게 한다(브레이크 무시), 평소엔 기본값
+		Move->BrakingDecelerationWalking = bIsSlipping ? SlipBrakingDeceleration : DefaultBrakingDeceleration;
 
 		if (!FMath::IsNearlyZero(ThrottleInput))
 		{
-			//카트가 바라보는 방향으로 전/후진
+			//카트가 바라보는 방향으로 전/후진 (미끄럼 중에도 빠져나오려 가속은 가능)
 			AddMovementInput(GetActorForwardVector(), ThrottleInput);
 		}
 	}
@@ -128,6 +140,15 @@ void ACartPawn::Tick(float DeltaSeconds)
 
 		const float YawDelta = CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
 		AddActorWorldRotation(FRotator(0.f, YawDelta, 0.f));
+	}
+
+	//--- 미끄럼 강제 스핀: 남은 스핀각을 SlipSpinSpeedDeg 속도로 풀어낸다 ---
+	if (bIsSlipping && !FMath::IsNearlyZero(SlipSpinRemainingDeg))
+	{
+		const float MaxStep = SlipSpinSpeedDeg * DeltaSeconds;
+		const float Step = FMath::Clamp(SlipSpinRemainingDeg, -MaxStep, MaxStep);
+		AddActorWorldRotation(FRotator(0.f, Step, 0.f));
+		SlipSpinRemainingDeg -= Step;
 	}
 
 	//--- B5: 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
@@ -261,6 +282,47 @@ bool ACartPawn::ServerSetBoosting_Validate(bool bNewBoosting)
 void ACartPawn::ServerSetBoosting_Implementation(bool bNewBoosting)
 {
 	bIsBoosting = bNewBoosting;
+}
+
+//[ISlideAffectable] 외부 기믹(물웅덩이 등)이 서버에서 호출 => 모든 인스턴스에 전파
+void ACartPawn::ApplySlip_Implementation(float Duration, float SpinAngleDeg)
+{
+	//서버 기준으로만 시작 => 멀티캐스트로 소유 클라(예측 이동) 포함 전체에 적용
+	if (HasAuthority())
+	{
+		MulticastApplySlip(Duration, SpinAngleDeg);
+	}
+}
+
+void ACartPawn::MulticastApplySlip_Implementation(float Duration, float SpinAngleDeg)
+{
+	StartSlip(Duration, SpinAngleDeg);
+}
+
+//미끄럼 시작 — 마찰을 낮추고 강제 스핀 각을 적재 (실제 처리는 Tick에서)
+void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
+{
+	bIsSlipping = true;
+	SlipTimeRemaining = Duration;
+	SlipSpinRemainingDeg = SpinAngleDeg;
+
+	//지면 마찰만 시작 시 한 번 낮춘다 (Tick에서 GroundFriction은 안 건드리므로)
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->GroundFriction = SlipGroundFriction;
+	}
+}
+
+//미끄럼 종료 — 마찰 원복
+void ACartPawn::EndSlip()
+{
+	bIsSlipping = false;
+	SlipSpinRemainingDeg = 0.f;
+
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->GroundFriction = DefaultGroundFriction;
+	}
 }
 
 void ACartPawn::SetLoadRatio(float InLoadRatio)
