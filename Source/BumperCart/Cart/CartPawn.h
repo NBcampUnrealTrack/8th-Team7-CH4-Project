@@ -12,6 +12,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UInputMappingContext;
 struct FInputActionValue;
 
 UCLASS(abstract)
@@ -64,6 +65,14 @@ protected:
 	UCameraComponent* FollowCamera;
 
 	//---------- 입력 액션 (BP_CartPawn에서 지정) ----------
+	//입력 매핑 컨텍스트 (BP_CartPawn에 IMC_Cart 지정). 빙의 시 카트가 직접 등록 => PlayerController 종류와 무관하게 동작
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputMappingContext* DefaultMappingContext;
+
+	//IMC 우선순위
+	UPROPERTY(EditAnywhere, Category = "Input")
+	int32 MappingContextPriority = 0;
+
 	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* ThrottleAction; //W/S
 
