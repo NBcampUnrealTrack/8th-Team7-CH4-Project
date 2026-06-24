@@ -5,7 +5,7 @@
 #include "BC_EventManager.generated.h"
 
 class AProductShelfManager;
-class APickUpProduct;
+class AProductBase;
 
 UCLASS()
 class BUMPERCART_API ABC_EventManager : public AActor
@@ -32,7 +32,7 @@ private:
 private:
     // 세일 제품 목록
     UPROPERTY(EditAnywhere, Category = "Sale Event | Product List")
-    TArray<TSubclassOf<APickUpProduct>> SaleProductList;
+    TArray<TSubclassOf<AProductBase>> SaleProductList;
 
     // 세일 이벤트 종료용
     FTimerHandle SaleEventTimerHandle;
@@ -53,11 +53,11 @@ private:
 
     // 현재 세일 제품
     UPROPERTY()
-    TSubclassOf<class APickUpProduct> CurrentSaleProduct;
+    TSubclassOf<class AProductBase> CurrentSaleProduct;
 
 public:
     // 세일 제품 선택
-    TSubclassOf<APickUpProduct> SaleProductSelection();
+    TSubclassOf<AProductBase> SaleProductSelection();
 
     // 세일 이벤트 시작
     void StartSaleEvent();
@@ -73,10 +73,10 @@ public:
 private:
     // 한정판 제품 목록
     UPROPERTY(EditAnywhere, Category = "Limited Event | Product List")
-    TArray<TSubclassOf<APickUpProduct>> LimitedProductList;
+    TArray<TSubclassOf<AProductBase>> LimitedProductList;
 
     // 한정 제품 선택
-    TSubclassOf<APickUpProduct> LimitedProductSelection();
+    TSubclassOf<AProductBase> LimitedProductSelection();
 
     FTimerHandle TestLimitedEventTimerHandle;
 

@@ -22,11 +22,11 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Component")
     TObjectPtr<USceneComponent> SceneRoot;
 
-    // 믈 웅덩이 메쉬
+    // 믈 웅덩이 매쉬
     UPROPERTY(EditAnywhere, Category = "Component")
     TObjectPtr<UStaticMeshComponent> WaterHoleMesh;
 
-    // 오버랩용 콜리전
+    // 콜리전
     UPROPERTY(EditAnywhere, Category = "Component")
     TObjectPtr<UBoxComponent> BoxCollision;
 

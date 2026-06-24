@@ -35,11 +35,41 @@ void AMapGimmickManager::BeginPlay()
 
     UE_LOG(LogTemp, Log, TEXT("[MapGimmickManager] 총 타겟 포인트 갯수 : %d "), GimmickSpawnPointList.Num());
 
+    RespawnWaterHole();
+
+    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnWaterHole, WaterHoleRespawnInterval, true);
+}
+
+void AMapGimmickManager::RespawnWaterHole()
+{
+    if (!HasAuthority()) return;
+
+    ClearAllWaterHole();
+
     SpawnWaterHole();
+}
+
+void AMapGimmickManager::ClearAllWaterHole()
+{
+    if (!HasAuthority()) return;
+
+    for (AWaterHoleGimmick* WaterHole : SpawnedWaterHoles)
+    {
+        if (IsValid(WaterHole))
+        {
+            WaterHole->Destroy();
+        }
+    }
+
+    SpawnedWaterHoles.Empty();
+
+    UE_LOG(LogTemp, Warning, TEXT("[GimmickManager] 기존 물 웅덩이 정리완료"));
 }
 
 void AMapGimmickManager::SpawnWaterHole()
 {
+    if (!HasAuthority()) return;
+
     if (!IsValid(WaterHoleClass))
     {
         UE_LOG(LogTemp, Warning, TEXT("[GimmickManager] 물 웅덩이 클래스가 없습니다"));
@@ -71,9 +101,12 @@ void AMapGimmickManager::SpawnWaterHole()
             AWaterHoleGimmick* SpawnedWaterHole = GetWorld()->SpawnActor<AWaterHoleGimmick>(WaterHoleClass, SpawnLocation, SpawnRotation);
             if (IsValid(SpawnedWaterHole))
             {
-                UE_LOG(LogTemp, Log, TEXT("[GimmickManager] %d 번쨰 물 웅덩이 스폰"), i + 1);
+                SpawnedWaterHoles.Add(SpawnedWaterHole);
             }
         }
     }
+
+    UE_LOG(LogTemp, Log, TEXT("[GimmickManager] 물 웅덩이 %d개 스폰"), FinalSpawnCount);
+
 }
 

@@ -2,7 +2,7 @@
 
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/PrimitiveComponent.h"
-#include "Product/PickUpProduct.h"
+#include "Product/ProductBase.h"
 
 AProductShelf::AProductShelf()
 {
@@ -19,14 +19,9 @@ AProductShelf::AProductShelf()
 void AProductShelf::BeginPlay()
 {
 	Super::BeginPlay();
-
-    // 테스트용
-    //SpawnRandomItems();
-    //GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelf::SpawnRandomItems, RespawnDelay, true);
-	
 }
 
-APickUpProduct* AProductShelf::SpawnRandomProduct()
+AProductBase* AProductShelf::SpawnRandomProduct()
 {
     if (!HasAuthority())  return nullptr;
 
@@ -38,12 +33,12 @@ APickUpProduct* AProductShelf::SpawnRandomProduct()
 
     // 제품 목록에서 랜덤 선택
     int32 RandomIndex = FMath::RandRange(0, ProductList.Num() - 1);
-    TSubclassOf<APickUpProduct> RandomProduct = ProductList[RandomIndex];
+    TSubclassOf<AProductBase> RandomProduct = ProductList[RandomIndex];
 
     return SpawnSpecificItem(RandomProduct);
 }
 
-APickUpProduct* AProductShelf::SpawnSpecificItem(TSubclassOf<APickUpProduct> ItemClass)
+AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass)
 {
     if (!HasAuthority() || !ItemClass) return nullptr;
 
@@ -57,7 +52,7 @@ APickUpProduct* AProductShelf::SpawnSpecificItem(TSubclassOf<APickUpProduct> Ite
     //SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-    APickUpProduct* SpawnedProduct = GetWorld()->SpawnActor<APickUpProduct>(ItemClass, SpawnLocation, SpawnRotation, SpawnParams);
+    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, SpawnLocation, SpawnRotation, SpawnParams);
 
     if (SpawnedProduct)
     {

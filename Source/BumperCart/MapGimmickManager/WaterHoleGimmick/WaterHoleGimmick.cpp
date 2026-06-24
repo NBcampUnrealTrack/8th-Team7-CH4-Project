@@ -36,8 +36,6 @@ void AWaterHoleGimmick::OnWaterHoleBeginOverlap(UPrimitiveComponent* OverlappedC
 {
     if (IsValid(SpinningCharacter)) return;
 
-    if (!HasAuthority()) return;
-
     ACharacter* TargetCharacter = Cast<ACharacter>(OtherActor);
     if (IsValid(TargetCharacter))
     {
@@ -138,8 +136,6 @@ void AWaterHoleGimmick::StopCharacterSpin()
         UE_LOG(LogTemp, Log, TEXT("[WaterHoleGimmick] %s 캐릭터 회전 종료"), *SpinningCharacter->GetName());
 
         SpinningCharacter = nullptr;
-
-        Destroy();
     }
 }
 

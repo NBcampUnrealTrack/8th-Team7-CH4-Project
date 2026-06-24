@@ -48,59 +48,6 @@ void AProductShelfManager::BeginPlay()
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelfManager::ProductSpawnCall, RespawnDelay, true);
 }
 
-void AProductShelfManager::SetAllShelvesOpen(bool bToggle)
-{
-    if (!HasAuthority()) return;
-
-    for (AProductShelf* Shelf : AllProductShelfs)
-    {
-        if (Shelf)
-        {
-            Shelf->SetSpawnToggle(bToggle);
-        }
-    }
-}
-
-void AProductShelfManager::DistributeItemsToShelves()
-{
-    if (!HasAuthority()) return;
-
-    // 에디터에서 값이 변경이 안되서 일단 주석처리
-    /*if (!bToggleOn)
-    {
-        UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰 활성화 안됨"));
-        return;
-    }*/
-
-    for (AProductShelf* Shelf : AllProductShelfs)
-    {
-        if (Shelf)
-        {
-            int32 RandomCount = FMath::RandRange(1, MaxSpawnCount);
-
-            for (int32 i = 0; i < RandomCount; i++)
-            {
-                if (SpawnedItems.Num() >= MaxItemCount)
-                {
-                    UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 아이템이 최대로 스폰되었습니다."));
-                    return;
-                }
-
-                // 아이템 리스트에서 랜덤으로 하나 뽑기
-                int32 RandomIndex = FMath::RandRange(0, MasterProductList.Num() - 1);
-                TSubclassOf<APickUpProduct> SpawnedItem = MasterProductList[RandomIndex];
-                
-                // 스폰 명령
-                if (Shelf->SpawnSpecificItem(SpawnedItem))
-                {
-                    SpawnedItems.Add(SpawnedItem);
-                }
-            }
-        }
-    }
-    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰된 아이템 수 : %d"), SpawnedItems.Num());
-}
-
 void AProductShelfManager::ProductSpawnCall()
 {
     if (!HasAuthority()) return;
@@ -113,25 +60,38 @@ void AProductShelfManager::ProductSpawnCall()
 
             for (int32 i = 0; i < RandomCount; i++)
             {
-                if (SpawnedItems.Num() >= MaxItemCount)
+                if (CurrentProductCount > MaxItemCount)
                 {
                     UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 맵의 제품이 최대로 스폰되었습니다."));
                     return;
                 }
 
-                APickUpProduct* SpawnedProduct = Shelf->SpawnRandomProduct();
+                AProductBase* SpawnedProduct = Shelf->SpawnRandomProduct();
 
                 if (SpawnedProduct)
                 {
-                    SpawnedItems.Add(SpawnedProduct->GetClass());
+                    //SpawnedItems.Add(SpawnedProduct->GetClass());
+                    CurrentProductCount++;
+
+                    // ProductBase에 SetManager(AProductShelfManager* InManager) 추가
+                    // 변수로 TObjectPtr<AProductShelfManager> 추가
+                    //SpawnedProduct->SetManager(this);
                 }
             }
         }
     }
-    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰된 제품 수 : %d"), SpawnedItems.Num());
+    UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 스폰된 제품 수 : %d"), CurrentProductCount);
 }
 
-void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProduct)
+void AProductShelfManager::OnProductDestroyed()
+{
+    if (CurrentProductCount > 0)
+    {
+        CurrentProductCount--;
+    }
+}
+
+void AProductShelfManager::SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct)
 {
     if (!HasAuthority() || !SaleProduct) return;
 
@@ -141,14 +101,14 @@ void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProd
         return;
     }
 
-    APickUpProduct* SpawnedProduct = CenterSaleShelf->SpawnSpecificItem(SaleProduct);
+    AProductBase* SpawnedProduct = CenterSaleShelf->SpawnSpecificItem(SaleProduct);
 
     if (SpawnedProduct != nullptr)
     {
-        // 세일 아이템 체크 (변수, 함수 추가 요청)
-        //SpawnedProduct->SetSaleItem(true);
+        // 세일 아이템 체크
+        SpawnedProduct->SetOnSale(true);
 
-        SpawnedItems.Add(SaleProduct);
+        CurrentProductCount++;
         UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 세일 제품 스폰 및 체크 완료."));
 
         // 넷 멀티캐스트로 UI 알림 추가해야함
@@ -160,7 +120,7 @@ void AProductShelfManager::SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProd
 
 }
 
-void AProductShelfManager::LimitedProductSpawn(TSubclassOf<APickUpProduct> LimitedProduct)
+void AProductShelfManager::LimitedProductSpawn(TSubclassOf<AProductBase> LimitedProduct)
 {
     if (!HasAuthority() || !LimitedProduct || !LimitedProductShelf) return;
 
@@ -170,14 +130,14 @@ void AProductShelfManager::LimitedProductSpawn(TSubclassOf<APickUpProduct> Limit
         return;
     }
 
-    APickUpProduct* SpawnedProduct = LimitedProductShelf->SpawnSpecificItem(LimitedProduct);
+    AProductBase* SpawnedProduct = LimitedProductShelf->SpawnSpecificItem(LimitedProduct);
 
     if (SpawnedProduct != nullptr)
     {
         // 한정 제품 체크 (변수, Set() 함수 추가 요청)
         // SpawnedProduct->SetLimitedProduct(true);
 
-        SpawnedItems.Add(LimitedProduct);
+        CurrentProductCount++;
         UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 한정 제품 스폰 및 체크 완료."));
 
         // 넷 멀티캐스트로 UI 알림 추가해야함

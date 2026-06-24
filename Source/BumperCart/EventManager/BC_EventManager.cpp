@@ -32,7 +32,7 @@ void ABC_EventManager::BeginPlay()
     GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &ABC_EventManager::StartLimitedEvent, 30.0f, false);
 }
 
-TSubclassOf<APickUpProduct> ABC_EventManager::SaleProductSelection()
+TSubclassOf<AProductBase> ABC_EventManager::SaleProductSelection()
 {
     if (!HasAuthority() || !ProductShelfManager)   return nullptr;
 
@@ -44,7 +44,7 @@ TSubclassOf<APickUpProduct> ABC_EventManager::SaleProductSelection()
 
     // 세일 제품 랜덤 선택
     int32 RandomIndex = FMath::RandRange(0, SaleProductList.Num()-1);
-    TSubclassOf<APickUpProduct> SaleProduct = SaleProductList[RandomIndex];
+    TSubclassOf<AProductBase> SaleProduct = SaleProductList[RandomIndex];
 
     UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 제품 : %s"), *SaleProduct->GetName());
 
@@ -91,7 +91,7 @@ void ABC_EventManager::ExecuteRepeatSpawn()
     UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 호출 -> 세일제품 스폰 반복 호출"));
 }
 
-TSubclassOf<APickUpProduct> ABC_EventManager::LimitedProductSelection()
+TSubclassOf<AProductBase> ABC_EventManager::LimitedProductSelection()
 {
     if (!HasAuthority() || !ProductShelfManager)   return nullptr;
 
@@ -103,7 +103,7 @@ TSubclassOf<APickUpProduct> ABC_EventManager::LimitedProductSelection()
 
     // 한정 제품 랜덤 선택
     int32 RandomIndex = FMath::RandRange(0, LimitedProductList.Num() - 1);
-    TSubclassOf<APickUpProduct> LimitedProduct = LimitedProductList[RandomIndex];
+    TSubclassOf<AProductBase> LimitedProduct = LimitedProductList[RandomIndex];
 
     UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 한정판 제품 : %s"), *LimitedProduct->GetName());
 
@@ -118,7 +118,7 @@ void ABC_EventManager::StartLimitedEvent()
 
     UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 한정판 이벤트 시작."));
 
-    TSubclassOf<APickUpProduct> LimitedProduct = LimitedProductSelection();
+    TSubclassOf<AProductBase> LimitedProduct = LimitedProductSelection();
 
     if (LimitedProduct)
     {

@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ItemSpawn/ProductShelf/ProductShelf.h"
-#include "Product/PickUpProduct.h"
+#include "Product/ProductBase.h"
 #include "ProductShelfManager.generated.h"
 
 UCLASS()
@@ -26,25 +26,7 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Shelf")
     TArray<AProductShelf*> AllProductShelfs;
 
-    // 스폰될 제품 블루프린트 목록
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
-    TArray<TSubclassOf<APickUpProduct>> MasterProductList;
-
     FTimerHandle RespawnTimerHandle;
-
-    // 제품 선반 아이템 스폰 온오프
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf", meta = (AllowPrivateAccess = "true"))
-    bool bToggleOn = false;
-
-public:
-    // 모든 제품 선반 온오프 세팅
-    void SetAllShelvesOpen(bool bToggle);
-
-    // 제푼 선반들을 순회하며 아이템을 하나씩 무작위로 배달하는 함수 - 기획 변경으로 미사용
-    void DistributeItemsToShelves();
-
-    UFUNCTION(BlueprintCallable)
-    bool SetToggleOn(bool bToggle) { return bToggleOn = bToggle; }
 
 #pragma endregion
 
@@ -62,13 +44,20 @@ private:
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
     float RespawnDelay = 10.0f;
 
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
+    int32 CurrentProductCount = 0;
+
     // 스폰된 아이템 목록
     UPROPERTY()
-    TArray<TSubclassOf<APickUpProduct>> SpawnedItems;
+    TArray<TSubclassOf<AProductBase>> SpawnedItems;
 
 public:
     // 제품 스폰 호출
     void ProductSpawnCall();
+
+    int32 GetCurrentProductCount() const { return CurrentProductCount; }
+
+    void OnProductDestroyed();
 
 #pragma endregion
 
@@ -80,7 +69,7 @@ private:
 
 public:
     // 세일 제품 스폰
-    void SaleProductSpawn(TSubclassOf<APickUpProduct> SaleProduct);
+    void SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct);
 
 #pragma endregion
 
@@ -92,13 +81,11 @@ private:
 
     // 한정 제품 리스트
     UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
-    TArray<TSubclassOf<APickUpProduct>> MasterLimitedProductList;
+    TArray<TSubclassOf<AProductBase>> MasterLimitedProductList;
 
 public:
     // 한정 제품 스폰
-    void LimitedProductSpawn(TSubclassOf<APickUpProduct> LimitedProduct);
-
-    TArray<TSubclassOf<APickUpProduct>> GetMasterLimitedProductList();
+    void LimitedProductSpawn(TSubclassOf<AProductBase> LimitedProduct);
 #pragma endregion
 
 };
