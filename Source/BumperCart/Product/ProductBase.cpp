@@ -30,9 +30,7 @@ AProductBase::AProductBase()
     GrabCollision->SetupAttachment(Mesh);
     GrabCollision->SetSphereRadius(65.f);
     GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    GrabCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
-    GrabCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    // 로봇손 전용 콜리전 채널 만들어야할듯?
+    GrabCollision->SetCollisionProfileName(TEXT("ProductGrab"));
 
     bOnSale = false;
 }

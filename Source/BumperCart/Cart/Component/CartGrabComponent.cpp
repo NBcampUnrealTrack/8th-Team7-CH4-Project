@@ -105,7 +105,7 @@ void UCartGrabComponent::StopAimTimer()
 
 void UCartGrabComponent::Multicast_StretchGrab_Implementation(FVector_NetQuantize StartLocation, FVector_NetQuantize EndLocation, float Duration)
 {
-
+    GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Multicast Message"));
 }
 
 void UCartGrabComponent::HandleFinishGrab()
@@ -132,6 +132,8 @@ void UCartGrabComponent::HandleFinishGrab()
         return;
     }
     bCanGrab = true;
+
+    GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Loaded!"));
 }
 
 void UCartGrabComponent::UpdateGrabAim()
@@ -150,6 +152,8 @@ void UCartGrabComponent::UpdateGrabAim()
         return;
     }
 
+    // 마우스 커서 위치에서 지정한 콜리전 채널 기준으로 광선 발사
+    // 부딪힌 위치 정보를 HitResult에 저장, 없다면 false 반환
     FHitResult HitResult;
 
     bool bHit = PlayerController->GetHitResultUnderCursorByChannel(
@@ -157,9 +161,10 @@ void UCartGrabComponent::UpdateGrabAim()
         false,
         HitResult
     );
-
     if (!bHit) return;
 
+
+    // 시작점, 마우스 위치 기준으로 방향 구하기
     FVector Start = OwnerPawn->GetActorLocation();
     FVector Target = HitResult.ImpactPoint;
 
@@ -170,25 +175,32 @@ void UCartGrabComponent::UpdateGrabAim()
 
     if (AimDirection.IsNearlyZero()) return;
 
-    CachedAimDirection = AimDirection.GetSafeNormal();
-    CachedAimTargetLocation = Target;
+    //// 조준선을 Start위치로 올리면서 어긋나는 문제 있음
+    // 보여주는거랑 실제 판정은 다르게 해야함
 
-    ShowMouseAim(Start, Target);
+    // 조준선이 GrabRange 넘어가면 Min 으로 자르기
+    float Distance = AimDirection.Size();
+    float ActualDistance = FMath::Min(Distance, GrabRange);
+
+    CachedAimDirection = AimDirection.GetSafeNormal();
+    CachedAimTargetLocation = Start + CachedAimDirection * ActualDistance;
+
+    ShowMouseAim(Start);
 }
 
-void UCartGrabComponent::ShowMouseAim(const FVector& Start, const FVector& End)
+void UCartGrabComponent::ShowMouseAim(const FVector& Start)
 {
-    // 임시로 디버그 라인 그려서 보여주기
+    // 임시로 디버그 라인 그려서 보여주는 중
     UWorld* World = GetWorld();
     if (!IsValid(World)) return;
 
     DrawDebugLine(
         World,
         Start,
-        End,
+        CachedAimTargetLocation,
         FColor::Green,
         false,
-        AimUpdateInterval + 0.02f,
+        AimUpdateInterval,
         0,
         5.f
     );
@@ -232,17 +244,8 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     // 해당 시간만큼 모든 클라이언트에게 해당 클라이언트 손 뻗는 연출 요청하기
     Multicast_StretchGrab(StartLocation, TargetLocation, Duration);
 
-
-    // 쿨다운 적용하기
-    UWorld* World = GetWorld();
-    if (!IsValid(World)) return;
-
-    World->GetTimerManager().SetTimer(
-        GrabFinishTimer,
-        this,
-        &ThisClass::HandleFinishGrab,
-        Duration,
-        false);
+    // 쿨다운 적용
+    SetGrabCooldown(Duration);
 }
 
 bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, FHitResult& Hit)
@@ -259,17 +262,42 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(OwnerActor);
 
-    World->SweepSingleByChannel(
+    bool bHit = World->SweepSingleByChannel(
         Hit,
         Start,
         End,
         FQuat::Identity,
-        ECC_GameTraceChannel1,
+        ECC_GameTraceChannel2,
         FCollisionShape::MakeSphere(GrabRadius),
         Params
     );
 
+    // 맞은게 없다면 연출만하고 종료
+    if (!bHit)
+    {
+        float Distance = FVector::Distance(Start, End);
+        float Duration = Distance / GrabSpeed;
+        Multicast_StretchGrab(Start, End, Duration);
+        SetGrabCooldown(Duration);
+        return false;
+    }
 
-    return false;
+    return true;
 }
 
+void UCartGrabComponent::SetGrabCooldown(float Duration)
+{
+    bCanGrab = false;
+
+    // 쿨다운 적용하기
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return;
+
+    World->GetTimerManager().SetTimer(
+        GrabFinishTimer,
+        this,
+        &ThisClass::HandleFinishGrab,
+        Duration,
+        false
+    );
+}
