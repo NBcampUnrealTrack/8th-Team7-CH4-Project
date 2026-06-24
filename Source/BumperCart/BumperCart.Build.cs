@@ -18,7 +18,10 @@ public class BumperCart : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+            "OnlineSubsystemEOS",
+            "OnlineSubsystem",
+            "OnlineSubsystemUtils"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
