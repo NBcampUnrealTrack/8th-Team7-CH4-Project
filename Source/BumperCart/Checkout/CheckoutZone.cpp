@@ -158,37 +158,6 @@ ACharacter* ACheckoutZone::FindNextCheckoutPlayer()
     return nullptr;
 }
 
-void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
-{
-    switch (CurrentCheckoutZoneState)
-    {
-    case ECheckoutZoneState::None:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: None"));
-        break;
-
-    case ECheckoutZoneState::Open:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Open"));
-        CheckoutZoneMesh->SetMaterial(0, OpenMaterial);
-        // 초록색 색상 로직
-        break;
-
-    case ECheckoutZoneState::ClosingSoon:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: ClosingSoon"));
-        CheckoutZoneMesh->SetMaterial(0, ClosingSoonMaterial);
-        // 노란색 색상 로직
-        break;
-
-    case ECheckoutZoneState::Closed:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Closed"));
-        CheckoutZoneMesh->SetMaterial(0, ClosedMaterial);
-        // 빨간색 색상 로직
-        break;
-
-    default:
-        break;
-    }
-}
-
 // ------------------------------------------------------------
 // 계산 조건
 // ------------------------------------------------------------
@@ -276,6 +245,9 @@ void ACheckoutZone::StartCheckout(ACharacter* PlayerCharacter)
     bIsCheckoutInProgress = true;
     CheckoutProgress = 0.0f;
     ElapsedCheckoutTime = 0.0f;
+
+    // 정산 시작 시 호출 
+    OnRep_CheckoutSession();
 
     // 적재된 상품 수에 따라 추가 정산 시간
     int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
@@ -403,17 +375,17 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
-    CheckoutScore = ScoreResult.TotalScore;
+    LastCheckoutScore = ScoreResult.TotalScore;
     //PlayerState->AddScore(CehckoutScore);
     
-    UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore);
+    UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
     if (GEngine)
     {
         GEngine->AddOnScreenDebugMessage(
             1,
             3.0f,
             FColor::Blue,
-            FString::Printf(TEXT("정산 완료 - 획득 점수: %d"), CheckoutScore)
+            FString::Printf(TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore)
         );
     }
 
@@ -458,6 +430,9 @@ void ACheckoutZone::ResetCheckout()
     ElapsedCheckoutTime = 0.0f;
     RequiredCheckoutTime = 0.0f;
     CheckoutProgress = 0.0f;
+
+    // 정산 초기화 시 호출
+    OnRep_CheckoutSession();
 }
 
 // ------------------------------------------------------------
@@ -503,6 +478,26 @@ float ACheckoutZone::GetCheckoutProgress() const
     return FMath::Clamp(CurrentElapsedTime / RequiredCheckoutTime, 0.0f, 1.0f);
 }
 
+float ACheckoutZone::GetRequiredCheckoutTime() const
+{
+    return RequiredCheckoutTime;
+}
+
+float ACheckoutZone::GetRemainingCheckoutTime() const
+{
+    if (!bIsCheckoutInProgress)
+    {
+        return 0.0f;
+    }
+
+    if (RequiredCheckoutTime <= KINDA_SMALL_NUMBER)
+    {
+        return 0.0f;
+    }
+
+    return FMath::Max(RequiredCheckoutTime * (1.0f - GetCheckoutProgress()), 0.0f);
+}
+
 bool ACheckoutZone::IsCheckoutInProgress() const
 {
     return bIsCheckoutInProgress;
@@ -518,14 +513,14 @@ ECheckoutZoneState ACheckoutZone::GetCheckoutZoneState() const
     return CurrentCheckoutZoneState;
 }
 
-// ------------------------------------------------------------
-// Setter
-// ------------------------------------------------------------
-
 int32 ACheckoutZone::GetCheckoutZoneID() const
 {
     return CheckoutZoneID;
 }
+
+// ------------------------------------------------------------
+// Setter
+// ------------------------------------------------------------
 
 void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
 {
@@ -551,4 +546,47 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
     {
         TryStartCheckout();
     }
+}
+
+// ------------------------------------------------------------
+// RepNotify
+// ------------------------------------------------------------
+
+void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
+{
+    switch (CurrentCheckoutZoneState)
+    {
+    case ECheckoutZoneState::None:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: None"));
+        break;
+
+    case ECheckoutZoneState::Open:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Open"));
+        CheckoutZoneMesh->SetMaterial(0, OpenMaterial);
+        // 초록색 색상 로직
+        break;
+
+    case ECheckoutZoneState::ClosingSoon:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: ClosingSoon"));
+        CheckoutZoneMesh->SetMaterial(0, ClosingSoonMaterial);
+        // 노란색 색상 로직
+        break;
+
+    case ECheckoutZoneState::Closed:
+        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Closed"));
+        CheckoutZoneMesh->SetMaterial(0, ClosedMaterial);
+        // 빨간색 색상 로직
+        break;
+
+    default:
+        break;
+    }
+
+    // 브로드캐스트
+    OnCheckoutZoneStateChanged.Broadcast(CheckoutZoneID, CurrentCheckoutZoneState);
+}
+
+void ACheckoutZone::OnRep_CheckoutSession()
+{
+    OnCheckoutSessionChanged.Broadcast(CheckoutZoneID, CurrentCheckoutPlayer, bIsCheckoutInProgress);
 }

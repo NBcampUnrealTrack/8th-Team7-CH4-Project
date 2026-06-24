@@ -33,7 +33,7 @@ int32 UCheckoutScoreCalculator::CalculateSaleBonusScore(const TArray<FLoadedProd
         }
 
         // 세일 상품이 아닐 경우 제외
-        if (!ProductInfo.bIsSaled)
+        if (!ProductInfo.bOnSale)
         {
             continue;
         }

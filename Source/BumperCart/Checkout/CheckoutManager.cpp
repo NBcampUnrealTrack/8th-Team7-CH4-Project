@@ -83,13 +83,13 @@ void ACheckoutManager::HandleCheckoutCompleted(ACheckoutZone* CompletedCheckoutZ
         return;
     }
 
-    // 이미 닫힌 계산대여도 진행 중인 정산이 완료되면 정산
-    if (CompletedCheckoutZone->GetCheckoutZoneState() == ECheckoutZoneState::Closed)
+    if (!IsValid(CompletedCheckoutZone))
     {
         return;
     }
 
-    if (!IsValid(CompletedCheckoutZone))
+    // 이미 닫힌 계산대여도 진행 중인 정산이 완료되면 정산
+    if (CompletedCheckoutZone->GetCheckoutZoneState() == ECheckoutZoneState::Closed)
     {
         return;
     }

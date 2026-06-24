@@ -5,12 +5,36 @@
 #include "CheckoutTypes.h"
 #include "CheckoutZone.generated.h"
 
+class ACheckoutZone;
+class ACharacter;
 class USceneComponent;
 class UStaticMeshComponent;
 class UBoxComponent;
 class UMaterialInterface;
 
 struct FLoadedProductInfo;
+struct FLoadedProductInfo;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(
+    FOnCheckoutCompleted,
+    ACheckoutZone*
+);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+    FOnCheckoutZoneStateChanged,
+    int32,
+    CheckoutZoneID,
+    ECheckoutZoneState,
+    NewState
+);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+    FOnCheckoutSessionChanged,
+    int32,
+    CheckoutZoneID,
+    ACharacter*,
+    CheckoutPlayer,
+    bool,
+    bInProgress
+);
 
 UCLASS(Blueprintable)
 class BUMPERCART_API ACheckoutZone : public AActor
@@ -49,6 +73,62 @@ private:
     );
 
 // ------------------------------------------------------------
+// Getter
+// ------------------------------------------------------------
+public:
+    // 서버 시간 기준 정산 진행도 리턴
+    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
+    float GetCheckoutProgress() const;
+
+    // 필요 정산 시간
+    UFUNCTION(BlueprintPure, Category = "Checkout|Progress")
+    float GetRequiredCheckoutTime() const;
+
+    // 남은 정산 시간
+    UFUNCTION(BlueprintPure, Category = "Checkout|Progress")
+    float GetRemainingCheckoutTime() const;
+
+    // 정산 중인지 리턴
+    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
+    bool IsCheckoutInProgress() const;
+
+    // 현재 정산중인 플레이어 리턴
+    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
+    ACharacter* GetCurrentCheckoutPlayer() const;
+
+    // 현재 계산대 상태 리턴
+    UFUNCTION(BlueprintPure, Category = " Checkout|Condition")
+    ECheckoutZoneState GetCheckoutZoneState() const;
+
+    // 계산대 ID 리턴
+    UFUNCTION(BlueprintPure, Category = " Checkout|Identity")
+    int32 GetCheckoutZoneID() const;
+
+// ------------------------------------------------------------
+// Setter
+// ------------------------------------------------------------
+public:
+
+    // 계산대 상태 변경
+    void SetCheckoutZoneState(ECheckoutZoneState NewState);
+
+// ------------------------------------------------------------
+// 이벤트
+// ------------------------------------------------------------
+
+public:
+    // 정산 완료 사실을 Manager에게 전달하기 위한 이벤트
+    FOnCheckoutCompleted OnCheckoutCompleted;
+
+    // 계산대 상태 변경을 조회하기 위한 이벤트
+    UPROPERTY(BlueprintAssignable, Category = "Checkout|Event")
+    FOnCheckoutZoneStateChanged OnCheckoutZoneStateChanged;
+
+    // 계산 시작, 취소, 완료 이벤트
+    UPROPERTY(BlueprintAssignable, Category = "Checkout|Event")
+    FOnCheckoutSessionChanged OnCheckoutSessionChanged;
+
+// ------------------------------------------------------------
 // 컴포넌트
 // ------------------------------------------------------------
 private:
@@ -80,6 +160,11 @@ private:
     UPROPERTY(EditInstanceOnly, Category = " Checkout|Identity")
     int32 CheckoutZoneID = INDEX_NONE;
 
+    // 현재 계산대 오픈 상태
+    // 복제 데이터
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCheckoutZoneState, Category = " Checkout|Condition")
+    ECheckoutZoneState CurrentCheckoutZoneState = ECheckoutZoneState::Open;
+
 // ------------------------------------------------------------
 // 구역 내 플레이어
 // ------------------------------------------------------------
@@ -97,7 +182,7 @@ private:
 
     // 계산 중인 플레이어
     // 복제 데이터
-    UPROPERTY(VisibleAnywhere, Replicated, Category = " Checkout|Player")
+    UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_CheckoutSession, Category = " Checkout|Player")
     TObjectPtr<ACharacter> CurrentCheckoutPlayer;
 
 // ------------------------------------------------------------
@@ -113,20 +198,10 @@ private:
     // 다음 계산 대상 찾기
     ACharacter* FindNextCheckoutPlayer();
 
-    // 클라이언트에서 값을 복제 받을 때 호출되는 콜백 함수
-    // 색상, UI 표시용
-    UFUNCTION()
-    void OnRep_CurrentCheckoutZoneState();
-
 private:
-    // 현재 계산대 오픈 상태
-    // 복제 데이터
-    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCheckoutZoneState, Category = " Checkout|Condition")
-    ECheckoutZoneState CurrentCheckoutZoneState = ECheckoutZoneState::Open;
-
     // 현재 계산 진행 중인지
     // 복제 데이터
-    UPROPERTY(VisibleAnywhere, Replicated, Category = " Checkout|Condition")
+    UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_CheckoutSession, Category = " Checkout|Condition")
     bool bIsCheckoutInProgress = false;
 
 // ------------------------------------------------------------
@@ -207,45 +282,19 @@ public:
     bool bIsApplyLastCheckoutBonusForTest = false;
 
     // 정산 점수
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
-    int32 CheckoutScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
+    int32 LastCheckoutScore = 0;
 
 // ------------------------------------------------------------
-// Getter
+// RepNotify
 // ------------------------------------------------------------
-public:
-    // 서버 시간 기준 정산 진행도 리턴
-    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
-    float GetCheckoutProgress() const;
+private:
+    // 클라이언트에서 값을 복제 받을 때 호출되는 콜백 함수
+    // 색상, UI 표시용
+    UFUNCTION()
+    void OnRep_CurrentCheckoutZoneState();
 
-    // 정산 중인지 리턴
-    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
-    bool IsCheckoutInProgress() const;
-
-    // 현재 정산중인 플레이어 리턴
-    UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
-    ACharacter* GetCurrentCheckoutPlayer() const;
-
-    // 현재 계산대 상태 리턴
-    UFUNCTION(BlueprintPure, Category = " Checkout|Condition")
-    ECheckoutZoneState GetCheckoutZoneState() const;
-
-// ------------------------------------------------------------
-// Setter
-// ------------------------------------------------------------
-public:
-    UFUNCTION(BlueprintPure, Category = " Checkout|Identity")
-    int32 GetCheckoutZoneID() const;
-
-    // 계산대 상태 변경
-    void SetCheckoutZoneState(ECheckoutZoneState NewState);
-
-// ------------------------------------------------------------
-// 델리게이트
-// ------------------------------------------------------------
-
-public:
-    // 정산 완료 사실을 Manager에게 전달하기 위한 Delegate
-    DECLARE_MULTICAST_DELEGATE_OneParam(FOnCheckoutCompleted, ACheckoutZone*);
-    FOnCheckoutCompleted OnCheckoutCompleted;
+    // 정산 중인지 확인
+    UFUNCTION()
+    void OnRep_CheckoutSession();
 };
