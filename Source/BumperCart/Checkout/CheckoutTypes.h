@@ -51,32 +51,3 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")
     bool bIsCalculationCompleted = false;
 };
-
-USTRUCT(BlueprintType)
-struct FCheckoutZoneVisualStyle
-{
-    GENERATED_BODY()
-
-public:
-    // 바깥쪽
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CheckoutZone")
-    FLinearColor RingColor = FLinearColor::White;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CheckoutZone", meta = (ClampMin = "0.0"))
-    float RingEmissiveStrength = 3.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CheckoutZone", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float RingOpacity = 1.0f;
-
-    // 안쪽
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CheckoutZone")
-    FLinearColor FillColor = FLinearColor::White;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CheckoutZone", meta = (ClampMin = "0.0"))
-
-    float FillEmissiveStrength = 0.3f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CheckoutZone", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-
-    float FillOpacity = 0.5f;
-};
