@@ -4,6 +4,7 @@
 #include "Cart/CartPawn.h"
 #include "Product/ProductTypes.h"
 #include "Checkout/CheckoutScoreCalculator.h"
+#include "GameState/MainGameState.h"
 
 #include "GameFramework/Character.h"
 #include "GameFramework/GameStateBase.h"
@@ -181,9 +182,9 @@ void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Styl
 
     if (IsValid(CheckoutZoneFillMID))
     {
-        CheckoutZoneFillMID->SetVectorParameterValue(TEXT("CheckoutZoneColor"),Style.FillColor);
-        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("EmissiveStrength"),Style.FillEmissiveStrength);
-        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("Opacity"),Style.FillOpacity);
+        CheckoutZoneFillMID->SetVectorParameterValue(TEXT("CheckoutZoneColor"), Style.FillColor);
+        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("EmissiveStrength"), Style.FillEmissiveStrength);
+        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("Opacity"), Style.FillOpacity);
     }
 }
 
@@ -261,6 +262,18 @@ bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
     {
         return false;
     }
+
+    // GameState가 없거나 라운드가 종료되었을 경우
+    const AMainGameState* MainGameState = GetWorld()->GetGameState<AMainGameState>();
+    if (!IsValid(MainGameState))
+    {
+        return false;
+    }
+    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd || MainGameState->GetCurrentPhase() == ERoundPhase::None)
+    {
+        return false;
+    }
+
 
     // 계산대 오픈 중인지
     if (CurrentCheckoutZoneState == ECheckoutZoneState::Closed)
@@ -425,6 +438,7 @@ void ACheckoutZone::CompleteCheckout()
 
     ACartPawn* CompletedPlayer = CurrentCheckoutPlayer;
 
+    // 계산 취소 및 다음 플레이어 계산 시작
     if (!IsValid(CompletedPlayer))
     {
         CancelCheckout();
@@ -432,14 +446,34 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
+    // Load 컴포넌트 있는지
     UCartLoadComponent* CartLoadComponent = CompletedPlayer->FindComponentByClass<UCartLoadComponent>();
-
     if (!IsValid(CartLoadComponent))
     {
         CancelCheckout();
         TryStartCheckout();
         return;
     }
+
+    // MainGameState 인지
+    const AMainGameState* MainGameState = GetWorld()->GetGameState<AMainGameState>();
+    if (!IsValid(MainGameState))
+    {
+        CancelCheckout();
+        TryStartCheckout();
+        return;
+    }
+
+    // 라운드 종료 시 정산 멈춤
+    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd || MainGameState->GetCurrentPhase() == ERoundPhase::None)
+    {
+        CancelCheckout();
+        return;
+    }
+
+    // 현재 마지막 라운드인지
+    const bool bIsLastCheckoutBonusApplied = MainGameState->GetCurrentPhase() == ERoundPhase::FinalWarningOneOpen;
+
 
     // 정산 점수 계산
     TArray<FLoadedProductInfo> CheckoutProducts;
@@ -450,13 +484,11 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
-    // 마지막 정산 시간대인지
-    const bool bIsLastCheckoutBonusApplied = false;
-
+    // 보너스 점수 적용
     const FCheckoutScoreResult ScoreResult = UCheckoutScoreCalculator::CalculateCheckoutScore(
             CheckoutProducts,
             SaleBonusMultiplier,
-            bIsApplyLastCheckoutBonusForTest,
+            bIsLastCheckoutBonusApplied,
             LastCheckoutBonusMultiplier
         );
 
