@@ -7,18 +7,7 @@
 #include "GameState/MainGameState.h"
 #include "MainGameMode.generated.h"
 
-
-USTRUCT()
-struct FRoundPhaseSchedule
-{
-    GENERATED_BODY()
-
-    UPROPERTY()
-    float TriggerTimeSeconds = 0.f;
-
-    UPROPERTY()
-    ERoundPhase Phase = ERoundPhase::None;
-};
+class ACheckoutManager;
 
 UCLASS()
 class BUMPERCART_API AMainGameMode : public AGameMode
@@ -44,14 +33,19 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Cart")
     TSubclassOf<APawn> CartPawnClass;
 
-private:
-    // 라운드 전체 스케줄 (한눈에 보이는 시간표)
-    TArray<FRoundPhaseSchedule> PhaseSchedule;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Round Schedule")
+    TMap<float, ERoundPhase> PhaseScheduleMap;
 
+private:
+
+    TArray<float> SortedTriggerTimes;
     int32 NextPhaseIndex = 0;
 
     FTimerHandle Timer_RoundTick;
 
     static constexpr float TickInterval = 0.25f;
+
+    UPROPERTY()
+    ACheckoutManager* CheckoutManagerRef;
 
 };
