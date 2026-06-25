@@ -36,6 +36,21 @@ void AMainGameMode::BeginPlay()
 {
     Super::BeginPlay();
 
+    if (GetWorld())
+    {
+        // 맵에 배치된 이벤트 매니저 수색 및 캐스팅
+        AActor* FoundEventActor = UGameplayStatics::GetActorOfClass(GetWorld(), ABC_EventManager::StaticClass());
+        BC_EventManager = Cast<ABC_EventManager>(FoundEventActor);
+
+        // 맵에 배치된 맵 기믹 매니저 수색 및 캐스팅
+        AActor* FoundGimmickActor = UGameplayStatics::GetActorOfClass(GetWorld(), AMapGimmickManager::StaticClass());
+        MapGimmickManager = Cast<AMapGimmickManager>(FoundGimmickActor);
+
+        // 맵에 배치된 제품 선반 매니저 수색 및 캐스팅
+        AActor* FoundShelfActor = UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass());
+        ProductShelfManager = Cast<AProductShelfManager>(FoundShelfActor);
+    }
+
     //매니저 배치 확인
     if (!BC_EventManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 BC_EventManager가 배치되지 않았습니다"));
     if (!MapGimmickManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 MapGimmickManager가 배치되지 않았습니다"));
@@ -194,12 +209,21 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     case ERoundPhase::FinalWarningOneOpen:
         // 마지막 30초 경고 및 계산대 1게만 오픈
         PhaseName = TEXT("FinalWarningOneOpen (마지막 30초 경고 및 계산대 1개만 오픈)");
+        if (CheckoutManagerRef)
+        {
+            CheckoutManagerRef->PrepareNextCheckoutZoneState(1);
+        }
         break;
 
     case ERoundPhase::RoundEnd:
         // 라운드 종료 계산대 전부 닫음
         // 결과화면 표시 및 점수 집계
         PhaseName = TEXT("RoundEnd (라운드 종료 계산대 전부 닫음)");
+        if (CheckoutManagerRef)
+        {
+            CheckoutManagerRef->PrepareNextCheckoutZoneState(0);
+        }
+
         GetWorldTimerManager().ClearTimer(Timer_RoundTick);
         break;
 
