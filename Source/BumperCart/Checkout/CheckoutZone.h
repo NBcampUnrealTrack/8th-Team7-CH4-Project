@@ -5,6 +5,8 @@
 #include "CheckoutTypes.h"
 #include "CheckoutZone.generated.h"
 
+// PlayerState에 점수 반영할 함수 필요
+
 class ACheckoutZone;
 class ACartPawn;
 class USceneComponent;

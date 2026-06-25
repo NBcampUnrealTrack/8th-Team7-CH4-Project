@@ -339,12 +339,12 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     CheckoutProgress = 0.0f;
     ElapsedCheckoutTime = 0.0f;
 
-    // 정산 시작 시 호출 
-    OnRep_CheckoutSession();
-
     // 적재된 상품 수에 따라 추가 정산 시간
     int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
     RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount);
+
+    // 정산 시작 시 호출 
+    OnRep_CheckoutSession();
 
     // 클라이언트와 동기화된 정산 시작 시점
     AGameStateBase* GameStateBase = GetWorld()->GetGameState<AGameStateBase>();
