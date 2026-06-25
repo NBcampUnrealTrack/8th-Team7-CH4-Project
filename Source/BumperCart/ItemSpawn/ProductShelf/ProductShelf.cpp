@@ -73,7 +73,7 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
             SpawnedProduct->SetLifeSpan(30.0f);
         }
 
-        UE_LOG(LogTemp, Log, TEXT("[%s] 제품 스폰."), *GetName());
+        UE_LOG(LogTemp, Log, TEXT("[ProductShelf] %s 제품 스폰."), *SpawnedProduct->GetName());
 
         return SpawnedProduct;
     }

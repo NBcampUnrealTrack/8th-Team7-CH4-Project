@@ -45,7 +45,8 @@ void AProductShelfManager::BeginPlay()
 
     UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 모든 일반 선반 등록 - 등록 갯수 : %d"), AllProductShelfs.Num());
 
-    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelfManager::ProductSpawnCall, RespawnDelay, true);
+    // 게임 모드에서 호출시 삭제 예정
+    StartProductSpawning();
 }
 
 void AProductShelfManager::ProductSpawnCall()
@@ -73,8 +74,9 @@ void AProductShelfManager::ProductSpawnCall()
                     //SpawnedItems.Add(SpawnedProduct->GetClass());
                     CurrentProductCount++;
 
-                    // ProductBase에 SetManager(AProductShelfManager* InManager) 추가
-                    // 변수로 TObjectPtr<AProductShelfManager> 추가
+                    // 제품이 제거 되었을때 매니저의 현재 스폰된 수 관리를 위해
+                    // ProductBase에 SetManager(AProductShelfManager* InManager) 추가 요청
+                    // 변수로 TObjectPtr<AProductShelfManager> 추가 요청
                     //SpawnedProduct->SetManager(this);
                 }
             }
@@ -89,6 +91,11 @@ void AProductShelfManager::OnProductDestroyed()
     {
         CurrentProductCount--;
     }
+}
+
+void AProductShelfManager::StartProductSpawning()
+{
+    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelfManager::ProductSpawnCall, RespawnDelay, true);
 }
 
 void AProductShelfManager::SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct)

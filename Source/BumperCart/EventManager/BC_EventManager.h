@@ -59,7 +59,7 @@ public:
     // 세일 제품 선택
     TSubclassOf<AProductBase> SaleProductSelection();
 
-    // 세일 이벤트 시작
+    // 세일 이벤트 시작 - 게임 모드에서 호출
     void StartSaleEvent();
 
     // 세일 이벤트 종료
@@ -81,7 +81,7 @@ private:
     FTimerHandle TestLimitedEventTimerHandle;
 
 public:
-    // 한정 이벤트 시작
+    // 한정 이벤트 시작 - 게임 모드에서 호출
     void StartLimitedEvent();
 #pragma endregion
 

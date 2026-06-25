@@ -17,8 +17,8 @@ void AMapGimmickManager::BeginPlay()
 
     if (!HasAuthority()) return;
 
+    // 맵에 있는 'GimmickPoint' 태그가 붙어있는 타겟포인트 가져오기
     TArray<AActor*> FoundActors;
-
     UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATargetPoint::StaticClass(), FoundActors);
 
     for (AActor* Actor : FoundActors)
@@ -35,6 +35,13 @@ void AMapGimmickManager::BeginPlay()
 
     UE_LOG(LogTemp, Log, TEXT("[MapGimmickManager] 총 타겟 포인트 갯수 : %d "), GimmickSpawnPointList.Num());
 
+
+    // 게임 모드에서 호출시 삭제 예정
+    StartGimmickSpawning();
+}
+
+void AMapGimmickManager::StartGimmickSpawning()
+{
     RespawnWaterHole();
 
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnWaterHole, WaterHoleRespawnInterval, true);
@@ -108,5 +115,10 @@ void AMapGimmickManager::SpawnWaterHole()
 
     UE_LOG(LogTemp, Log, TEXT("[GimmickManager] 물 웅덩이 %d개 스폰"), FinalSpawnCount);
 
+}
+
+void AMapGimmickManager::EndSpawnWaterHole()
+{
+    ClearAllWaterHole();
 }
 

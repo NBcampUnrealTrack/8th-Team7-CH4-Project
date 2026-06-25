@@ -31,11 +31,12 @@ private:
 
 #pragma region Gimmick
 private:
-    
-
     UPROPERTY()
     TArray<TWeakObjectPtr<class AObstacleGimmick>> SpawnedObstacles;
 
+public:
+    // 게임 시작시 호출 - 게임 모드에서 호출
+    void StartGimmickSpawning();
 #pragma endregion
 
 
@@ -45,14 +46,16 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
     TSubclassOf<AWaterHoleGimmick> WaterHoleClass;
 
-    // 물 웅덩이 수
+    // 스폰될 물 웅덩이 수
     UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
     int32 TotalWaterHoleSpawnCount = 3;
 
+    // 물 웅덩이 리스폰 시간
     UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
     float WaterHoleRespawnInterval = 20.0f;
 
 private:
+    // 스폰된 물 웅덩이 저장
     UPROPERTY()
     TArray<TObjectPtr<class AWaterHoleGimmick>> SpawnedWaterHoles;
 
@@ -66,6 +69,10 @@ private:
 
     // 물 웅덩이 스폰
     void SpawnWaterHole();
+
+    // 라운드 끝 정리용
+    void EndSpawnWaterHole();
+
 #pragma endregion
 
 #pragma region Obstacle

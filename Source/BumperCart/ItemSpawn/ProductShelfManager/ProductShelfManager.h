@@ -38,7 +38,7 @@ private:
 
     // 한 번에 스폰되는 최대 갯수
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
-    int32 MaxSpawnCount = 5;
+    int32 MaxSpawnCount = 3;
 
     // 아이템 리스폰 시간
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
@@ -55,9 +55,15 @@ public:
     // 제품 스폰 호출
     void ProductSpawnCall();
 
-    int32 GetCurrentProductCount() const { return CurrentProductCount; }
+    FORCEINLINE int32 GetCurrentProductCount() const { return CurrentProductCount; }
 
+    // 스폰된 아이템이 파괴되었을 떄
     void OnProductDestroyed();
+
+    FORCEINLINE void SetMaxItemCount(int32 ItemCount) { MaxItemCount = ItemCount; }
+
+    // 게임 시작시 호출
+    void StartProductSpawning();
 
 #pragma endregion
 
