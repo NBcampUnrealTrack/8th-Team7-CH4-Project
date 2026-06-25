@@ -67,8 +67,6 @@ void AProductBase::ApplyDataAsset()
 {
     if (!IsValid(ProductDataAsset)) return;
 
-    ProductData = ProductDataAsset->ProductData;
-
     if (IsValid(ProductDataAsset->ProductMesh))
     {
         Mesh->SetStaticMesh(ProductDataAsset->ProductMesh);
@@ -257,14 +255,21 @@ void AProductBase::HandleReturnDisplay()
     }
 }
 
+void AProductBase::AttachToGrabHand(USceneComponent* Parent, FName SocketName)
+{
+    if (!IsValid(Parent)) return;
+
+    AttachToComponent(Parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+}
+
 int32 AProductBase::GetWeight() const
 {
-    return ProductData.Weight;
+    return ProductDataAsset->ProductData.Weight;
 }
 
 int32 AProductBase::GetValue() const
 {
-    return ProductData.Value;
+    return ProductDataAsset->ProductData.Value;
 }
 
 EProductState AProductBase::GetProductState() const
@@ -279,8 +284,8 @@ FLoadedProductInfo AProductBase::GetLoadedProductInfo() const
     if (IsValid(ProductDataAsset))
     {
         Info.ProductId = ProductDataAsset->ProductId;
+        Info.Value = ProductDataAsset->ProductData.Value;
     }
-    Info.Value = ProductData.Value;
     Info.bOnSale = bOnSale;
 
     return Info;

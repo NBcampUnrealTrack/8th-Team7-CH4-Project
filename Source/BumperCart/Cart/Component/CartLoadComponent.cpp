@@ -151,7 +151,7 @@ bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProduct
 
         LoadedProducts[i]->SetProductState(EProductState::Paid);
 
-        LoadedProducts[i]->Destroy();
+        LoadedProducts[i]->SetLifeSpan(2.f);
     }
 
     LoadedProducts.Empty();

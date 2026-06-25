@@ -7,31 +7,49 @@
 #include "CartGrabComponent.generated.h"
 
 class AProductBase;
+class UInputMappingContext;
+class UInputAction;
+class USplineMeshComponent;
+class UStaticMeshComponent;
+
+UENUM(BlueprintType)
+enum class EGrabVisualState : uint8
+{
+    None,
+    Extending,
+    Returning
+};
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BUMPERCART_API UCartGrabComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	UCartGrabComponent();
 
     // IMC, IA를 설정하는 함수, Pawn의 SetupPlayerInputComponent에서 호출함
     // 테스트용으로 UFUNCTION 열어둠
     UFUNCTION(BlueprintCallable)
-    void SetupInput(UInputComponent* PlayerInputComponent);
+    void SetupInput();
 
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     // 게임 시작 시 마우스 조준선 타이머 시작하는 함수
     void StartAimTimer();
 
+    // Owner Actor에 로봇손 스플라인 메시를 생성하는 함수
+    void CreateVisualComponents();
+
+protected:
+    virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Input")
-    TObjectPtr<class UInputMappingContext> GrabMappingContext;
+    TObjectPtr<UInputMappingContext> GrabMappingContext;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Input")
-    TObjectPtr<class UInputAction> GrabAction;
+    TObjectPtr<UInputAction> GrabAction;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Input")
     int32 MappingPriority;
@@ -60,7 +78,7 @@ private:
     // 멀티캐스트 RPC, 로봇손 뻗는 연출 실행하라고 요청하는 함수
     // Duration을 받아서 해당 시간동안 손을 뻗고, 회수하면 됨
     UFUNCTION(NetMulticast, Reliable)
-    void Multicast_StretchGrab(FVector_NetQuantize StartLocation, FVector_NetQuantize EndLocation, float Duration);
+    void Multicast_PlayGrab(AProductBase* Product, FVector_NetQuantize Start, FVector_NetQuantize Target);
 
     bool PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, FHitResult& Hit);
 
@@ -69,10 +87,43 @@ private:
 
     void SetGrabCooldown(float Duration);
 
+    // 로봇손 연출 갱신하는 함수
+    void UpdateGrabVisual(const FVector& Location);
+
+    // 로봇손 뻗는 연출 시작하는 함수
+    void PlayGrabVisual(AProductBase* Product, const FVector& Start, const FVector& Target);
+
+    // 로봇손 연출 종료하는 함수
+    void FinishGrabVisual();
+
+    // 관찰중인 상품을 손에 붙이는 함수
+    void AttachProductToHand();
+
 private:
+    // 로봇손 팔에 사용할 에셋
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UStaticMesh> ArmMeshAsset;
+
+    // 로봇손 손에 사용할 에셋
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UStaticMesh> HandMeshAsset;
+
+    UPROPERTY()
+    TObjectPtr<USplineMeshComponent> ArmSpline;
+
+    UPROPERTY()
+    TObjectPtr<UStaticMeshComponent> Hand;
+
     // 붙잡은 상품 관찰용 포인터
     UPROPERTY()
     TWeakObjectPtr<AProductBase> GrabbedProduct;
+
+    // 연출관련 변수들
+    FVector VisualStartLocation;
+    FVector VisualTargetLocation;
+    float VisualReachDuration;
+    float VisualReturnDuration;
+    float VisualElapsedTime;
 
     // 저장한 조준 방향
     FVector CachedAimDirection;
@@ -109,4 +160,7 @@ private:
 
     // 조준선 갱신 타이머
     FTimerHandle GrabAimUpdateTimer;
+
+    // 현재 연출 상태
+    EGrabVisualState VisualState;
 };
