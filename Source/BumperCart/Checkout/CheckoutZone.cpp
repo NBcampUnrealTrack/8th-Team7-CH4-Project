@@ -1,13 +1,14 @@
 ﻿#include "Checkout/CheckoutZone.h"
 
 #include "Cart/Component/CartLoadComponent.h"
+#include "Cart/CartPawn.h"
 #include "Product/ProductTypes.h"
 #include "Checkout/CheckoutScoreCalculator.h"
 
 #include "GameFramework/Character.h"
 #include "GameFramework/GameStateBase.h"
 #include "Components/SceneComponent.h"
-#include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -25,10 +26,30 @@ ACheckoutZone::ACheckoutZone()
     CheckoutZoneMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneMesh"));
     CheckoutZoneMesh->SetupAttachment(SceneRoot);
 
-    CheckoutTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("CheckoutTrigger"));
+    CheckoutTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("CheckoutTrigger"));
     CheckoutTrigger->SetupAttachment(SceneRoot);
     CheckoutTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     CheckoutTrigger->SetGenerateOverlapEvents(true);
+
+    // 불필요한 충돌 방지
+    CheckoutTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+    CheckoutTrigger->SetCollisionResponseToChannel(ECC_Pawn,ECR_Overlap);
+    CheckoutTrigger->SetSphereRadius(100.0f);
+
+    CheckoutZoneFill =  CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneFill"));
+
+    CheckoutZoneFill->SetupAttachment(SceneRoot);
+    CheckoutZoneFill->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    CheckoutZoneFill->SetGenerateOverlapEvents(false);
+    CheckoutZoneFill->SetCastShadow(false);
+
+
+    CheckoutZoneRing =CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneRing"));
+
+    CheckoutZoneRing->SetupAttachment(SceneRoot);
+    CheckoutZoneRing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    CheckoutZoneRing->SetGenerateOverlapEvents(false);
+    CheckoutZoneRing->SetCastShadow(false);
 }
 
 void ACheckoutZone::BeginPlay()
@@ -37,6 +58,8 @@ void ACheckoutZone::BeginPlay()
 
     CheckoutTrigger->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneBeginOverlap);
     CheckoutTrigger->OnComponentEndOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneEndOverlap);
+
+    InitializeCheckoutZoneMaterials();
 
     OnRep_CurrentCheckoutZoneState();
 }
@@ -63,7 +86,7 @@ void ACheckoutZone::OnCheckoutZoneBeginOverlap(UPrimitiveComponent* OverlappedCo
         return;
     }
 
-    ACharacter* PlayerCharacter = Cast<ACharacter>(OtherActor);
+    ACartPawn* PlayerCharacter = Cast<ACartPawn>(OtherActor);
 
     if (!IsValid(PlayerCharacter))
     {
@@ -81,7 +104,7 @@ void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComp
         return;
     }
 
-    ACharacter* PlayerCharacter = Cast<ACharacter>(OtherActor);
+    ACartPawn* PlayerCharacter = Cast<ACartPawn>(OtherActor);
 
     if (!IsValid(PlayerCharacter))
     {
@@ -95,9 +118,79 @@ void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComp
 }
 
 // ------------------------------------------------------------
+// 컴포넌트
+// ------------------------------------------------------------
+
+void ACheckoutZone::InitializeCheckoutZoneMaterials()
+{
+    if (IsValid(CheckoutZoneRing))
+    {
+        CheckoutZoneRingMID = CheckoutZoneRing->CreateAndSetMaterialInstanceDynamic(0);
+    }
+
+    if (IsValid(CheckoutZoneFill))
+    {
+        CheckoutZoneFillMID = CheckoutZoneFill->CreateAndSetMaterialInstanceDynamic(0);
+    }
+}
+
+void ACheckoutZone::UpdateCheckoutZoneVisual()
+{
+    if (!IsValid(CheckoutZoneRing) || !IsValid(CheckoutZoneFill))
+    {
+        return;
+    }
+
+    CheckoutZoneRing->SetVisibility(true);
+    CheckoutZoneFill->SetVisibility(true);
+
+    switch (CurrentCheckoutZoneState)
+    {
+    case ECheckoutZoneState::None:
+        CheckoutZoneRing->SetVisibility(false);
+        CheckoutZoneFill->SetVisibility(false);
+        break;
+
+    case ECheckoutZoneState::Open:
+        ApplyCheckoutZoneVisual(OpenCheckoutZoneStyle);
+        break;
+
+    case ECheckoutZoneState::ClosingSoon:
+        ApplyCheckoutZoneVisual(ClosingSoonCheckoutZoneStyle);
+        break;
+
+    case ECheckoutZoneState::Closed:
+        ApplyCheckoutZoneVisual(ClosedCheckoutZoneStyle);
+        break;
+
+    default:
+        CheckoutZoneRing->SetVisibility(false);
+        CheckoutZoneFill->SetVisibility(false);
+        break;
+    }
+}
+
+void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Style)
+{
+    if (IsValid(CheckoutZoneRingMID))
+    {
+        CheckoutZoneRingMID->SetVectorParameterValue(TEXT("CheckoutZoneColor"), Style.RingColor);
+        CheckoutZoneRingMID->SetScalarParameterValue(TEXT("EmissiveStrength"), Style.RingEmissiveStrength);
+        CheckoutZoneRingMID->SetScalarParameterValue(TEXT("Opacity"), Style.RingOpacity);
+    }
+
+    if (IsValid(CheckoutZoneFillMID))
+    {
+        CheckoutZoneFillMID->SetVectorParameterValue(TEXT("CheckoutZoneColor"),Style.FillColor);
+        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("EmissiveStrength"),Style.FillEmissiveStrength);
+        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("Opacity"),Style.FillOpacity);
+    }
+}
+
+// ------------------------------------------------------------
 // 구역 내 플레이어
 // ------------------------------------------------------------
-void ACheckoutZone::AddPlayerInZone(ACharacter* PlayerCharacter)
+void ACheckoutZone::AddPlayerInZone(ACartPawn* PlayerCharacter)
 {
     if (!IsValid(PlayerCharacter))
     {
@@ -113,7 +206,7 @@ void ACheckoutZone::AddPlayerInZone(ACharacter* PlayerCharacter)
     TryStartCheckout();
 }
 
-void ACheckoutZone::RemovePlayerFromZone(ACharacter* PlayerCharacter)
+void ACheckoutZone::RemovePlayerFromZone(ACartPawn* PlayerCharacter)
 {
     if (!IsValid(PlayerCharacter))
     {
@@ -134,11 +227,11 @@ void ACheckoutZone::RemovePlayerFromZone(ACharacter* PlayerCharacter)
     }
 }
 
-ACharacter* ACheckoutZone::FindNextCheckoutPlayer()
+ACartPawn* ACheckoutZone::FindNextCheckoutPlayer()
 {
     for (int32 i = 0; i < PlayersInZone.Num(); ++i)
     {
-        ACharacter* PlayerCharacter = PlayersInZone[i].Get();
+        ACartPawn* PlayerCharacter = PlayersInZone[i].Get();
 
         // 유효하지 않은 플레이어 배열에서 제거
         if (!IsValid(PlayerCharacter))
@@ -161,7 +254,7 @@ ACharacter* ACheckoutZone::FindNextCheckoutPlayer()
 // ------------------------------------------------------------
 // 계산 조건
 // ------------------------------------------------------------
-bool ACheckoutZone::CanStartCheckout(ACharacter* PlayerCharacter) const
+bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
 {
     // 플레이어인지
     if (!IsValid(PlayerCharacter))
@@ -212,7 +305,7 @@ void ACheckoutZone::TryStartCheckout()
     }
 
     // 배열에서 정산 가능한 플레이어 찾기
-    ACharacter* NextPlayer = FindNextCheckoutPlayer();
+    ACartPawn* NextPlayer = FindNextCheckoutPlayer();
 
     if (!CanStartCheckout(NextPlayer))
     {
@@ -225,7 +318,7 @@ void ACheckoutZone::TryStartCheckout()
 // ------------------------------------------------------------
 // 계산 진행
 // ------------------------------------------------------------
-void ACheckoutZone::StartCheckout(ACharacter* PlayerCharacter)
+void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
 {
     // 정산 시작 조건 검사
     if (!CanStartCheckout(PlayerCharacter))
@@ -330,7 +423,7 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
-    ACharacter* CompletedPlayer = CurrentCheckoutPlayer;
+    ACartPawn* CompletedPlayer = CurrentCheckoutPlayer;
 
     if (!IsValid(CompletedPlayer))
     {
@@ -503,7 +596,7 @@ bool ACheckoutZone::IsCheckoutInProgress() const
     return bIsCheckoutInProgress;
 }
 
-ACharacter* ACheckoutZone::GetCurrentCheckoutPlayer() const
+ACartPawn* ACheckoutZone::GetCurrentCheckoutPlayer() const
 {
     return CurrentCheckoutPlayer;
 }
@@ -562,25 +655,24 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 
     case ECheckoutZoneState::Open:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Open"));
-        CheckoutZoneMesh->SetMaterial(0, OpenMaterial);
         // 초록색 색상 로직
         break;
 
     case ECheckoutZoneState::ClosingSoon:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: ClosingSoon"));
-        CheckoutZoneMesh->SetMaterial(0, ClosingSoonMaterial);
         // 노란색 색상 로직
         break;
 
     case ECheckoutZoneState::Closed:
         UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Closed"));
-        CheckoutZoneMesh->SetMaterial(0, ClosedMaterial);
         // 빨간색 색상 로직
         break;
 
     default:
         break;
     }
+
+    UpdateCheckoutZoneVisual();
 
     // 브로드캐스트
     OnCheckoutZoneStateChanged.Broadcast(CheckoutZoneID, CurrentCheckoutZoneState);
