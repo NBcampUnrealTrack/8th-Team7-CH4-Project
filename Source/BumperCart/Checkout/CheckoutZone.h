@@ -6,11 +6,12 @@
 #include "CheckoutZone.generated.h"
 
 class ACheckoutZone;
-class ACharacter;
+class ACartPawn;
 class USceneComponent;
 class UStaticMeshComponent;
-class UBoxComponent;
+class USphereComponent;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
 
 struct FLoadedProductInfo;
 struct FLoadedProductInfo;
@@ -30,7 +31,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
     FOnCheckoutSessionChanged,
     int32,
     CheckoutZoneID,
-    ACharacter*,
+    ACartPawn*,
     CheckoutPlayer,
     bool,
     bInProgress
@@ -94,7 +95,7 @@ public:
 
     // 현재 정산중인 플레이어 리턴
     UFUNCTION(BlueprintPure, Category = " Checkout|Progress")
-    ACharacter* GetCurrentCheckoutPlayer() const;
+    ACartPawn* GetCurrentCheckoutPlayer() const;
 
     // 현재 계산대 상태 리턴
     UFUNCTION(BlueprintPure, Category = " Checkout|Condition")
@@ -139,17 +140,42 @@ private:
     TObjectPtr<UStaticMeshComponent> CheckoutZoneMesh;
 
     UPROPERTY(VisibleAnywhere, Category = " Checkout|Components")
-    TObjectPtr<UBoxComponent> CheckoutTrigger;
+    TObjectPtr<USphereComponent> CheckoutTrigger;
 
 private:
-    UPROPERTY(EditAnywhere, Category = " Checkout|Material")
-    TObjectPtr<UMaterialInterface> OpenMaterial;
+    // 계산대 범위 외곽선
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Components", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UStaticMeshComponent> CheckoutZoneRing;
 
-    UPROPERTY(EditAnywhere, Category = " Checkout|Material")
-    TObjectPtr<UMaterialInterface> ClosingSoonMaterial;
+    // 계산대 범위 내부 채움
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Components", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UStaticMeshComponent> CheckoutZoneFill;
 
-    UPROPERTY(EditAnywhere, Category = " Checkout|Material")
-    TObjectPtr<UMaterialInterface> ClosedMaterial;
+    UPROPERTY(Transient)
+    TObjectPtr<UMaterialInstanceDynamic> CheckoutZoneRingMID;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UMaterialInstanceDynamic> CheckoutZoneFillMID;
+
+private:
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Components")
+    FCheckoutZoneVisualStyle OpenCheckoutZoneStyle;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Components")
+    FCheckoutZoneVisualStyle ClosingSoonCheckoutZoneStyle;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Components")
+    FCheckoutZoneVisualStyle ClosedCheckoutZoneStyle;
+
+private:
+    // 링과 내부 채움의 동적 머티리얼 생성
+    void InitializeCheckoutZoneMaterials();
+
+    // 현재 계산대 상태에 맞춰 범위 연출 갱신
+    void UpdateCheckoutZoneVisual();
+
+    // 링과 내부 채움에 색상 및 밝기 적용
+    void ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Style);
 
 // ------------------------------------------------------------
 // 계산대 정보
@@ -170,33 +196,33 @@ private:
 // ------------------------------------------------------------
 private:
     // 플레이어가 범위 안에 들어오면 배열에 추가
-    void AddPlayerInZone(ACharacter* PlayerCharacter);
+    void AddPlayerInZone(ACartPawn* PlayerCharacter);
 
     // 플레이어가 범위 밖으로 나가면 배열에서 삭제
-    void RemovePlayerFromZone(ACharacter* PlayerCharacter);
+    void RemovePlayerFromZone(ACartPawn* PlayerCharacter);
 
 private:
     // 범위 내 플레이어 배열
     UPROPERTY(VisibleAnywhere, Category = " Checkout|Player")
-    TArray<TObjectPtr<ACharacter>> PlayersInZone;
+    TArray<TObjectPtr<ACartPawn>> PlayersInZone;
 
     // 계산 중인 플레이어
     // 복제 데이터
     UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_CheckoutSession, Category = " Checkout|Player")
-    TObjectPtr<ACharacter> CurrentCheckoutPlayer;
+    TObjectPtr<ACartPawn> CurrentCheckoutPlayer;
 
 // ------------------------------------------------------------
 // 계산 조건
 // ------------------------------------------------------------
 private:
     // 계산 가능 여부 확인
-    bool CanStartCheckout(ACharacter* PlayerCharacter) const;
+    bool CanStartCheckout(ACartPawn* PlayerCharacter) const;
 
     // 계산 시도
     void TryStartCheckout();
 
     // 다음 계산 대상 찾기
-    ACharacter* FindNextCheckoutPlayer();
+    ACartPawn* FindNextCheckoutPlayer();
 
 private:
     // 현재 계산 진행 중인지
@@ -209,7 +235,7 @@ private:
 // ------------------------------------------------------------
 private:
     // 계산 시작
-    void StartCheckout(ACharacter* PlayerCharacter);
+    void StartCheckout(ACartPawn* PlayerCharacter);
 
     // 계산 진행도 업데이트
     void UpdateCheckoutProgress();
