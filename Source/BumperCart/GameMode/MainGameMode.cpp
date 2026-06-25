@@ -5,6 +5,9 @@
 
 #include "Checkout/CheckoutManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
+#include "EventManager/BC_EventManager.h"
+#include "MapGimmickManager/MapGimmickManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMainGameMode, Log, All);
 
@@ -12,10 +15,7 @@ AMainGameMode::AMainGameMode()
 {
     GameStateClass = AMainGameState::StaticClass();
 
-    if (CartPawnClass)
-    {
-        DefaultPawnClass = CartPawnClass;
-    }
+
 
     bUseSeamlessTravel = true;
 
@@ -28,11 +28,45 @@ AMainGameMode::AMainGameMode()
     PhaseScheduleMap.Add(180.f, ERoundPhase::RoundEnd);
 
     CheckoutManagerRef = nullptr;
+
+
+}
+
+void AMainGameMode::BeginPlay()
+{
+    Super::BeginPlay();
+
+    //매니저 배치 확인
+    if (!BC_EventManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 BC_EventManager가 배치되지 않았습니다"));
+    if (!MapGimmickManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 MapGimmickManager가 배치되지 않았습니다"));
+    if (!ProductShelfManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 ProductShelfManager가 배치되지 않았습니다"));
+
+    if(BC_EventManager && MapGimmickManager && ProductShelfManager)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[GameMode] 모든 매니저가 성공적으로 등록되었습니다."));
+    }
+}
+
+void AMainGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+    if (CartPawnClass)
+    {
+        DefaultPawnClass = CartPawnClass;
+        UE_LOG(LogMainGameMode, Warning, TEXT("카트 설정"));
+    }
+    else
+    {
+        UE_LOG(LogMainGameMode, Warning, TEXT("설정된 카트가 존재하지 않습니다."));
+    }
+
+    Super::InitGame(MapName, Options, ErrorMessage);
 }
 
 void AMainGameMode::HandleMatchHasStarted()
 {
     Super::HandleMatchHasStarted();
+
+
 
     UE_LOG(LogMainGameMode, Warning, TEXT("=== HandleMatchHasStarted: 매치가 시작되었습니다! ==="));
     StartRound();

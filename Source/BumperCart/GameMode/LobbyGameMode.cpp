@@ -57,5 +57,5 @@ void ALobbyGameMode::StartGame()
         return;
     }
 
-    GetWorld()->ServerTravel(TEXT("/Game/Developers/LSJae/Levels/TestPlayLevel"));
+    GetWorld()->ServerTravel(TEXT("/Game/Developers/dongh/L_MarketLevel_Blockout"));
 }
