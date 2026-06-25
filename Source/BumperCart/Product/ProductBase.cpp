@@ -80,6 +80,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Display:
         SetActorHiddenInGame(false);
         SetNetUpdateFrequency(20.f);
+        SetReplicateMovement(true);
 
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -88,8 +89,9 @@ void AProductBase::ApplyProductState()
         break;
 
     case EProductState::Grabbed:
-        SetActorHiddenInGame(false);
+        SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
@@ -102,6 +104,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Loaded:
         SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
@@ -114,6 +117,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Falling:
         SetActorHiddenInGame(false);
         SetNetUpdateFrequency(30.f);
+        SetReplicateMovement(true);
 
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -125,6 +129,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Paid:
         SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionProfileName(TEXT("NoCollision"));
@@ -137,6 +142,7 @@ void AProductBase::ApplyProductState()
     default:
         SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -255,13 +261,6 @@ void AProductBase::HandleReturnDisplay()
     }
 }
 
-void AProductBase::AttachToGrabHand(USceneComponent* Parent, FName SocketName)
-{
-    if (!IsValid(Parent)) return;
-
-    AttachToComponent(Parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
-}
-
 int32 AProductBase::GetWeight() const
 {
     return ProductDataAsset->ProductData.Weight;
@@ -289,6 +288,11 @@ FLoadedProductInfo AProductBase::GetLoadedProductInfo() const
     Info.bOnSale = bOnSale;
 
     return Info;
+}
+
+UStaticMesh* AProductBase::GetProductMesh() const
+{
+    return IsValid(Mesh) ? Mesh->GetStaticMesh() : nullptr;
 }
 
 void AProductBase::SetOnSale(bool NewValue)

@@ -36,9 +36,6 @@ public:
     // 카트에서 해당 상품을 떨어뜨리는 함수
     void DropFromCart(AActor* CartActor);
 
-    // 상품을 로봇손에 붙이는 함수
-    void AttachToGrabHand(USceneComponent* Parent, FName SocketName);
-
     UFUNCTION(BlueprintPure)
     int32 GetWeight() const;
 
@@ -50,6 +47,8 @@ public:
 
     UFUNCTION(BlueprintPure)
     FLoadedProductInfo GetLoadedProductInfo() const;
+
+    UStaticMesh* GetProductMesh() const;
 
     UFUNCTION(BlueprintCallable)
     void SetOnSale(bool NewValue);

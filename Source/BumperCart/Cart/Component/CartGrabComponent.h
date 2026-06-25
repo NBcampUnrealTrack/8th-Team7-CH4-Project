@@ -64,6 +64,9 @@ private:
     UFUNCTION()
     void UpdateGrabAim();
 
+    UFUNCTION()
+    void TryGrabProduct();
+
     // 마우스 에임을 시각화 하는 함수
     void ShowMouseAim(const FVector& Start);
 
@@ -78,7 +81,7 @@ private:
     // 멀티캐스트 RPC, 로봇손 뻗는 연출 실행하라고 요청하는 함수
     // Duration을 받아서 해당 시간동안 손을 뻗고, 회수하면 됨
     UFUNCTION(NetMulticast, Reliable)
-    void Multicast_PlayGrab(AProductBase* Product, FVector_NetQuantize Start, FVector_NetQuantize Target);
+    void Multicast_PlayGrab(FVector_NetQuantize Start, FVector_NetQuantize Target);
 
     bool PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, FHitResult& Hit);
 
@@ -91,13 +94,22 @@ private:
     void UpdateGrabVisual(const FVector& Location);
 
     // 로봇손 뻗는 연출 시작하는 함수
-    void PlayGrabVisual(AProductBase* Product, const FVector& Start, const FVector& Target);
+    void PlayGrabVisual(const FVector& Start, const FVector& Target);
 
     // 로봇손 연출 종료하는 함수
     void FinishGrabVisual();
 
-    // 관찰중인 상품을 손에 붙이는 함수
-    void AttachProductToHand();
+    // 연출용 메시 보여주기
+    void ShowVisualProductMesh(AProductBase* Product);
+
+    // 연출용 메시 끄기
+    void HideVisualProductMesh();
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_ShowVisualProductMesh(AProductBase* Product);
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_HideVisualProductMesh();
 
     // 현재 로봇손 시작위치 구하는 함수
     FVector GetGrabStartLocation() const;
@@ -120,6 +132,10 @@ private:
     // 붙잡은 상품 관찰용 포인터
     UPROPERTY()
     TWeakObjectPtr<AProductBase> GrabbedProduct;
+
+    // 연출용 상품 메시
+    UPROPERTY()
+    TObjectPtr<UStaticMeshComponent> VisualProductMesh;
 
     // 연출관련 변수들
     FVector VisualStartLocation;
@@ -163,6 +179,9 @@ private:
 
     // 조준선 갱신 타이머
     FTimerHandle GrabAimUpdateTimer;
+
+    // 상품과 손이 닿을 시간을 확인하는 타이머
+    FTimerHandle TryGrabTimer;
 
     // 현재 연출 상태
     EGrabVisualState VisualState;

@@ -78,6 +78,15 @@ void UCartGrabComponent::SetupInput()
 
 void UCartGrabComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    UWorld* World = GetWorld();
+    if (!IsValid(World))
+    {
+        Super::EndPlay(EndPlayReason);
+        return;
+    }
+
+    World->GetTimerManager().ClearTimer(GrabFinishTimer);
+    World->GetTimerManager().ClearTimer(TryGrabTimer);
     StopAimTimer();
 
     Super::EndPlay(EndPlayReason);
@@ -129,6 +138,28 @@ void UCartGrabComponent::CreateVisualComponents()
         OwnerActor->AddInstanceComponent(Hand);
         Hand->RegisterComponent();
     }
+
+    if (!VisualProductMesh)
+    {
+        VisualProductMesh = NewObject<UStaticMeshComponent>(OwnerActor, TEXT("VisualProductMesh"));
+        VisualProductMesh->SetMobility(EComponentMobility::Movable);
+        VisualProductMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        VisualProductMesh->SetVisibility(false);
+
+        VisualProductMesh->SetupAttachment(Hand, SocketName);
+
+        OwnerActor->AddInstanceComponent(VisualProductMesh);
+        VisualProductMesh->RegisterComponent();
+
+        if (IsValid(Hand))
+        {
+            VisualProductMesh->AttachToComponent(
+                Hand,
+                FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+                SocketName
+            );
+        }
+    }
 }
 
 void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -150,8 +181,6 @@ void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
         // 상품 or 끝에 도달하면 로봇손 회수
         if (Progress >= 1.f)
         {
-            AttachProductToHand();
-
             VisualElapsedTime = 0.f;
             VisualState = EGrabVisualState::Returning;
         }
@@ -201,10 +230,10 @@ void UCartGrabComponent::StopAimTimer()
     CachedAimTargetLocation = FVector::ZeroVector;
 }
 
-void UCartGrabComponent::Multicast_PlayGrab_Implementation(AProductBase* Product, FVector_NetQuantize Start,
+void UCartGrabComponent::Multicast_PlayGrab_Implementation(FVector_NetQuantize Start,
     FVector_NetQuantize Target)
 {
-    PlayGrabVisual(Product, Start, Target);
+    PlayGrabVisual(Start, Target);
 }
 
 void UCartGrabComponent::HandleFinishGrab()
@@ -288,6 +317,23 @@ void UCartGrabComponent::UpdateGrabAim()
     ShowMouseAim(Start);
 }
 
+void UCartGrabComponent::TryGrabProduct()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+    AProductBase* Product = GrabbedProduct.Get();
+    if (!IsValid(Product)) return;
+
+    // 잡는데 실패하면 WeakPtr 초기화
+    if (!Product->TrySetGrabbed())
+    {
+        GrabbedProduct.Reset();
+        return;
+    }
+
+    Multicast_ShowVisualProductMesh(Product);
+}
+
 void UCartGrabComponent::ShowMouseAim(const FVector& Start)
 {
     // 임시로 디버그 라인 그려서 보여주는 중
@@ -317,6 +363,9 @@ void UCartGrabComponent::RequestGrab()
 
 void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNormal AimDirection)
 {
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return;
+
     AActor* OwnerActor = GetOwner();
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
     if (!bCanGrab) return;
@@ -325,16 +374,11 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     FHitResult Hit;
     if (!PerformGrabTrace(AimDirection, Hit)) return;
 
-
-    // 상품을 Grabbed 상태로 변경
     AProductBase* Product = Cast<AProductBase>(Hit.GetActor());
     if (!IsValid(Product)) return;
 
-    if (!Product->TrySetGrabbed()) return;
-
-    // 붙잡은 Proudct WeakPtr 갱신
+    // 붙잡을 Proudct WeakPtr 확인
     GrabbedProduct = Product;
-
 
     // 속도와 거리를 이용해서 시간 구하기
     FVector StartLocation = OwnerActor->GetActorLocation();
@@ -343,9 +387,17 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     float Distance = FVector::Distance(StartLocation, TargetLocation);
     float Duration = Distance / GrabSpeed;
 
+    // 상품과 접촉하는 시간에 잡을 수 있는지 체크하도록 타이머 설정
+    World->GetTimerManager().SetTimer(
+        TryGrabTimer,
+        this,
+        &ThisClass::TryGrabProduct,
+        Duration / 2.f,
+        false
+    );
 
-    // 해당 시간만큼 모든 클라이언트에게 해당 클라이언트 손 뻗는 연출 요청하기
-    Multicast_PlayGrab(Product, StartLocation, TargetLocation);
+    // 모든 클라이언트에게 해당 클라이언트 손 뻗는 연출 요청하기
+    Multicast_PlayGrab(StartLocation, TargetLocation);
 
     // 쿨다운 적용
     SetGrabCooldown(Duration);
@@ -380,7 +432,7 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     {
         float Distance = FVector::Distance(Start, End);
         float Duration = Distance / GrabSpeed;
-        Multicast_PlayGrab(nullptr, Start, End);
+        Multicast_PlayGrab(Start, End);
         SetGrabCooldown(Duration);
         return false;
     }
@@ -433,12 +485,11 @@ void UCartGrabComponent::UpdateGrabVisual(const FVector& Location)
     Hand->SetWorldRotation(WorldDirection.Rotation());
 }
 
-void UCartGrabComponent::PlayGrabVisual(AProductBase* Product, const FVector& Start, const FVector& Target)
+void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Target)
 {
     CreateVisualComponents();
     if (!ArmSpline || !Hand) return;
 
-    GrabbedProduct = Product;
     VisualStartLocation = Start;
     VisualTargetLocation = Target;
 
@@ -453,6 +504,7 @@ void UCartGrabComponent::PlayGrabVisual(AProductBase* Product, const FVector& St
     ArmSpline->SetVisibility(true);
     Hand->SetVisibility(true);
 
+    // 시작위치에서 한번 그려주기
     UpdateGrabVisual(Start);
 
     SetComponentTickEnabled(true);
@@ -471,18 +523,41 @@ void UCartGrabComponent::FinishGrabVisual()
     {
         Hand->SetVisibility(false);
     }
-
-    GrabbedProduct.Reset();
+    HideVisualProductMesh();
 
     SetComponentTickEnabled(false);
 }
 
-void UCartGrabComponent::AttachProductToHand()
+void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
 {
-    AProductBase* Product = GrabbedProduct.Get();
-    if (!IsValid(Product) || !Hand) return;
+    CreateVisualComponents();
 
-    Product->AttachToGrabHand(Hand, SocketName);
+    if (!IsValid(Product) || !IsValid(VisualProductMesh)) return;
+
+    UStaticMesh* ProductMesh = Product->GetProductMesh();
+    if (!IsValid(ProductMesh)) return;
+
+    VisualProductMesh->SetStaticMesh(ProductMesh);
+    VisualProductMesh->SetVisibility(true);
+}
+
+void UCartGrabComponent::HideVisualProductMesh()
+{
+    if (VisualProductMesh)
+    {
+        VisualProductMesh->SetVisibility(true);
+        VisualProductMesh->SetStaticMesh(nullptr);
+    }
+}
+
+void UCartGrabComponent::Multicast_ShowVisualProductMesh_Implementation(AProductBase* Product)
+{
+    ShowVisualProductMesh(Product);
+}
+
+void UCartGrabComponent::Multicast_HideVisualProductMesh_Implementation()
+{
+    HideVisualProductMesh();
 }
 
 FVector UCartGrabComponent::GetGrabStartLocation() const
