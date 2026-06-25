@@ -131,6 +131,10 @@ void ACheckoutManager::HandleCheckoutCompleted(ACheckoutZone* CompletedCheckoutZ
     CheckoutZoneToOpen->SetCheckoutZoneState(ECheckoutZoneState::Open);
 }
 
+
+// Closing Soon 상태를 표시하기 위해 계산대의 상태를 즉시 변경하지 않고,
+// 미리 다음 라운드에 Open할 계산대를 랜덤으로 미리 추첨한다.
+// 그리고 ClosingSoonDuration 이후에 계산대의 상태가 변경된다.
 void ACheckoutManager::PrepareNextCheckoutZoneState(int32 OpenCount)
 {
     if (!HasAuthority())

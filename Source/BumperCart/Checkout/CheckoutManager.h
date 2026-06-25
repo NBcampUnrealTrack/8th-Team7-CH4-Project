@@ -6,6 +6,11 @@
 
 class ACheckoutZone;
 
+// GameState에서 라운드 변경될 때마다 PrepareNextCheckoutZoneState(int32 OpenCount) 호출해야 됨
+// 이 함수는 계산대의 상태를 즉시 변경하지 않고, 10초 뒤에 변경하기 때문에
+// 첫 호출을 20초에 시작하고, 30초 간격으로 반복 호출해야 됨
+
+
 UCLASS(Blueprintable)
 class BUMPERCART_API ACheckoutManager : public AActor
 {
