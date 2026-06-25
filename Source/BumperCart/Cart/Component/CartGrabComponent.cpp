@@ -6,11 +6,18 @@
 #include "EnhancedInputSubsystems.h"
 #include "Product/ProductBase.h"
 #include "CartLoadComponent.h"
+#include "TimerManager.h"
+#include "Components/SplineMeshComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
+#include "GameFramework/Pawn.h"
 
 
 UCartGrabComponent::UCartGrabComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.bStartWithTickEnabled = false;
 
     SetIsReplicatedByDefault(true);
 
@@ -28,10 +35,10 @@ UCartGrabComponent::UCartGrabComponent()
     GrabRange = 500.f;
     GrabRadius = 30.f;
     bCanGrab = true;
-    SocketName = TEXT("GrabPoint");
+    SocketName = TEXT("ProductSocket");
 }
 
-void UCartGrabComponent::SetupInput(UInputComponent* PlayerInputComponent)
+void UCartGrabComponent::SetupInput()
 {
     APawn* OwnerPawn = Cast<APawn>(GetOwner());
 
@@ -45,7 +52,10 @@ void UCartGrabComponent::SetupInput(UInputComponent* PlayerInputComponent)
             ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
         {
             // IMC 등록
-            Subsystem->AddMappingContext(GrabMappingContext, 0);
+            if (GrabMappingContext)
+            {
+                Subsystem->AddMappingContext(GrabMappingContext, MappingPriority);
+            }
 
             // IA 등록
             if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerController->InputComponent))
@@ -71,6 +81,94 @@ void UCartGrabComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
     StopAimTimer();
 
     Super::EndPlay(EndPlayReason);
+}
+
+void UCartGrabComponent::CreateVisualComponents()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    USceneComponent* Root = OwnerActor->GetRootComponent();
+    if (!IsValid(Root)) return;
+
+    if (!ArmSpline)
+    {
+        // OwnerActor 에 로봇손 팔 부분 부착
+        ArmSpline = NewObject<USplineMeshComponent>(OwnerActor, TEXT("RobotArmSplineMesh"));
+        ArmSpline->SetMobility(EComponentMobility::Movable);
+        ArmSpline->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        ArmSpline->SetVisibility(false);
+
+        if (ArmMeshAsset)
+        {
+            ArmSpline->SetStaticMesh(ArmMeshAsset);
+        }
+
+        ArmSpline->SetForwardAxis(ESplineMeshAxis::X);
+        ArmSpline->SetupAttachment(Root);
+
+        OwnerActor->AddInstanceComponent(ArmSpline);
+        ArmSpline->RegisterComponent();
+    }
+
+    if (!Hand)
+    {
+        // OwnerActor 에 로봇손 손 부분 부착
+        Hand = NewObject<UStaticMeshComponent>(OwnerActor, TEXT("RobotArmHandMesh"));
+        Hand->SetMobility(EComponentMobility::Movable);
+        Hand->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Hand->SetVisibility(false);
+
+        if (HandMeshAsset)
+        {
+            Hand->SetStaticMesh(HandMeshAsset);
+        }
+
+        Hand->SetupAttachment(Root);
+
+        OwnerActor->AddInstanceComponent(Hand);
+        Hand->RegisterComponent();
+    }
+}
+
+void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    if (VisualState == EGrabVisualState::None) return;
+
+    VisualElapsedTime += DeltaTime;
+
+    if (VisualState == EGrabVisualState::Extending)
+    {
+        // 진행 정도 확인
+        float Progress = VisualElapsedTime / VisualReachDuration;
+
+        FVector CurrentLocation = FMath::Lerp(VisualStartLocation, VisualTargetLocation, Progress);
+        UpdateGrabVisual(CurrentLocation);
+
+        // 상품 or 끝에 도달하면 로봇손 회수
+        if (Progress >= 1.f)
+        {
+            AttachProductToHand();
+
+            VisualElapsedTime = 0.f;
+            VisualState = EGrabVisualState::Returning;
+        }
+    }
+    else if (VisualState == EGrabVisualState::Returning)
+    {
+        // 진행 정도 확인
+        float Progress = VisualElapsedTime / VisualReachDuration;
+
+        FVector CurrentLocation = FMath::Lerp(VisualStartLocation, VisualTargetLocation, Progress);
+        UpdateGrabVisual(CurrentLocation);
+
+        if (Progress >= 1.f)
+        {
+            FinishGrabVisual();
+        }
+    }
 }
 
 void UCartGrabComponent::StartAimTimer()
@@ -103,13 +201,16 @@ void UCartGrabComponent::StopAimTimer()
     CachedAimTargetLocation = FVector::ZeroVector;
 }
 
-void UCartGrabComponent::Multicast_StretchGrab_Implementation(FVector_NetQuantize StartLocation, FVector_NetQuantize EndLocation, float Duration)
+void UCartGrabComponent::Multicast_PlayGrab_Implementation(AProductBase* Product, FVector_NetQuantize Start,
+    FVector_NetQuantize Target)
 {
-    GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Multicast Message"));
+    PlayGrabVisual(Product, Start, Target);
 }
 
 void UCartGrabComponent::HandleFinishGrab()
 {
+    bCanGrab = true;
+
     AActor* OwnerActor = GetOwner();
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
 
@@ -131,7 +232,6 @@ void UCartGrabComponent::HandleFinishGrab()
         Product->SetProductState(EProductState::Display);
         return;
     }
-    bCanGrab = true;
 
     GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Loaded!"));
 }
@@ -208,6 +308,9 @@ void UCartGrabComponent::ShowMouseAim(const FVector& Start)
 
 void UCartGrabComponent::RequestGrab()
 {
+    if (CachedAimDirection.IsNearlyZero()) return;
+    if (GrabSpeed <= 0.f) return;
+
     // 클라이언트에서 계산한 값이므로 인자로 넘겨야 함
     Server_GrabProduct(CachedAimDirection);
 }
@@ -242,7 +345,7 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
 
 
     // 해당 시간만큼 모든 클라이언트에게 해당 클라이언트 손 뻗는 연출 요청하기
-    Multicast_StretchGrab(StartLocation, TargetLocation, Duration);
+    Multicast_PlayGrab(Product, StartLocation, TargetLocation);
 
     // 쿨다운 적용
     SetGrabCooldown(Duration);
@@ -277,7 +380,7 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     {
         float Distance = FVector::Distance(Start, End);
         float Duration = Distance / GrabSpeed;
-        Multicast_StretchGrab(Start, End, Duration);
+        Multicast_PlayGrab(nullptr, Start, End);
         SetGrabCooldown(Duration);
         return false;
     }
@@ -300,4 +403,83 @@ void UCartGrabComponent::SetGrabCooldown(float Duration)
         Duration,
         false
     );
+}
+
+void UCartGrabComponent::UpdateGrabVisual(const FVector& Location)
+{
+    if (!ArmSpline || !Hand) return;
+
+    FTransform MeshTransform = ArmSpline->GetComponentTransform();
+
+    FVector Start = MeshTransform.InverseTransformPosition(VisualStartLocation);
+    FVector End = MeshTransform.InverseTransformPosition(Location);
+
+    FVector Direction = End - Start;
+    FVector NormalizedDirection = Direction.GetSafeNormal();
+
+    if (NormalizedDirection == FVector::ZeroVector) return;
+
+    ArmSpline->SetStartAndEnd(
+        Start,
+        Direction,
+        End,
+        Direction,
+        true
+        );
+
+    FVector WorldDirection = (Location - VisualStartLocation).GetSafeNormal();
+
+    Hand->SetWorldLocation(Location);
+    Hand->SetWorldRotation(WorldDirection.Rotation());
+}
+
+void UCartGrabComponent::PlayGrabVisual(AProductBase* Product, const FVector& Start, const FVector& Target)
+{
+    CreateVisualComponents();
+    if (!ArmSpline || !Hand) return;
+
+    GrabbedProduct = Product;
+    VisualStartLocation = Start;
+    VisualTargetLocation = Target;
+
+    float Distance = FVector::Distance(VisualStartLocation, VisualTargetLocation);
+    VisualReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
+    VisualReturnDuration = VisualReachDuration;
+
+    VisualElapsedTime = 0.f;
+    VisualState = EGrabVisualState::Extending;
+
+    ArmSpline->SetVisibility(true);
+    Hand->SetVisibility(true);
+
+    UpdateGrabVisual(Start);
+
+    SetComponentTickEnabled(true);
+}
+
+void UCartGrabComponent::FinishGrabVisual()
+{
+    VisualState = EGrabVisualState::None;
+    VisualElapsedTime = 0.f;
+
+    if (ArmSpline)
+    {
+        ArmSpline->SetVisibility(false);
+    }
+    if (Hand)
+    {
+        Hand->SetVisibility(false);
+    }
+
+    GrabbedProduct.Reset();
+
+    SetComponentTickEnabled(false);
+}
+
+void UCartGrabComponent::AttachProductToHand()
+{
+    AProductBase* Product = GrabbedProduct.Get();
+    if (!IsValid(Product) || !Hand) return;
+
+    Product->AttachToGrabHand(Hand, SocketName);
 }
