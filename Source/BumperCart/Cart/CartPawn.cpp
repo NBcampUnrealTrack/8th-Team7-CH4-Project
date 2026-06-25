@@ -1,4 +1,4 @@
-//BumperCart - B(카트/플레이어 조작) 파트
+﻿//BumperCart - B(카트/플레이어 조작) 파트
 
 #include "CartPawn.h"
 #include "Camera/CameraComponent.h"
@@ -13,6 +13,7 @@
 #include "TimerManager.h"
 #include "BumperCart.h"
 #include "Net/UnrealNetwork.h"
+#include "Component/CartGrabComponent.h"
 
 ACartPawn::ACartPawn()
 {
@@ -57,6 +58,9 @@ ACartPawn::ACartPawn()
 
 	//적재 컴포넌트(C 상품 시스템) 부착. 적재율 연동은 BeginPlay에서 이벤트 바인딩
 	LoadComponent = CreateDefaultSubobject<UCartLoadComponent>(TEXT("CartLoadComponent"));
+
+    // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
+    GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
 }
 
 void ACartPawn::BeginPlay()
@@ -218,6 +222,12 @@ void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	{
 		EIC->BindAction(BoostAction, ETriggerEvent::Started, this, &ACartPawn::OnBoost);
 	}
+
+    // 그랩 전용 IMC, IA 연결
+    if (IsValid(GrabComponent))
+    {
+        GrabComponent->SetupInput();
+    }
 }
 
 void ACartPawn::OnThrottle(const FInputActionValue& Value)

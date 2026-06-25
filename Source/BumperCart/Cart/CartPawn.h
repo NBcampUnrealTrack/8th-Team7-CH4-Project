@@ -1,4 +1,4 @@
-//BumperCart - B(카트/플레이어 조작) 파트
+﻿//BumperCart - B(카트/플레이어 조작) 파트
 //CartPawn: 쇼핑카트 플레이어 폰. ACharacter 기반 직접 제어(완전 물리 X).
 
 #pragma once
@@ -15,6 +15,7 @@ class UInputAction;
 class UInputMappingContext;
 class UCameraShakeBase; //충돌 카메라 쉐이크 클래스
 struct FInputActionValue;
+class UCartGrabComponent;
 
 UCLASS(abstract)
 class ACartPawn : public ACharacter, public ISlideAffectable
@@ -118,6 +119,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
 	float BoostCooldown = 2.5f;
+
+    //---------- 그랩 컴포넌트 ----------
+    // 생성자에서 생성하고, SetupPlayerInputComponent에서 IMC 바인딩
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Grab")
+    UCartGrabComponent* GrabComponent;
 
 	//---------- 적재 (C 상품 시스템 연동) ----------
 	//C가 만든 적재 컴포넌트. 생성자에서 부착, BeginPlay에서 적재 변경 이벤트에 바인딩

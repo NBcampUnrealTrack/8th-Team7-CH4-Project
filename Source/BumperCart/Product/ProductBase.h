@@ -30,6 +30,9 @@ public:
     // Loaded 상태로 변환 시도하는 함수
     bool TrySetLoaded();
 
+    // Grabbed 상태로 변환 시도하는 함수
+    bool TrySetGrabbed();
+
     // 카트에서 해당 상품을 떨어뜨리는 함수
     void DropFromCart(AActor* CartActor);
 
@@ -44,6 +47,8 @@ public:
 
     UFUNCTION(BlueprintPure)
     FLoadedProductInfo GetLoadedProductInfo() const;
+
+    UStaticMesh* GetProductMesh() const;
 
     UFUNCTION(BlueprintCallable)
     void SetOnSale(bool NewValue);
@@ -86,10 +91,6 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Drop")
     TObjectPtr<UProductDropConfig> DropConfig;
 
-    // 상품 정보
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
-    FProductData ProductData;
-
     // 상품의 현재 상태, 드롭 위치를 저장하는 구조체
     UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     FProductRepState ProductState;
@@ -103,6 +104,8 @@ private:
     void HandleReturnDisplay();
 
     bool CanLoad() const;
+
+    bool CanGrab() const;
 
 private:
     FTimerHandle ReturnDisplayTimer;
