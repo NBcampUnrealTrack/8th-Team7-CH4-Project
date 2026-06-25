@@ -2,6 +2,8 @@
 
 #include "CartPawn.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/CameraShakeBase.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EnhancedInputComponent.h"
@@ -175,6 +177,9 @@ void ACartPawn::Tick(float DeltaSeconds)
 			BoostTurnAccumDeg = 0.f;
 		}
 	}
+
+	//충돌 세기 계산용: 이번 프레임 속도를 저장 (다음 프레임 NotifyHit에서 '충돌 직전' 속도로 사용)
+	PreviousVelocity = GetVelocity();
 }
 
 void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -382,12 +387,37 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		return;
 	}
 
-	//충돌 노멀 반대방향으로의 상대 접근 속도 = 정면으로 부딪힐수록 큼
-	const FVector RelativeVelocity = GetVelocity() - OtherCart->GetVelocity();
-	const float ClosingSpeed = FVector::DotProduct(RelativeVelocity, -HitNormal);
+	//비물리 카트라 NotifyHit 시점엔 GetVelocity()가 이미 0으로 깎이는 프레임이 있어, '충돌 직전' 프레임 속도(캐시)를 쓴다
+	const FVector RelativeVelocity = PreviousVelocity - OtherCart->PreviousVelocity;
+
+	//두 카트 중심을 잇는 선 방향(수평면) — 접근 중인지(충돌) vs 멀어지는지(튕겨남/접촉 유지) 판정에만 사용
+	const FVector ToOther = (OtherCart->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	const float Approach = FVector::DotProduct(RelativeVelocity, ToOther);
+	if (Approach <= 0.f)
+	{
+		return; //서로 멀어지는 중이면 충돌로 치지 않음 (접촉 유지 프레임의 closing=0 폭탄 제거)
+	}
+
+	//충돌 세기 = 상대속도 크기(2D). 부딪힌 각도와 무관하게 일관됨
+	const float ClosingSpeed = RelativeVelocity.Size2D();
+
 	if (ClosingSpeed < MinBumpSpeed)
 	{
 		return; //약하게 스치는 접촉은 무시
+	}
+
+	//충돌 연출: 이 카트를 조종하는 클라 화면만 흔든다 (서버 → 소유 클라 Client RPC, 슬립과 동일한 클라측 연출)
+	//충돌이 셀수록 쉐이크도 더 세게: 접근속도 [MinBumpSpeed..BumpShakeFullSpeed] => 배율 [BumpShakeScale..BumpShakeMaxScale]
+	if (BumpCameraShakeClass)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			const float ShakeScale = FMath::GetMappedRangeValueClamped(
+				FVector2D(MinBumpSpeed, BumpShakeFullSpeed),
+				FVector2D(BumpShakeScale, BumpShakeMaxScale),
+				ClosingSpeed);
+			PC->ClientStartCameraShake(BumpCameraShakeClass, ShakeScale);
+		}
 	}
 
 	//[B5-②] 충돌 역할 판정 (서버 기준 부스터 상태로)

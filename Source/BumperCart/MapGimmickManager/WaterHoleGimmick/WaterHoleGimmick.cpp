@@ -50,7 +50,7 @@ void AWaterHoleGimmick::OnWaterHoleEndOverlap(UPrimitiveComponent* OverlappedCom
 
 void AWaterHoleGimmick::UpdateCharacterSpin()
 {
-    if (!IsValid(SpinningCharacter))
+    /*if (!IsValid(SpinningCharacter))
     {
         GetWorldTimerManager().ClearTimer(SpinTimerHandle);
         return;
@@ -93,13 +93,13 @@ void AWaterHoleGimmick::UpdateCharacterSpin()
         GetWorldTimerManager().ClearTimer(SpinTimerHandle);
 
         SpinningCharacter = nullptr;
-    }
+    }*/
 
 }
 
 void AWaterHoleGimmick::StopCharacterSpin()
 {
-    GetWorldTimerManager().ClearTimer(SpinTimerHandle);
+    /*GetWorldTimerManager().ClearTimer(SpinTimerHandle);
 
     if (IsValid(SpinningCharacter))
     {
@@ -115,6 +115,6 @@ void AWaterHoleGimmick::StopCharacterSpin()
         UE_LOG(LogTemp, Log, TEXT("[WaterHoleGimmick] %s 캐릭터 회전 종료"), *SpinningCharacter->GetName());
 
         SpinningCharacter = nullptr;
-    }
+    }*/
 }
 

@@ -64,7 +64,7 @@ private:
     UPROPERTY(EditAnywhere, Category = "Spin")
     float SpinDuration = 0.25f;
 
-    // 회전각
+    // 효과 지속시간
     UPROPERTY(EditAnywhere, Category = "Spin")
     float EffectDuration = 0.8f;
 

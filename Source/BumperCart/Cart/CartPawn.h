@@ -13,6 +13,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
+class UCameraShakeBase; //충돌 카메라 쉐이크 클래스
 struct FInputActionValue;
 class UCartGrabComponent;
 
@@ -167,6 +168,22 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BoostTurnSpillAngle = 60.f;
 
+	//충돌 시 재생할 카메라 쉐이크 (BP_CartPawn에 BP_CartBumpShake 지정). 비어있으면 흔들지 않음
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump")
+	TSubclassOf<UCameraShakeBase> BumpCameraShakeClass;
+
+	//충돌 카메라 쉐이크 세기: 약한 충돌(MinBumpSpeed 부근)일 때의 배율
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpShakeScale = 1.f;
+
+	//충돌 카메라 쉐이크 세기: 강한 충돌(BumpShakeFullSpeed 이상)일 때의 배율 — 셀수록 더 세게
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpShakeMaxScale = 1.6f;
+
+	//이 접근속도(cm/s)에서 쉐이크가 최대 세기에 도달 (MinBumpSpeed~이 값 사이를 보간)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpShakeFullSpeed = 1200.f;
+
 	//---------- 미끄럼 (F 맵 기믹 연동: 물웅덩이 등) ----------
 	//미끄럼 중 지면 마찰 (낮을수록 더 미끄러짐)
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
@@ -225,6 +242,9 @@ private:
 
 	//마지막으로 스필(드롭)을 요청한 시각 — BumpDropCooldown 공통 적용
 	float LastBumpDropTime = -1000.f;
+
+	//충돌 직전 프레임의 속도 (NotifyHit 시점엔 비물리라 속도가 0으로 깎여 신뢰 불가 => Tick에서 매 프레임 캐시)
+	FVector PreviousVelocity = FVector::ZeroVector;
 
 	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
 	float BoostTurnAccumDeg = 0.f;
