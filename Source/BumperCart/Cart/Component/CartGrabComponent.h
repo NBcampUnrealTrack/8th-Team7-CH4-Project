@@ -99,6 +99,9 @@ private:
     // 관찰중인 상품을 손에 붙이는 함수
     void AttachProductToHand();
 
+    // 현재 로봇손 시작위치 구하는 함수
+    FVector GetGrabStartLocation() const;
+
 private:
     // 로봇손 팔에 사용할 에셋
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")

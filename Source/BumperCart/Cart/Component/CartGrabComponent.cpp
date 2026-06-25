@@ -144,7 +144,7 @@ void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
         // 진행 정도 확인
         float Progress = VisualElapsedTime / VisualReachDuration;
 
-        FVector CurrentLocation = FMath::Lerp(VisualStartLocation, VisualTargetLocation, Progress);
+        FVector CurrentLocation = FMath::Lerp(GetGrabStartLocation(), VisualTargetLocation, Progress);
         UpdateGrabVisual(CurrentLocation);
 
         // 상품 or 끝에 도달하면 로봇손 회수
@@ -161,7 +161,7 @@ void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
         // 진행 정도 확인
         float Progress = VisualElapsedTime / VisualReachDuration;
 
-        FVector CurrentLocation = FMath::Lerp(VisualStartLocation, VisualTargetLocation, Progress);
+        FVector CurrentLocation = FMath::Lerp(GetGrabStartLocation(), VisualTargetLocation, 1.f - Progress);
         UpdateGrabVisual(CurrentLocation);
 
         if (Progress >= 1.f)
@@ -411,7 +411,7 @@ void UCartGrabComponent::UpdateGrabVisual(const FVector& Location)
 
     FTransform MeshTransform = ArmSpline->GetComponentTransform();
 
-    FVector Start = MeshTransform.InverseTransformPosition(VisualStartLocation);
+    FVector Start = MeshTransform.InverseTransformPosition(GetGrabStartLocation());
     FVector End = MeshTransform.InverseTransformPosition(Location);
 
     FVector Direction = End - Start;
@@ -442,8 +442,9 @@ void UCartGrabComponent::PlayGrabVisual(AProductBase* Product, const FVector& St
     VisualStartLocation = Start;
     VisualTargetLocation = Target;
 
+    // Duration은 거리 / 속도의 절반, 도달, 회수를 해야하기 때문
     float Distance = FVector::Distance(VisualStartLocation, VisualTargetLocation);
-    VisualReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
+    VisualReachDuration = Distance / FMath::Max(GrabSpeed, 1.f) / 2.f;
     VisualReturnDuration = VisualReachDuration;
 
     VisualElapsedTime = 0.f;
@@ -482,4 +483,12 @@ void UCartGrabComponent::AttachProductToHand()
     if (!IsValid(Product) || !Hand) return;
 
     Product->AttachToGrabHand(Hand, SocketName);
+}
+
+FVector UCartGrabComponent::GetGrabStartLocation() const
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return {};
+
+    return OwnerActor->GetActorLocation();
 }
