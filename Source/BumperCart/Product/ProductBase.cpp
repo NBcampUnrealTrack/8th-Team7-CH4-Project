@@ -30,9 +30,7 @@ AProductBase::AProductBase()
     GrabCollision->SetupAttachment(Mesh);
     GrabCollision->SetSphereRadius(65.f);
     GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    GrabCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
-    GrabCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    // 로봇손 전용 콜리전 채널 만들어야할듯?
+    GrabCollision->SetCollisionProfileName(TEXT("ProductGrab"));
 
     bOnSale = false;
 }
@@ -69,8 +67,6 @@ void AProductBase::ApplyDataAsset()
 {
     if (!IsValid(ProductDataAsset)) return;
 
-    ProductData = ProductDataAsset->ProductData;
-
     if (IsValid(ProductDataAsset->ProductMesh))
     {
         Mesh->SetStaticMesh(ProductDataAsset->ProductMesh);
@@ -84,6 +80,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Display:
         SetActorHiddenInGame(false);
         SetNetUpdateFrequency(20.f);
+        SetReplicateMovement(true);
 
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -91,9 +88,23 @@ void AProductBase::ApplyProductState()
         GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         break;
 
+    case EProductState::Grabbed:
+        SetActorHiddenInGame(true);
+        SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
+
+        Mesh->SetSimulatePhysics(false);
+        Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+        Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+        GrabCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        break;
+
     case EProductState::Loaded:
         SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
@@ -106,6 +117,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Falling:
         SetActorHiddenInGame(false);
         SetNetUpdateFrequency(30.f);
+        SetReplicateMovement(true);
 
         Mesh->SetSimulatePhysics(true);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -117,6 +129,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Paid:
         SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionProfileName(TEXT("NoCollision"));
@@ -129,6 +142,7 @@ void AProductBase::ApplyProductState()
     default:
         SetActorHiddenInGame(true);
         SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
         Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -157,6 +171,17 @@ bool AProductBase::TrySetLoaded()
     if (!CanLoad()) return false;
 
     SetProductState(EProductState::Loaded);
+    ForceNetUpdate();
+    return true;
+}
+
+bool AProductBase::TrySetGrabbed()
+{
+    if (!HasAuthority()) return false;
+
+    if (!CanGrab()) return false;
+
+    SetProductState(EProductState::Grabbed);
     ForceNetUpdate();
     return true;
 }
@@ -238,12 +263,12 @@ void AProductBase::HandleReturnDisplay()
 
 int32 AProductBase::GetWeight() const
 {
-    return ProductData.Weight;
+    return ProductDataAsset->ProductData.Weight;
 }
 
 int32 AProductBase::GetValue() const
 {
-    return ProductData.Value;
+    return ProductDataAsset->ProductData.Value;
 }
 
 EProductState AProductBase::GetProductState() const
@@ -258,11 +283,16 @@ FLoadedProductInfo AProductBase::GetLoadedProductInfo() const
     if (IsValid(ProductDataAsset))
     {
         Info.ProductId = ProductDataAsset->ProductId;
+        Info.Value = ProductDataAsset->ProductData.Value;
     }
-    Info.Value = ProductData.Value;
     Info.bOnSale = bOnSale;
 
     return Info;
+}
+
+UStaticMesh* AProductBase::GetProductMesh() const
+{
+    return IsValid(Mesh) ? Mesh->GetStaticMesh() : nullptr;
 }
 
 void AProductBase::SetOnSale(bool NewValue)
@@ -276,6 +306,11 @@ bool AProductBase::IsOnSale() const
 }
 
 bool AProductBase::CanLoad() const
+{
+    return ProductState.State == EProductState::Grabbed;
+}
+
+bool AProductBase::CanGrab() const
 {
     return ProductState.State == EProductState::Display ||
         ProductState.State == EProductState::Falling;
