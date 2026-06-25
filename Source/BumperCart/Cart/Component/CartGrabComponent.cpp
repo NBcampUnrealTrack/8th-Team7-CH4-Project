@@ -539,13 +539,16 @@ void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
 
     VisualProductMesh->SetStaticMesh(ProductMesh);
     VisualProductMesh->SetVisibility(true);
+
+    // 원본 상품은 가리기
+    Product->SetActorHiddenInGame(true);
 }
 
 void UCartGrabComponent::HideVisualProductMesh()
 {
     if (VisualProductMesh)
     {
-        VisualProductMesh->SetVisibility(true);
+        VisualProductMesh->SetVisibility(false);
         VisualProductMesh->SetStaticMesh(nullptr);
     }
 }
