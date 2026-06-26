@@ -14,6 +14,7 @@
 #include "BumperCart.h"
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 ACartPawn::ACartPawn()
 {
@@ -253,6 +254,12 @@ void ACartPawn::OnSteerReleased(const FInputActionValue& Value)
 void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
 {
 	bIsBraking = true;
+
+	//브레이크 효과음 (소유 클라 로컬)
+	if (BrakeSound)
+	{
+		UGameplayStatics::PlaySound2D(this, BrakeSound);
+	}
 }
 
 void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
@@ -271,6 +278,12 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 	bBoostOnCooldown = true;
 	BoostTurnAccumDeg = 0.f; //새 부스터마다 누적 회전 리셋
 	ServerSetBoosting(true); //서버에도 부스터 상태 통지 (충돌 역할용)
+
+	//부스터 효과음 (소유 클라 로컬)
+	if (BoostSound)
+	{
+		UGameplayStatics::PlaySound2D(this, BoostSound);
+	}
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
@@ -420,6 +433,9 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		}
 	}
 
+	//충돌음: 소유 클라에서 재생 (쉐이크와 동일 — 서버에서 Client RPC)
+	ClientPlayBumpSound();
+
 	//[B5-②] 충돌 역할 판정 (서버 기준 부스터 상태로)
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 	if (bIsBoosting)
@@ -431,6 +447,15 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		DropRole = EDropCollisionRole::BoostedTarget;        //부스터한테 박힘 => 더 흘림
 	}
 	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
+}
+
+//충돌음을 소유 클라에서 재생 (BumpSound 비어있으면 무음)
+void ACartPawn::ClientPlayBumpSound_Implementation()
+{
+	if (BumpSound)
+	{
+		UGameplayStatics::PlaySound2D(this, BumpSound);
+	}
 }
 
 //스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청 (충돌·부스터오용 공용)
