@@ -424,9 +424,6 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     LastLoadedProductCount = ProductCount;
     RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount);
 
-    // 정산 시작 시 호출 
-    OnRep_CheckoutSession();
-
     // 클라이언트와 동기화된 정산 시작 시점
     AGameStateBase* GameStateBase = GetWorld()->GetGameState<AGameStateBase>();
     if (IsValid(GameStateBase))
@@ -446,6 +443,9 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
         0.05f,
         true
     );
+
+    // 정산 시작 시 호출 
+    OnRep_CheckoutSession();
 
     UE_LOG(LogTemp, Warning, TEXT("%s 정산 시작"), *GetNameSafe(CurrentCheckoutPlayer));
 }
