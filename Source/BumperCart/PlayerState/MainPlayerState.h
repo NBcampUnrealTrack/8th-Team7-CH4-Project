@@ -21,9 +21,9 @@ public:
     FOnPlayerStatsChanged OnPlayerStatsChanged;
 
     //점수 추가
-    void AddScore(float AddScore);
+    void AddPlayerScore(float AddScore);
     UFUNCTION(BlueprintPure, Category = "PlayerStats")
-    float GetScore() const;
+    float GetPlayerScore() const;
 
     //플레이어 순위
     void SetRank(int32 NewRank);

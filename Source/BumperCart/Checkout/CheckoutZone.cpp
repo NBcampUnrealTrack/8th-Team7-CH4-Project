@@ -444,7 +444,7 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
         true
     );
 
-    // 정산 시작 시 호출 
+    // 정산 시작 시 호출
     OnRep_CheckoutSession();
 
     UE_LOG(LogTemp, Warning, TEXT("%s 정산 시작"), *GetNameSafe(CurrentCheckoutPlayer));
@@ -577,7 +577,7 @@ void ACheckoutZone::CompleteCheckout()
     LastCheckoutScore = ScoreResult.TotalScore;
 
     // 최종 점수 Player State 반영
-    MainPlayerState->AddScore(LastCheckoutScore);
+    MainPlayerState->AddPlayerScore(LastCheckoutScore);
     MainPlayerState->AddCheckoutCount(1);
 
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
