@@ -104,11 +104,11 @@ protected:
 
 	//정지 상태에서의 최소 조향 배율
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0", ClampMax = "1"))
-	float MinSteerSpeedFactor = 0.35f;
+	float MinSteerSpeedFactor = 0.55f;
 
 	//조향 입력을 따라가는 속도. 낮을수록 묵직하게 늦게 먹는다(회전 지연)
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0.1"))
-	float SteerInterpSpeed = 3.f;
+	float SteerInterpSpeed = 5.f;
 
 	//---------- 브레이크 ----------
 	//브레이크 시 감속도
@@ -179,11 +179,11 @@ protected:
 
 	//충돌 카메라 쉐이크 세기: 약한 충돌(MinBumpSpeed 부근)일 때의 배율
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpShakeScale = 1.f;
+	float BumpShakeScale = 0.4f;
 
 	//충돌 카메라 쉐이크 세기: 강한 충돌(BumpShakeFullSpeed 이상)일 때의 배율 — 셀수록 더 세게
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpShakeMaxScale = 1.6f;
+	float BumpShakeMaxScale = 0.8f;
 
 	//이 접근속도(cm/s)에서 쉐이크가 최대 세기에 도달 (MinBumpSpeed~이 값 사이를 보간)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
