@@ -39,7 +39,7 @@ public:
     void StartAimTimer();
 
     // Owner Actor에 로봇손 스플라인 메시를 생성하는 함수
-    void CreateVisualComponents();
+    void EnsureVisualComponents();
 
 protected:
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
