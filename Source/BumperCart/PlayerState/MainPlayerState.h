@@ -22,24 +22,27 @@ public:
 
     //점수 추가
     void AddScore(float AddScore);
-
+    UFUNCTION(BlueprintPure, Category = "PlayerStats")
     float GetScore() const;
 
     //플레이어 순위
     void SetRank(int32 NewRank);
-
+    UFUNCTION(BlueprintPure, Category = "PlayerStats")
     int32 GetRank() const;
 
     //계산대 이용 횟수
     void AddCheckoutCount(int32 Count);
+    UFUNCTION(BlueprintPure, Category = "PlayerStats")
     int32 GetCheckoutCount() const;
 
     //카트끼리 충돌 횟수
     void AddCartBumpCount(int32 Count);
+    UFUNCTION(BlueprintPure, Category = "PlayerStats")
     int32 GetCartBumpCount() const;
 
     //카트에서 상품 낙하 횟수
     void AddDroppedItemCount(int32 Count);
+    UFUNCTION(BlueprintPure, Category = "PlayerStats")
     int32 GetDroppedItemCount() const;
 
     //라운드 시작 시 통계 초기화
