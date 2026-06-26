@@ -2,7 +2,11 @@
 
 
 #include "PlayerState/MainPlayerState.h"
+
+#include "GameMode/MainGameMode.h"
 #include "Net/UnrealNetwork.h"
+
+class AMainGameMode;
 
 AMainPlayerState::AMainPlayerState()
 {
@@ -28,6 +32,12 @@ void AMainPlayerState::AddScore(float AddScore)
     PlayerScore += AddScore;
 
     OnPlayerStatsChanged.Broadcast();
+
+    //등수 계산
+    if (AMainGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AMainGameMode>() : nullptr)
+    {
+        GM->UpdateAllPlayerRanks();
+    }
 }
 
 float AMainPlayerState::GetScore() const

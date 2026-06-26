@@ -8,7 +8,9 @@
 #include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
 #include "EventManager/BC_EventManager.h"
 #include "MapGimmickManager/MapGimmickManager.h"
+#include "PlayerState/MainPlayerState.h"
 
+class AMainPlayerState;
 DEFINE_LOG_CATEGORY_STATIC(LogMainGameMode, Log, All);
 
 AMainGameMode::AMainGameMode()
@@ -236,6 +238,8 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         }
 
         GetWorldTimerManager().ClearTimer(Timer_RoundTick);
+
+        UpdateAllPlayerRanks();
         break;
 
     default:
@@ -243,4 +247,53 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     }
 
     UE_LOG(LogMainGameMode, Warning, TEXT("[PHASE CHANGE] 새로운 페이즈 진입: %s"), *PhaseName);
+}
+
+void AMainGameMode::UpdateAllPlayerRanks()
+{
+    AMainGameState* GS = GetGameState<AMainGameState>();
+    if (!GS)
+    {
+        return;
+    }
+
+    TArray<AMainPlayerState*> SortedStates;
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        if (AMainPlayerState* MPS = Cast<AMainPlayerState>(PS))
+        {
+            SortedStates.Add(MPS);
+        }
+    }
+
+    if (SortedStates.Num() == 0)
+    {
+        return;
+    }
+
+
+    //점수 내림차순 정렬
+    SortedStates.Sort([](const AMainPlayerState& A, const AMainPlayerState& B)
+    {
+        return A.GetScore() > B.GetScore();
+    });
+
+    //동점자는 같은 등수
+    int32 CurrentRank = 1;
+    for (int32 Index = 0; Index < SortedStates.Num(); ++Index)
+    {
+        if (Index > 0 && SortedStates[Index]->GetScore() == SortedStates[Index - 1]->GetScore())
+        {
+            // 바로 앞 사람과 점수가 같으면 같은 등수 부여
+            SortedStates[Index]->SetRank(SortedStates[Index - 1]->GetRank());
+        }
+        else
+        {
+            SortedStates[Index]->SetRank(CurrentRank);
+        }
+
+        ++CurrentRank;
+    }
+
+
 }
