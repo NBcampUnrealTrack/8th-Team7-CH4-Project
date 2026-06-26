@@ -199,11 +199,22 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     case ERoundPhase::SaleEvent:
         // 세일 상품 이벤트 시작
         PhaseName = TEXT("SaleEvent (세일 상품 이벤트 시작)");
+
+        if (BC_EventManager)
+        {
+            BC_EventManager->StartSaleEvent();
+        }
+
         break;
 
     case ERoundPhase::PremiumRespawn:
         // 중앙 고급 상품 스폰
         PhaseName = TEXT("PremiumRespawn (중앙 고급 상품 스폰)");
+
+        if (BC_EventManager)
+        {
+            BC_EventManager->StartLimitedEvent();
+        }
         break;
 
     case ERoundPhase::FinalWarningOneOpen:
