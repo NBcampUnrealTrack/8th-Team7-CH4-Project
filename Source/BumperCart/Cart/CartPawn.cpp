@@ -34,7 +34,7 @@ ACartPawn::ACartPawn()
 		Move->GroundFriction = 3.0f; //낮을수록 미끄러짐(드리프트)
 		Move->BrakingFriction = 1.5f;
 		Move->MaxAcceleration = 1200.f;
-		Move->MaxWalkSpeed = 900.f;
+		Move->MaxWalkSpeed = 700.f;
 		Move->BrakingDecelerationWalking = 1400.f;
 		Move->JumpZVelocity = 0.f; //카트는 점프 없음
 		Move->AirControl = 0.f;
@@ -43,7 +43,7 @@ ACartPawn::ACartPawn()
 	//카메라: 고정 쿼터뷰. 카트가 회전해도 각도는 고정되고 위치만 따라간다.
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 1100.f; //쿼터뷰라 멀리서
+	CameraBoom->TargetArmLength = 800.f; //쿼터뷰 — 카트 메시 크기에 맞춰 당겨옴
 	CameraBoom->SetRelativeRotation(FRotator(-55.f, 0.f, 0.f)); //아래로 비스듬히 내려봄
 	CameraBoom->bUsePawnControlRotation = false;
 	CameraBoom->bInheritPitch = false; //카트 회전과 무관하게 각도 고정
