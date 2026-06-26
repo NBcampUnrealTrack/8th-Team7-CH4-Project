@@ -14,6 +14,7 @@ class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class UCameraShakeBase; //충돌 카메라 쉐이크 클래스
+class USoundBase; //효과음(SFX)
 struct FInputActionValue;
 class UCartGrabComponent;
 
@@ -58,6 +59,10 @@ protected:
 	//미끄럼(슬립) 효과를 모든 인스턴스에 전파해 각자 로컬 적용 (소유 클라의 예측 이동에도 반영)
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastApplySlip(float Duration, float SpinAngleDeg);
+
+	//충돌음을 소유 클라에서 재생 (서버 NotifyHit에서 호출 — 쉐이크와 동일 패턴, 멀티캐스트 중복재생 회피)
+	UFUNCTION(Client, Unreliable)
+	void ClientPlayBumpSound();
 
 	//---------- 카메라 ----------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
@@ -196,6 +201,19 @@ protected:
 	//미끄럼 시작 시 강제 스핀이 풀리는 속도(도/초)
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
 	float SlipSpinSpeedDeg = 240.f;
+
+	//---------- 효과음 (SFX) — BP_CartPawn에서 사운드 지정. 비어있으면 무음 ----------
+	//충돌(범프) 시 효과음
+	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
+	USoundBase* BumpSound;
+
+	//부스터 발동 시 효과음
+	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
+	USoundBase* BoostSound;
+
+	//브레이크 시 효과음
+	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
+	USoundBase* BrakeSound;
 
 protected:
 	//---------- 입력 핸들러 ----------
