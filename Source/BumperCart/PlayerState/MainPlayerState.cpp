@@ -13,7 +13,7 @@ void AMainPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(AMainPlayerState, Score);
+    DOREPLIFETIME(AMainPlayerState, PlayerScore);
     DOREPLIFETIME(AMainPlayerState, Rank);
     DOREPLIFETIME(AMainPlayerState, CheckoutCount);
     DOREPLIFETIME(AMainPlayerState, BumpCartCount);
@@ -25,17 +25,17 @@ void AMainPlayerState::AddScore(float AddScore)
 {
     if (!HasAuthority()) return;
 
-    Score += AddScore;
+    PlayerScore += AddScore;
 
     OnPlayerStatsChanged.Broadcast();
 }
 
 float AMainPlayerState::GetScore() const
 {
-    return Score;
+    return PlayerScore;
 }
 
-void AMainPlayerState::OnRep_Score()
+void AMainPlayerState::OnRep_PlayerScore()
 {
     OnPlayerStatsChanged.Broadcast();
 }
@@ -131,7 +131,7 @@ void AMainPlayerState::ResetStats()
 {
     if (!HasAuthority()) return;
 
-    Score = 0;
+    PlayerScore = 0;
     Rank = 0;
     CheckoutCount = 0;
     BumpCartCount = 0;
