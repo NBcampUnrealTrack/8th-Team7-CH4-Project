@@ -92,7 +92,7 @@ void UCartGrabComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
     Super::EndPlay(EndPlayReason);
 }
 
-void UCartGrabComponent::CreateVisualComponents()
+void UCartGrabComponent::EnsureVisualComponents()
 {
     AActor* OwnerActor = GetOwner();
     if (!IsValid(OwnerActor)) return;
@@ -188,7 +188,7 @@ void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
     else if (VisualState == EGrabVisualState::Returning)
     {
         // 진행 정도 확인
-        float Progress = VisualElapsedTime / VisualReachDuration;
+        float Progress = VisualElapsedTime / VisualReturnDuration;
 
         FVector CurrentLocation = FMath::Lerp(GetGrabStartLocation(), VisualTargetLocation, 1.f - Progress);
         UpdateGrabVisual(CurrentLocation);
@@ -385,14 +385,14 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     FVector TargetLocation = Product->GetActorLocation();
 
     float Distance = FVector::Distance(StartLocation, TargetLocation);
-    float Duration = Distance / GrabSpeed;
+    float ReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
 
     // 상품과 접촉하는 시간에 잡을 수 있는지 체크하도록 타이머 설정
     World->GetTimerManager().SetTimer(
         TryGrabTimer,
         this,
         &ThisClass::TryGrabProduct,
-        Duration / 2.f,
+        ReachDuration,
         false
     );
 
@@ -400,7 +400,7 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     Multicast_PlayGrab(StartLocation, TargetLocation);
 
     // 쿨다운 적용
-    SetGrabCooldown(Duration);
+    SetGrabCooldown(ReachDuration * 2.f);
 }
 
 bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, FHitResult& Hit)
@@ -431,9 +431,9 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     if (!bHit)
     {
         float Distance = FVector::Distance(Start, End);
-        float Duration = Distance / GrabSpeed;
+        float ReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
         Multicast_PlayGrab(Start, End);
-        SetGrabCooldown(Duration);
+        SetGrabCooldown(ReachDuration * 2.f);
         return false;
     }
 
@@ -487,15 +487,15 @@ void UCartGrabComponent::UpdateGrabVisual(const FVector& Location)
 
 void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Target)
 {
-    CreateVisualComponents();
+    EnsureVisualComponents();
     if (!ArmSpline || !Hand) return;
 
     VisualStartLocation = Start;
     VisualTargetLocation = Target;
 
-    // Duration은 거리 / 속도의 절반, 도달, 회수를 해야하기 때문
+    // Duration은 거리 / 속도,
     float Distance = FVector::Distance(VisualStartLocation, VisualTargetLocation);
-    VisualReachDuration = Distance / FMath::Max(GrabSpeed, 1.f) / 2.f;
+    VisualReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
     VisualReturnDuration = VisualReachDuration;
 
     VisualElapsedTime = 0.f;
@@ -530,7 +530,7 @@ void UCartGrabComponent::FinishGrabVisual()
 
 void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
 {
-    CreateVisualComponents();
+    EnsureVisualComponents();
 
     if (!IsValid(Product) || !IsValid(VisualProductMesh)) return;
 
