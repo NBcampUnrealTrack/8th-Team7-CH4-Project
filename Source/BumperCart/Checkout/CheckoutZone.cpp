@@ -5,6 +5,7 @@
 #include "Product/ProductTypes.h"
 #include "Checkout/CheckoutScoreCalculator.h"
 #include "GameState/MainGameState.h"
+#include "PlayerState/MainPlayerState.h"
 
 #include "GameFramework/Character.h"
 #include "GameFramework/GameStateBase.h"
@@ -520,7 +521,7 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
-    // MainGameState 인지
+    // MainGameState 검사
     const AMainGameState* MainGameState = GetWorld()->GetGameState<AMainGameState>();
     if (!IsValid(MainGameState))
     {
@@ -539,7 +540,14 @@ void ACheckoutZone::CompleteCheckout()
     // 현재 마지막 라운드인지
     const bool bIsLastCheckoutBonusApplied = MainGameState->GetCurrentPhase() == ERoundPhase::FinalWarningOneOpen;
 
-
+    // PlayerState 검사
+    AMainPlayerState* MainPlayerState = CompletedPlayer->GetPlayerState<AMainPlayerState>();
+    if (!IsValid(MainPlayerState))
+    {
+        CancelCheckout();
+        TryStartCheckout();
+        return;
+    }
     // 정산 점수 계산
     TArray<FLoadedProductInfo> CheckoutProducts;
     if (!CartLoadComponent->CheckoutProducts(CheckoutProducts)) // LoadedProducts 순회하며 정산 데이터 가져옴
@@ -565,9 +573,13 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
+    // 최종 점수 계산
     LastCheckoutScore = ScoreResult.TotalScore;
-    //PlayerState->AddScore(CehckoutScore);
-    
+
+    // 최종 점수 Player State 반영
+    MainPlayerState->AddScore(LastCheckoutScore);
+    MainPlayerState->AddCheckoutCount(1);
+
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
     if (GEngine)
     {
