@@ -25,7 +25,7 @@ void AMainPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 }
 
 // 점수 관련
-void AMainPlayerState::AddScore(float AddScore)
+void AMainPlayerState::AddPlayerScore(float AddScore)
 {
     if (!HasAuthority()) return;
 
@@ -40,7 +40,7 @@ void AMainPlayerState::AddScore(float AddScore)
     }
 }
 
-float AMainPlayerState::GetScore() const
+float AMainPlayerState::GetPlayerScore() const
 {
     return PlayerScore;
 }
