@@ -46,7 +46,7 @@ void AProductShelfManager::BeginPlay()
     UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 모든 일반 선반 등록 - 등록 갯수 : %d"), AllProductShelfs.Num());
 
     // 게임 모드에서 호출시 삭제 예정
-    StartProductSpawning();
+    //StartProductSpawning();
 }
 
 void AProductShelfManager::ProductSpawnCall()

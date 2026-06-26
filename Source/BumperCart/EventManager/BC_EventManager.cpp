@@ -28,8 +28,8 @@ void ABC_EventManager::BeginPlay()
         UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 등록되어있음"));
     }
 
-    GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &ABC_EventManager::StartSaleEvent, 20.0f,false);
-    GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &ABC_EventManager::StartLimitedEvent, 30.0f, false);
+    //GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &ABC_EventManager::StartSaleEvent, 20.0f,false);
+    //GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &ABC_EventManager::StartLimitedEvent, 30.0f, false);
 }
 
 TSubclassOf<AProductBase> ABC_EventManager::SaleProductSelection()

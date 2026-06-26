@@ -42,9 +42,9 @@ void AMapGimmickManager::BeginPlay()
 
 void AMapGimmickManager::StartGimmickSpawning()
 {
-    RespawnWaterHole();
+    RespawnObstacles();
 
-    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnWaterHole, WaterHoleRespawnInterval, true);
+    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnObstacles, WaterHoleRespawnInterval, true);
 }
 
 void AMapGimmickManager::RespawnWaterHole()
@@ -120,5 +120,81 @@ void AMapGimmickManager::SpawnWaterHole()
 void AMapGimmickManager::EndSpawnWaterHole()
 {
     ClearAllWaterHole();
+}
+
+void AMapGimmickManager::SpawnObstacles()
+{
+    if (!HasAuthority()) return;
+
+    if (!GetWorld() || GimmickSpawnPointList.Num() == 0) return;
+
+    for (int32 i = 0; i <= GimmickSpawnPointList.Num() - 1; ++i)
+    {
+        int32 RandomIndex = FMath::RandRange(i, GimmickSpawnPointList.Num() - 1);
+        if (i != RandomIndex)
+        {
+            GimmickSpawnPointList.Swap(i, RandomIndex);
+        }
+    }
+
+    int32 CurrentTargetPointIndex = 0;
+
+    for (const FObstacleSpawnInfo& Info : ObstacleSpawnList)
+    {
+        if (!Info.ObstacleClass) continue;
+
+        for (int32 i = 0; i < Info.SpawnCount; ++i)
+        {
+            ATargetPoint* TargetPoint = GimmickSpawnPointList[CurrentTargetPointIndex];
+
+            if (IsValid(TargetPoint))
+            {
+                FVector SpawnLocation = TargetPoint->GetActorLocation();
+                FRotator SpawnRotation = TargetPoint->GetActorRotation();
+
+                AActor* SpawnedGimmick = GetWorld()->SpawnActor<AActor>(Info.ObstacleClass, SpawnLocation, SpawnRotation);
+
+                if (IsValid(SpawnedGimmick))
+                {
+                    CurrentTargetPointIndex++;
+
+                    SpawnedObstacleList.Add(SpawnedGimmick);
+                }
+            }
+        }
+
+        UE_LOG(LogTemp, Log, TEXT("[MapGimmickManager] %s %d개 스폰 완료"), *Info.ObstacleName.ToString(), Info.SpawnCount);
+    }
+}
+
+void AMapGimmickManager::ClearAllObstacles()
+{
+    if (!HasAuthority()) return;
+
+    for (AActor* Obstacle : SpawnedObstacleList)
+    {
+        if (IsValid(Obstacle))
+        {
+            Obstacle->Destroy();
+        }
+    }
+
+    SpawnedObstacleList.Empty();
+
+    UE_LOG(LogTemp, Warning, TEXT("[GimmickManager] 기존 장애물들 정리완료"));
+}
+
+void AMapGimmickManager::RespawnObstacles()
+{
+    if (!HasAuthority()) return;
+
+    ClearAllObstacles();
+
+    SpawnObstacles();
+}
+
+void AMapGimmickManager::EndSpawnObstacle()
+{
+    ClearAllObstacles();
 }
 
