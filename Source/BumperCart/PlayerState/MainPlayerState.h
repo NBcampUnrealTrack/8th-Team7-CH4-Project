@@ -50,7 +50,7 @@ protected:
 
 private:
     UFUNCTION()
-    void OnRep_Score();
+    void OnRep_PlayerScore();
 
     UFUNCTION()
     void OnRep_Rank();
@@ -64,19 +64,19 @@ private:
     UFUNCTION()
     void OnRep_DroppedItemCount();
 
-    UPROPERTY(ReplicatedUsing = OnRep_Score, VisibleAnywhere, BlueprintReadOnly, Category = "PlayerStats")
-    int32 Score = 0;
+    UPROPERTY(ReplicatedUsing = OnRep_PlayerScore, VisibleAnywhere,  Category = "PlayerStats")
+    int32 PlayerScore = 0;
 
-    UPROPERTY(ReplicatedUsing = OnRep_Rank, VisibleAnywhere, BlueprintReadOnly, Category = "PlayerStats")
+    UPROPERTY(ReplicatedUsing = OnRep_Rank, VisibleAnywhere,  Category = "PlayerStats")
     int32 Rank = 0;
 
-    UPROPERTY(ReplicatedUsing = OnRep_CheckoutCount, VisibleAnywhere, BlueprintReadOnly, Category = "PlayerStats")
+    UPROPERTY(ReplicatedUsing = OnRep_CheckoutCount, VisibleAnywhere,  Category = "PlayerStats")
     int32 CheckoutCount = 0;
 
-    UPROPERTY(ReplicatedUsing = OnRep_CartBumpCount, VisibleAnywhere, BlueprintReadOnly, Category = "PlayerStats")
+    UPROPERTY(ReplicatedUsing = OnRep_CartBumpCount, VisibleAnywhere,  Category = "PlayerStats")
     int32 BumpCartCount = 0;
 
-    UPROPERTY(ReplicatedUsing = OnRep_DroppedItemCount, VisibleAnywhere, BlueprintReadOnly, Category = "PlayerStats")
+    UPROPERTY(ReplicatedUsing = OnRep_DroppedItemCount, VisibleAnywhere,  Category = "PlayerStats")
     int32 DroppedItemCount = 0;
 
 };
