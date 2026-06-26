@@ -200,6 +200,13 @@ void ACheckoutZone::AddPlayerInZone(ACartPawn* PlayerCharacter)
 
     PlayersInZone.AddUnique(PlayerCharacter);
 
+    // 계산대 진입 시 HandleLoadInfoChanged 델리게이트 등록
+    UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
+    if (IsValid(CartLoadComponent))
+    {
+        CartLoadComponent->OnLoadInfoChanged.AddUniqueDynamic(this,&ThisClass::HandleLoadInfoChanged);
+    }
+
     UE_LOG(LogTemp, Warning, TEXT("계산 구역 진입: %s / 현재 계산대 내 인원: %d"), *GetNameSafe(PlayerCharacter), PlayersInZone.Num());
 
     // 배열에 추가 후 Checkout 시도
@@ -212,6 +219,13 @@ void ACheckoutZone::RemovePlayerFromZone(ACartPawn* PlayerCharacter)
     if (!IsValid(PlayerCharacter))
     {
         return;
+    }
+
+    // 계산대 이탈 시 HandleLoadInfoChanged 델리게이트 해제
+    UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
+    if (IsValid(CartLoadComponent))
+    {
+        CartLoadComponent->OnLoadInfoChanged.RemoveDynamic(this, &ThisClass::HandleLoadInfoChanged);
     }
 
     PlayersInZone.Remove(PlayerCharacter);
@@ -227,6 +241,58 @@ void ACheckoutZone::RemovePlayerFromZone(ACartPawn* PlayerCharacter)
         TryStartCheckout();
     }
 }
+
+void ACheckoutZone::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    ACartPawn* PlayerCharacter = Cast<ACartPawn>(OwnerActor);
+    if (!IsValid(PlayerCharacter))
+    {
+        return;
+    }
+
+    // 계산대 내부에서만 처리 가능
+    if (!PlayersInZone.Contains(PlayerCharacter))
+    {
+        return;
+    }
+
+    // 상품 0개로 계산대에 들어온 뒤, 상품을 획득한 경우
+    const int32 CurrentLoadedProductCount = FMath::Max(LoadInfo.CurrentLoadedCount, 0);
+
+    if (!bIsCheckoutInProgress)
+    {
+        if (CurrentLoadedProductCount > 0)
+        {
+            TryStartCheckout();
+        }
+
+        return;
+    }
+
+    if (CurrentCheckoutPlayer != PlayerCharacter)
+    {
+        return;
+    }
+
+    // 정산 중 증가한 상품 수만큼 정산 시간 추가
+    const int32 AddedProductCount = CurrentLoadedProductCount - LastLoadedProductCount;
+
+    if (AddedProductCount > 0)
+    {
+        RequiredCheckoutTime += AdditionalCheckoutTime * AddedProductCount;
+
+        UE_LOG(LogTemp, Warning, TEXT("상품 %d개 추가 / 필요 시간: %.1f초"), AddedProductCount, RequiredCheckoutTime);
+    }
+
+    // 현재 적재한 상품 수 갱신
+    LastLoadedProductCount = CurrentLoadedProductCount;
+}
+
 
 ACartPawn* ACheckoutZone::FindNextCheckoutPlayer()
 {
@@ -354,6 +420,7 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
 
     // 적재된 상품 수에 따라 추가 정산 시간
     int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
+    LastLoadedProductCount = ProductCount;
     RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount);
 
     // 정산 시작 시 호출 
@@ -370,8 +437,6 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     {
         CheckoutStartTime = GetWorld()->GetTimeSeconds();
     }
-
-
 
     GetWorldTimerManager().SetTimer(
         CheckoutTimerHandle,
@@ -515,7 +580,7 @@ void ACheckoutZone::CompleteCheckout()
     }
 
     // 정산이 완료되면 플레이어는 대기열에서 제거
-    PlayersInZone.Remove(CompletedPlayer);
+    //PlayersInZone.Remove(CompletedPlayer);
 
     // 계산대 세팅 초기화
     ResetCheckout();
@@ -550,6 +615,8 @@ void ACheckoutZone::ResetCheckout()
 
     CurrentCheckoutPlayer = nullptr;
     bIsCheckoutInProgress = false;
+
+    LastLoadedProductCount = 0;
 
     CheckoutStartTime = 0.0;
     ElapsedCheckoutTime = 0.0f;
