@@ -203,6 +203,10 @@ private:
     // 플레이어가 범위 밖으로 나가면 배열에서 삭제
     void RemovePlayerFromZone(ACartPawn* PlayerCharacter);
 
+    // 계산대 범위 내에서 상품을 획득할 경우
+    UFUNCTION()
+    void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
+
 private:
     // 범위 내 플레이어 배열
     UPROPERTY(VisibleAnywhere, Category = " Checkout|Player")
@@ -212,6 +216,9 @@ private:
     // 복제 데이터
     UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_CheckoutSession, Category = " Checkout|Player")
     TObjectPtr<ACartPawn> CurrentCheckoutPlayer;
+
+    // 정산 중 마지막으로 확인한 적재 상품 수
+    int32 LastLoadedProductCount = 0;
 
 // ------------------------------------------------------------
 // 계산 조건
