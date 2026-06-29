@@ -116,6 +116,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
 	float BrakeDeceleration = 2000.f;
 
+    //전진 중 후진키를 눌렀을 때의 감속도 (낮을수록 천천히)
+    UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
+    float ReverseSlideDeceleration = 600.f;
+
 	//---------- 부스터 ----------
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "1"))
 	float BoostSpeedMultiplier = 1.8f;
@@ -151,7 +155,7 @@ protected:
 
 	//가득 실었을 때 브레이크 배율 (낮을수록 무거우면 잘 안 멈춤)
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
-	float LoadBrakeScale = 0.7f;
+	float LoadBrakeScale = 0.45f;
 
 	//---------- 충돌/스필 드롭 (B4/B5) ----------
 	//충격속도(cm/s)를 C 드롭 충격량으로 환산하는 배율 (충돌용)
