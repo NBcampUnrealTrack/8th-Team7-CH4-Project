@@ -13,6 +13,9 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "Util/BCCollisionChannels.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Components/DecalComponent.h"
 
 
 UCartGrabComponent::UCartGrabComponent()
@@ -34,6 +37,9 @@ UCartGrabComponent::UCartGrabComponent()
     AimDashLength = 40.f;
     AimDashGap = 25.f;
     AimDashThickness = 1.f;
+    AimDotSpacing = 45.f;
+    AimDotSize = 20.f;
+    NiagaraHeightOffset = 20.f;
 
     // 로봇손 관련
     GrabSpeed = 300.f;
@@ -349,6 +355,7 @@ void UCartGrabComponent::UpdateGrabAim()
     if (!bDeprojected) return;
 
     FVector Start = OwnerPawn->GetActorLocation();
+    Start.Z = 10.f; // 강제로 상품 높이로 보정
     float PawnZ = Start.Z;
 
     if (FMath::IsNearlyZero(WorldDirection.Z)) return;
@@ -372,7 +379,9 @@ void UCartGrabComponent::UpdateGrabAim()
     CachedAimTargetLocation = Start + CachedAimDirection * ActualDistance;
     CachedAimDistance = ActualDistance;
 
-    UpdateDashedAimVisual(Start, CachedAimTargetLocation);
+    //UpdateDashedAimVisual(Start, CachedAimTargetLocation);
+    UpdateAimNiagaraVisual(Start, CachedAimTargetLocation);
+    UpdateAimDecal(CachedAimTargetLocation);
 }
 
 void UCartGrabComponent::TryGrabProduct()
@@ -456,6 +465,8 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
 
     FVector Start = OwnerActor->GetActorLocation();
     FVector End = Start + FVector(AimDirection) * AimDistance;
+    Start.Z = 10.f; // 카트가 중심점보다 아래있어서 강제로 보정, 상품들이 10.f에 위치함
+
 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(OwnerActor);
@@ -532,6 +543,8 @@ void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Tar
 {
     EnsureVisualComponents();
     if (!ArmSpline || !Hand) return;
+
+    HideAimDashMeshes();
 
     VisualStartLocation = Start;
     VisualTargetLocation = Target;
@@ -617,6 +630,9 @@ FVector UCartGrabComponent::GetGrabStartLocation() const
 
 void UCartGrabComponent::UpdateDashedAimVisual(const FVector& Start, const FVector& End)
 {
+    // 그랩 연출중에는 그리기 X
+    if (VisualState != EGrabVisualState::None) return;
+
     FVector AimVector = End - Start;
     float TotalLength = AimVector.Size();
 
@@ -695,4 +711,83 @@ void UCartGrabComponent::HideAimDashMeshes()
             DashMesh->SetVisibility(false);
         }
     }
+}
+
+void UCartGrabComponent::EnsureAimNiagara()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    if (!AimNiagaraSystem) return;
+
+    if (!AimNiagaraComponent)
+    {
+        AimNiagaraComponent = NewObject<UNiagaraComponent>(OwnerActor, TEXT("AimNiagaraComponent"));
+        AimNiagaraComponent->SetAsset(AimNiagaraSystem);
+        AimNiagaraComponent->SetupAttachment(OwnerActor->GetRootComponent());
+        AimNiagaraComponent->SetAutoActivate(false);
+
+        OwnerActor->AddInstanceComponent(AimNiagaraComponent);
+        AimNiagaraComponent->RegisterComponent();
+    }
+}
+
+void UCartGrabComponent::UpdateAimNiagaraVisual(const FVector& Start, const FVector& End)
+{
+    if (VisualState != EGrabVisualState::None) return;
+
+    EnsureAimNiagara();
+
+    if (!IsValid(AimNiagaraComponent)) return;
+
+    FVector NiagaraOffset(0.f, 0.f, NiagaraHeightOffset);
+
+    FVector NiagaraStart = Start + NiagaraOffset;
+    FVector NiagaraEnd = End + NiagaraOffset;
+
+    AimNiagaraComponent->SetVariablePosition(TEXT("User.StartPosition"), NiagaraStart);
+    AimNiagaraComponent->SetVariablePosition(TEXT("User.EndPosition"), NiagaraEnd);
+    AimNiagaraComponent->SetVariableFloat(TEXT("User.ActiveDistance"), CachedAimDistance);
+    AimNiagaraComponent->SetVariableFloat(TEXT("User.DotSpacing"), AimDotSpacing);
+    AimNiagaraComponent->SetVariableFloat(TEXT("User.DotSize"), AimDotSize);
+
+    if (!AimNiagaraComponent->IsActive())
+    {
+        AimNiagaraComponent->Activate(true);
+    }
+}
+
+void UCartGrabComponent::EnsureAimDecal()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    if (!AimDecal)
+    {
+        AimDecal = NewObject<UDecalComponent>(OwnerActor, TEXT("AimDecal"));
+        AimDecal->SetupAttachment(OwnerActor->GetRootComponent());
+        AimDecal->SetVisibility(false);
+
+        if (AimDecalMaterial)
+        {
+            AimDecal->SetDecalMaterial(AimDecalMaterial);
+        }
+
+        AimDecal->DecalSize = FVector(16.f, 16.f, 16.f);
+
+        OwnerActor->AddInstanceComponent(AimDecal);
+        AimDecal->RegisterComponent();
+    }
+}
+
+void UCartGrabComponent::UpdateAimDecal(const FVector& Target)
+{
+    if (VisualState != EGrabVisualState::None) return;
+
+    EnsureAimDecal();
+
+    if (!IsValid(AimDecal)) return;
+
+    AimDecal->SetWorldLocation(Target);
+    AimDecal->SetVisibility(true);
 }

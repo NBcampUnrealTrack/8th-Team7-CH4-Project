@@ -11,6 +11,9 @@ class UInputMappingContext;
 class UInputAction;
 class USplineMeshComponent;
 class UStaticMeshComponent;
+class UNiagaraComponent;
+class UNiagaraSystem;
+class UDecalComponent;
 
 UENUM(BlueprintType)
 enum class EGrabVisualState : uint8
@@ -121,6 +124,18 @@ private:
 
     void HideAimDashMeshes();
 
+    // 조준선 나이아가라 확인하고 생성하는 함수
+    void EnsureAimNiagara();
+
+    // 조준선용 나이아가라 업데이트하는 함수
+    void UpdateAimNiagaraVisual(const FVector& Start, const FVector& End);
+
+    // 마우스 위치에 데칼 확인하고 생성하는 함수
+    void EnsureAimDecal();
+
+    // 마우스 위치에 데칼 업데이트하는 함수
+    void UpdateAimDecal(const FVector& Target);
+
 private:
     // 로봇손 팔에 사용할 에셋
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
@@ -168,6 +183,38 @@ private:
     float AimUpdateInterval;
 
 
+    // ------------------- 조준선 나이아가라 이용 -------------------
+    // 조준선용 나이아가라 컴포넌트
+    UPROPERTY()
+    TObjectPtr<UNiagaraComponent> AimNiagaraComponent;
+
+    // 조준선용 나니아가라 시스템
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Aim")
+    TObjectPtr<UNiagaraSystem> AimNiagaraSystem;
+
+    // 마우스 위치에 그릴 데칼
+    UPROPERTY()
+    TObjectPtr<UDecalComponent> AimDecal;
+
+    // 데칼에 사용할 머티리얼
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Aim")
+    TObjectPtr<UMaterialInterface> AimDecalMaterial;
+
+    // 나이아가라 점 간격
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
+    float AimDotSpacing;
+
+    // 나이아가라 점 크기
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
+    float AimDotSize;
+
+    // 나이아가라 표시 높이 오프셋
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
+    float NiagaraHeightOffset;
+    // ---------------------------------------------------------
+
+
+    // ----------  기존 스플라인 메시 이용 --------------
     // 조준선용 메시 에셋
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Aim")
     TObjectPtr<UStaticMesh> AimDashMeshAsset;
@@ -187,6 +234,8 @@ private:
     // 조준선용 스플랑인 메시 두께
     UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
     float AimDashThickness = 1.f;
+    // ----------  기존 스플라인 메시 이용 --------------
+
 
     // 로봇손 속도
     // 최대 사거리가 몇초가 될건지를 기준으로 조정

@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
@@ -23,6 +23,7 @@ public class BumperCart : ModuleRules
             "OnlineSubsystem",
             "OnlineSubsystemUtils",
             "SlateCore",
+            "Niagara",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
