@@ -31,6 +31,9 @@ UCartGrabComponent::UCartGrabComponent()
     CachedAimTargetLocation = FVector::ZeroVector;
     CachedAimDistance = 0.f;
     AimUpdateInterval = 0.1f;
+    AimDashLength = 40.f;
+    AimDashGap = 25.f;
+    AimDashThickness = 1.f;
 
     // 로봇손 관련
     GrabSpeed = 300.f;
@@ -164,6 +167,44 @@ void UCartGrabComponent::EnsureVisualComponents()
     }
 }
 
+void UCartGrabComponent::EnsureAimDashMeshes(int32 RequiredCount)
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    USceneComponent* Root = OwnerActor->GetRootComponent();
+    if (!IsValid(Root)) return;
+
+    // 필요한 만큼 반복 생성
+    while (AimDashMeshes.Num() < RequiredCount)
+    {
+        int32 Index = AimDashMeshes.Num();
+
+        FName ComponentName = *FString::Printf(TEXT("AimDashMesh_%d"), Index);
+
+        USplineMeshComponent* DashMesh = NewObject<USplineMeshComponent>(OwnerActor, ComponentName);
+        if (!IsValid(DashMesh)) return;
+
+        DashMesh->SetMobility(EComponentMobility::Movable);
+        DashMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        DashMesh->SetVisibility(false);
+        DashMesh->SetForwardAxis(ESplineMeshAxis::X);
+
+        DashMesh->SetStartScale(FVector2D(AimDashThickness, AimDashThickness));
+        DashMesh->SetEndScale(FVector2D(AimDashThickness, AimDashThickness));
+
+        if (AimDashMeshAsset)
+        {
+            DashMesh->SetStaticMesh(AimDashMeshAsset);
+        }
+
+        OwnerActor->AddInstanceComponent(DashMesh);
+        DashMesh->RegisterComponent();
+
+        AimDashMeshes.Add(DashMesh);
+    }
+}
+
 void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -219,6 +260,22 @@ void UCartGrabComponent::StartAimTimer()
     );
 
     UpdateGrabAim();
+}
+
+void UCartGrabComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    if (GetNetMode() == NM_DedicatedServer) return;
+
+    // 최대 그랩 사거리만큼 미리 만들어두기
+    float StepLength = AimDashLength + AimDashGap;
+    if (StepLength > KINDA_SMALL_NUMBER)
+    {
+        int32 MaxDashCount = FMath::CeilToInt(GrabRange / StepLength);
+        EnsureAimDashMeshes(MaxDashCount);
+        HideAimDashMeshes();
+    }
 }
 
 void UCartGrabComponent::StopAimTimer()
@@ -315,7 +372,7 @@ void UCartGrabComponent::UpdateGrabAim()
     CachedAimTargetLocation = Start + CachedAimDirection * ActualDistance;
     CachedAimDistance = ActualDistance;
 
-    ShowMouseAim(Start);
+    UpdateDashedAimVisual(Start, CachedAimTargetLocation);
 }
 
 void UCartGrabComponent::TryGrabProduct()
@@ -335,29 +392,11 @@ void UCartGrabComponent::TryGrabProduct()
     Multicast_ShowVisualProductMesh(Product);
 }
 
-void UCartGrabComponent::ShowMouseAim(const FVector& Start)
-{
-    // 임시로 디버그 라인 그려서 보여주는 중
-    UWorld* World = GetWorld();
-    if (!IsValid(World)) return;
-
-    DrawDebugLine(
-        World,
-        Start,
-        CachedAimTargetLocation,
-        FColor::Green,
-        false,
-        AimUpdateInterval,
-        0,
-        5.f
-    );
-}
-
 void UCartGrabComponent::RequestGrab()
 {
     if (CachedAimDirection.IsNearlyZero()) return;
-    if (CachedAimDistance <= 0.f) return;
-    if (GrabSpeed <= 0.f) return;
+    if (CachedAimDistance <= KINDA_SMALL_NUMBER) return;
+    if (GrabSpeed <= KINDA_SMALL_NUMBER) return;
 
     // 클라이언트에서 계산한 값이므로 인자로 넘겨야 함
     Server_GrabProduct(CachedAimDirection, CachedAimDistance);
@@ -573,4 +612,87 @@ FVector UCartGrabComponent::GetGrabStartLocation() const
     if (!IsValid(OwnerActor)) return {};
 
     return OwnerActor->GetActorLocation();
+}
+
+
+void UCartGrabComponent::UpdateDashedAimVisual(const FVector& Start, const FVector& End)
+{
+    FVector AimVector = End - Start;
+    float TotalLength = AimVector.Size();
+
+    if (TotalLength <= KINDA_SMALL_NUMBER)
+    {
+        HideAimDashMeshes();
+        return;
+    }
+
+    // 메시 길이 + 간격 길이로 점선 하나당 길이 구하기
+    float StepLength = AimDashLength + AimDashGap;
+    if (StepLength <= KINDA_SMALL_NUMBER)
+    {
+        HideAimDashMeshes();
+        return;
+    }
+
+    // 점선 하나당 길이로 필요한 개수 결정하기
+    int32 RequiredCount = FMath::CeilToInt(TotalLength / StepLength);
+    EnsureAimDashMeshes(RequiredCount);
+
+    FVector Direction = AimVector / TotalLength;
+
+    for (int32 i = 0; i < AimDashMeshes.Num(); ++i)
+    {
+        USplineMeshComponent* DashMesh = AimDashMeshes[i];
+        if (!IsValid(DashMesh)) continue;
+
+        // 기존에 만들어둔게 필요로 하는것보다 많다면 Visibility 끄기
+        if (i >= RequiredCount)
+        {
+            DashMesh->SetVisibility(false);
+            continue;
+        }
+
+        float StartDistance = i * StepLength;
+        float EndDistance = FMath::Min(StartDistance + AimDashLength, TotalLength); // 끝부분 넘어가면 자르기
+
+        FVector DashStart = Start + Direction * StartDistance;
+        FVector DashEnd = Start + Direction * EndDistance;
+
+        FTransform MeshTransform = DashMesh->GetComponentTransform();
+
+        FVector LocalStart = MeshTransform.InverseTransformPosition(DashStart);
+        FVector LocalEnd = MeshTransform.InverseTransformPosition(DashEnd);
+
+        FVector LocalVector = LocalEnd - LocalStart;
+        float LocalLength = LocalVector.Size();
+
+        if (LocalLength <= KINDA_SMALL_NUMBER)
+        {
+            DashMesh->SetVisibility(false);
+            continue;
+        }
+
+        FVector Tangent = LocalVector.GetSafeNormal() * LocalLength;
+
+        DashMesh->SetStartAndEnd(
+            LocalStart,
+            Tangent,
+            LocalEnd,
+            Tangent,
+            true
+        );
+
+        DashMesh->SetVisibility(true);
+    }
+}
+
+void UCartGrabComponent::HideAimDashMeshes()
+{
+    for (USplineMeshComponent* DashMesh : AimDashMeshes)
+    {
+        if (IsValid(DashMesh))
+        {
+            DashMesh->SetVisibility(false);
+        }
+    }
 }

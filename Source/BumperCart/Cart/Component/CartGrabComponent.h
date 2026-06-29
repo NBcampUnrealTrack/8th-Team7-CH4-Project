@@ -38,10 +38,9 @@ public:
     // 게임 시작 시 마우스 조준선 타이머 시작하는 함수
     void StartAimTimer();
 
-    // Owner Actor에 로봇손 스플라인 메시를 생성하는 함수
-    void EnsureVisualComponents();
-
 protected:
+    virtual void BeginPlay() override;
+
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 protected:
@@ -66,9 +65,6 @@ private:
 
     UFUNCTION()
     void TryGrabProduct();
-
-    // 마우스 에임을 시각화 하는 함수
-    void ShowMouseAim(const FVector& Start);
 
     // Grab Action에 바인딩되어 호출하는 함수
     // 그랩 방향을 구해 서버로 요청 준비
@@ -114,6 +110,17 @@ private:
     // 현재 로봇손 시작위치 구하는 함수
     FVector GetGrabStartLocation() const;
 
+    // Owner Actor에 로봇손 스플라인 메시를 확인하고 생성하는 함수
+    void EnsureVisualComponents();
+
+    // 조준선용 스플라인 메시를 확인하고 생성하는 함수
+    void EnsureAimDashMeshes(int32 RequiredCount);
+
+    // 조준선 연출 갱신
+    void UpdateDashedAimVisual(const FVector& Start, const FVector& End);
+
+    void HideAimDashMeshes();
+
 private:
     // 로봇손 팔에 사용할 에셋
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
@@ -123,9 +130,11 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
     TObjectPtr<UStaticMesh> HandMeshAsset;
 
+    // 로봇손 팔 스플라인 메시 컴포넌트
     UPROPERTY()
     TObjectPtr<USplineMeshComponent> ArmSpline;
 
+    // 로봇손 손부분 메시 컴포넌트
     UPROPERTY()
     TObjectPtr<UStaticMeshComponent> Hand;
 
@@ -144,6 +153,9 @@ private:
     float VisualReturnDuration;
     float VisualElapsedTime;
 
+    // 현재 연출 상태
+    EGrabVisualState VisualState;
+
     // 저장한 조준 방향
     FVector CachedAimDirection;
     // 저장한 조준 위치
@@ -152,11 +164,32 @@ private:
     float CachedAimDistance;
 
     // 마우스 조준선 갱신 빈도
-    UPROPERTY(EditAnywhere, Category = "Cart|Grab")
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
     float AimUpdateInterval;
 
+
+    // 조준선용 메시 에셋
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Aim")
+    TObjectPtr<UStaticMesh> AimDashMeshAsset;
+
+    // 조준선용 스플라인 메쉬들
+    UPROPERTY()
+    TArray<TObjectPtr<USplineMeshComponent>> AimDashMeshes;
+
+    // 조준선용 스플라인 메시 길이
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
+    float AimDashLength;
+
+    // 조준선용 스플라인 메시 간격
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
+    float AimDashGap;
+
+    // 조준선용 스플랑인 메시 두께
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
+    float AimDashThickness = 1.f;
+
     // 로봇손 속도
-    // 최대 사거리 X2 가 몇초가 될건지를 기준으로 조정
+    // 최대 사거리가 몇초가 될건지를 기준으로 조정
     UPROPERTY(EditAnywhere, Category = "Cart|Grab")
     float GrabSpeed;
 
@@ -184,7 +217,4 @@ private:
 
     // 상품과 손이 닿을 시간을 확인하는 타이머
     FTimerHandle TryGrabTimer;
-
-    // 현재 연출 상태
-    EGrabVisualState VisualState;
 };
