@@ -260,6 +260,9 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
         return;
     }
 
+
+    Result.Session.SessionSettings.Get(SETTING_ROOMNAME, RoomName);
+
     Sessions->OnJoinSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnJoinSessionComplete);
     Sessions->JoinSession(0, NAME_GameSession, Result);
 }

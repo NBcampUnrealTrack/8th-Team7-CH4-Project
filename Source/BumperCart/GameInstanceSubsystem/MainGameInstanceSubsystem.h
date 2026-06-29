@@ -61,6 +61,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     int32 GetFoundSessionCount() const;
 
+    // 현재 참가한 방의 이름 조회
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    FString GetRoomName() const { return RoomName; }
+
 private:
     void OnLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
     void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);

@@ -14,28 +14,44 @@ void ALobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
     DOREPLIFETIME(ALobbyPlayerState, bIsReady);
 }
 
+//준비 완료 호출 받기
 void ALobbyPlayerState::SetReady(bool bInReady)
 {
-    // 서버에서만 값을 바꿀 수 있게 제한
-    if (!HasAuthority())
+
+    if (HasAuthority())
     {
-        return;
+        ApplyReady(bInReady);
+    }
+    else
+    {
+        Server_SetReady(bInReady);
     }
 
-    if (bIsReady == bInReady)
-    {
-        return;
-    }
+}
+
+//클라이언트의 준비완료 호출 처리
+void ALobbyPlayerState::Server_SetReady_Implementation(bool bInReady)
+{
+    ApplyReady(bInReady);
+}
+
+//준비완료 적용
+void ALobbyPlayerState::ApplyReady(bool bInReady)
+{
+    if (!HasAuthority()) return;
+
+    if (bIsReady == bInReady) return;
 
     bIsReady = bInReady;
 
-    // 서버 자신(호스트)은 OnRep이 안 불리므로 직접 GameState 갱신 트리거
+    //서버가 직접 호출하면 OnRep이 호출되지 않으로 직접 GameState 갱신
     if (ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr)
     {
-        GS->RefreshPlayerNames();
+        GS->RefreshPlayerInfos();
     }
 }
 
+//준비완료 시 자동 호출
 void ALobbyPlayerState::OnRep_IsReady()
 {
     if (ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr)
