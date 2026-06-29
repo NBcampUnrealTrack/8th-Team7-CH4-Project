@@ -11,6 +11,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSessionsFoundSignature, int32, FoundCount);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLoginResult, bool, bWasSuccessful, const FString&, ErrorMessage);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnJoinPasswordIncorrect);
 
 
 UCLASS()
@@ -19,23 +20,34 @@ class BUMPERCART_API UMainGameInstanceSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+    //플레이어 로그인
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     void Login(const FString& CredentialName);
 
+    //호스트가 되어 방 생성
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
-    void HostListenServer();
+    void HostListenServer(const FString& InRoomName, const FString& InRoomPassword);
 
+    //생성된 방 검색
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     void FindSessions();
 
+    //검색된 방 참가
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
-    void JoinFoundSession(int32 Index);
+    void JoinFoundSession(int32 Index, const FString& InputPassword);
+
+    //검색 결과 인덱스에 해당하는 방 제목 조회
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    FString GetFoundSessionRoomName(int32 Index) const;
 
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
     FOnSessionsFoundSignature OnSessionsFound;
 
     UPROPERTY(BlueprintAssignable, Category = "EOS")
     FOnLoginResult OnLoginResult;
+
+    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    FOnJoinPasswordIncorrect OnJoinPasswordIncorrect;
 
     // 로그인된 유저 이름/ID를 UI에서 바로 가져다 쓸 수 있게 캐싱
     UPROPERTY(BlueprintReadOnly, Category = "EOS")
@@ -48,8 +60,19 @@ private:
     void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
     void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
 
+    //실제 세션 생성 로직 (재시도/재생성 시에도 캐싱된 RoomName/RoomPassword 사용)
+    void CreateSessionInternal();
+
     TSharedPtr<FOnlineSessionSearch> SearchSettings;
     IOnlineSessionPtr GetSessionInterface() const;
     IOnlineIdentityPtr GetIdentityInterface() const;
+
+    //방 생성 이름 및 비밀번호
+    FString RoomName;
+    FString RoomPassword;
+
+    //세션 커스텀 세팅 키
+    static inline const FName SETTING_ROOMNAME     = TEXT("ROOMNAME");
+    static inline const FName SETTING_ROOMPASSWORD = TEXT("ROOMPW");
 
 };

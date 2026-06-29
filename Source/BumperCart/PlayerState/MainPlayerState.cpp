@@ -29,6 +29,10 @@ void AMainPlayerState::AddPlayerScore(float AddScore)
 {
     if (!HasAuthority()) return;
 
+
+    UE_LOG(LogTemp, Warning, TEXT("[MainPlayerState] AddPlayerScore (서버) - 대상 플레이어: %s, 기존 점수: %f, 추가될 점수: %f"),
+        *GetPlayerName(), PlayerScore, AddScore);
+
     PlayerScore += AddScore;
 
     OnPlayerStatsChanged.Broadcast();
