@@ -36,10 +36,6 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     void JoinFoundSession(int32 Index, const FString& InputPassword);
 
-    //검색 결과 인덱스에 해당하는 방 제목 조회
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
-    FString GetFoundSessionRoomName(int32 Index) const;
-
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
     FOnSessionsFoundSignature OnSessionsFound;
 
@@ -52,6 +48,18 @@ public:
     // 로그인된 유저 이름/ID를 UI에서 바로 가져다 쓸 수 있게 캐싱
     UPROPERTY(BlueprintReadOnly, Category = "EOS")
     FString CachedDisplayName;
+
+    //검색 결과 인덱스에 해당하는 방 제목 조회
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    FString GetFoundSessionRoomName(int32 Index) const;
+
+    //검색 결과 인덱스에 해당하는 방 소유자 이름 조회
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    FString GetFoundSessionOwnerName(int32 Index) const;
+
+    //검색 결과 개수 조회
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    int32 GetFoundSessionCount() const;
 
 private:
     void OnLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
@@ -74,5 +82,6 @@ private:
     //세션 커스텀 세팅 키
     static inline const FName SETTING_ROOMNAME     = TEXT("ROOMNAME");
     static inline const FName SETTING_ROOMPASSWORD = TEXT("ROOMPW");
+    static inline const FName SETTING_OWNERNAME    = TEXT("OWNERNAME");
 
 };

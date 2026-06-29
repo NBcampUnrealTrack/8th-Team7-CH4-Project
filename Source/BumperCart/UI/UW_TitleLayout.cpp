@@ -7,6 +7,9 @@
 #include "Components/ComboBoxString.h"
 #include "Components/EditableText.h"
 #include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Blueprint/WidgetTree.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/GameInstance.h"
 #include "GameInstanceSubsystem/MainGameInstanceSubsystem.h"
@@ -193,6 +196,34 @@ void UUW_TitleLayout::OnSessionsFoundHandler(int32 FoundCount)
     if (StatusText)
     {
         StatusText->SetText(FText::FromString(FString::Printf(TEXT("세션 %d개 발견됨"), FoundCount)));
+    }
+
+    RefreshSessionListUI(FoundCount);
+}
+
+void UUW_TitleLayout::RefreshSessionListUI(int32 FoundCount)
+{
+    if (!SessionListBox) return;
+
+    // 이전 검색 결과로 그려둔 항목들 전부 제거
+    SessionListBox->ClearChildren();
+
+    UMainGameInstanceSubsystem* Sub = GetGameInstance() ? GetGameInstance()->GetSubsystem<UMainGameInstanceSubsystem>() : nullptr;
+    if (!Sub) return;
+
+    for (int32 i = 0; i < FoundCount; ++i)
+    {
+        const FString RoomName = Sub->GetFoundSessionRoomName(i);
+        const FString OwnerName = Sub->GetFoundSessionOwnerName(i);
+
+        UTextBlock* EntryText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+        if (!EntryText) continue;
+
+        EntryText->SetText(FText::FromString(
+            FString::Printf(TEXT("[%d] %s  (방장: %s)"), i, *RoomName, *OwnerName)
+        ));
+
+        SessionListBox->AddChildToVerticalBox(EntryText);
     }
 }
 
