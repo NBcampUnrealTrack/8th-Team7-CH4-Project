@@ -16,17 +16,7 @@ void ABC_EventManager::BeginPlay()
 
     if (!HasAuthority())   return;
 
-    //if (!ProductShelfManager)
-    //{
-    //    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 등록 안됨 -> 등록"));
 
-    //    // 제품선반 매니저 등록을 안했을 시 맵에서 찾아서 등록
-    //    ProductShelfManager = Cast<AProductShelfManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass()));
-    //}
-    //else
-    //{
-    //    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 등록되어있음"));
-    //}
 
     GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &ABC_EventManager::StartSaleEvent, 10.0f,false);
     GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &ABC_EventManager::StartLimitedEvent, 20.0f, false);

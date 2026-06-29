@@ -61,7 +61,7 @@ private:
 
     // 현재 세일 제품
     UPROPERTY()
-    TSubclassOf<class AProductBase> CurrentSaleProduct;
+    TSubclassOf<AProductBase> CurrentSaleProduct;
 
 public:
     // 세일 제품 선택

@@ -7,6 +7,7 @@
 #include "ProductShelfManager.generated.h"
 
 class AProductShelf;
+class UProductShelfManagerConfig;
 
 UCLASS()
 class BUMPERCART_API AProductShelfManager : public AActor
@@ -52,11 +53,11 @@ public:
 private:
     // 맵에 최대 아이템 갯수 제한
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
-    int32 MaxItemCount = 150;
+    int32 MaxSpawnCount = 150;
 
     // 한 번에 스폰되는 최대 갯수
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
-    int32 MaxSpawnCount = 3;
+    int32 MaxSpawnLimit = 3;
 
     // 아이템 리스폰 시간
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
@@ -70,6 +71,9 @@ private:
     UPROPERTY()
     TArray<TSubclassOf<AProductBase>> SpawnedItems;
 
+    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
+    TObjectPtr<UProductShelfManagerConfig> SpawnConfig;
+
 public:
     // 제품 스폰 호출
     void ProductSpawnCall();
@@ -79,7 +83,7 @@ public:
     // 스폰된 아이템이 파괴되었을 떄
     void OnProductDestroyed();
 
-    FORCEINLINE void SetMaxItemCount(int32 ItemCount) { MaxItemCount = ItemCount; }
+    FORCEINLINE void SetMaxSpawnCount(int32 SpawnCount) { MaxSpawnCount = SpawnCount; }
 
     // 게임 시작시 호출
     void StartProductSpawning();

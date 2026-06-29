@@ -3,6 +3,7 @@
 #include "ItemSpawn/ProductShelf/ProductShelf.h"
 #include "Kismet/GameplayStatics.h"
 #include "EventManager/BC_EventManager.h"
+#include "ItemSpawn/ProductShelfManager/ProductShelfManagerConfig.h"
 
 AProductShelfManager::AProductShelfManager()
 {
@@ -26,8 +27,17 @@ void AProductShelfManager::BeginPlay()
         BC_EventManager->RegisterProductShelfManager(this);
     }
 
+    if (IsValid(SpawnConfig))
+    {
+        MaxSpawnCount = SpawnConfig->MaxSpawnCount;
+
+        MaxSpawnLimit = SpawnConfig->MaxSpawnLimit;
+
+        RespawnDelay = SpawnConfig->RespawnDelay;
+    }
+
     // 게임 모드에서 호출시 삭제 예정 - 테스트용
-    GetWorldTimerManager().SetTimer(GameStartTimerHandle, this, &AProductShelfManager::StartProductSpawning, 5.0f, false);
+    GetWorldTimerManager().SetTimer(GameStartTimerHandle, this, &AProductShelfManager::StartProductSpawning, RespawnDelay, false);
 }
 
 void AProductShelfManager::RegisterShelf(AProductShelf* InShelf, EShelfType InType)
@@ -70,11 +80,11 @@ void AProductShelfManager::ProductSpawnCall()
     {
         if (IsValid(Shelf))
         {
-            int32 RandomCount = FMath::RandRange(1, MaxSpawnCount);
+            int32 RandomCount = FMath::RandRange(1, MaxSpawnLimit);
 
             for (int32 i = 0; i < RandomCount; i++)
             {
-                if (CurrentProductCount > MaxItemCount)
+                if (CurrentProductCount > MaxSpawnCount)
                 {
                     UE_LOG(LogTemp, Warning, TEXT("[ProductShelfManager] 맵의 제품이 최대로 스폰되었습니다."));
                     return;
