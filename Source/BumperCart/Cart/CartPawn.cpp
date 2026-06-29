@@ -128,14 +128,29 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 	else
 	{
-		//미끄럼 중엔 감속을 거의 없애 미끄러지게 한다(브레이크 무시), 평소엔 기본값
-		Move->BrakingDecelerationWalking = bIsSlipping ? SlipBrakingDeceleration : DefaultBrakingDeceleration;
+		float EffectiveThrottle = ThrottleInput;
 
-		if (!FMath::IsNearlyZero(ThrottleInput))
-		{
-			//카트가 바라보는 방향으로 전/후진 (미끄럼 중에도 빠져나오려 가속은 가능)
-			AddMovementInput(GetActorForwardVector(), ThrottleInput);
-		}
+	    //부스터 중 후진 무시
+	    if (bIsBoosting)
+	    {
+	        EffectiveThrottle = 1.f;
+	    }
+
+	    //전진 중 후진 => 약한 감속
+ 	    const bool bReverseWhileForward = (EffectiveThrottle < 0.f && ForwardSpeed > 10.f);
+
+	    //미끄럼 > 전진중후진(약한 감속, 무게 반영) > 평소 기본값
+	    if (bIsSlipping)
+	        Move->BrakingDecelerationWalking = SlipBrakingDeceleration;
+	    else if (bReverseWhileForward)
+	        Move->BrakingDecelerationWalking = ReverseSlideDeceleration * LoadBrakeMul;
+	    else
+	        Move->BrakingDecelerationWalking = DefaultBrakingDeceleration;
+
+	    if (!bReverseWhileForward && !FMath::IsNearlyZero(EffectiveThrottle))
+	    {
+	        AddMovementInput(GetActorForwardVector(), EffectiveThrottle);
+	    }
 	}
 
 	//--- 조향 (A/D = Yaw 회전). 입력을 부드럽게 따라가 회전 지연감을 준다 ---
