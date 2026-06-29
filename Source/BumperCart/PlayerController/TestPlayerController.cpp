@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerState.h"
 #include "GameInstanceSubsystem/MainGameInstanceSubsystem.h"
+#include "GameState/LobbyGameState.h"
 
 class UMainGameInstanceSubsystem;
 
@@ -41,5 +42,11 @@ void ATestPlayerController::ServerRPCSetDisplayName_Implementation(const FString
     if (PlayerState)
     {
         PlayerState->SetPlayerName(DisplayName);
+
+        // 접속 직후 이름 갱신이 안되어 있을 수도 있으니 실제 세팅 이후 다시 갱신
+        if (ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr)
+        {
+            GS->RefreshPlayerInfos();
+        }
     }
 }

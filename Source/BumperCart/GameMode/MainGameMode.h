@@ -58,6 +58,9 @@ private:
     UPROPERTY()
     ACheckoutManager* CheckoutManagerRef;
 
+    //UFUNCTION(BlueprintCallable)
+    //void GetFinalRank();
+
 
 #pragma region EventManager
 private:
