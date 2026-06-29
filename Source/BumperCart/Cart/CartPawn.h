@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "Cart/Component/CartLoadComponent.h"
 #include "Cart/SlideAffectable.h"
+#include "Cart/Bumpable.h"
 #include "CartPawn.generated.h"
 
 class USpringArmComponent;
@@ -16,7 +17,7 @@ struct FInputActionValue;
 class UCartGrabComponent;
 
 UCLASS(abstract)
-class ACartPawn : public ACharacter, public ISlideAffectable
+class ACartPawn : public ACharacter, public ISlideAffectable, public IBumpable
 {
 	GENERATED_BODY()
 
