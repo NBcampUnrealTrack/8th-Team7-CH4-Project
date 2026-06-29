@@ -3,6 +3,8 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/PrimitiveComponent.h"
 #include "Product/ProductBase.h"
+#include "Kismet/GameplayStatics.h"
+#include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
 
 AProductShelf::AProductShelf()
 {
@@ -19,6 +21,19 @@ AProductShelf::AProductShelf()
 void AProductShelf::BeginPlay()
 {
 	Super::BeginPlay();
+
+    AActor* FoundProductShelfManager = UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass());
+    AProductShelfManager* ProductShelfManager = Cast<AProductShelfManager>(FoundProductShelfManager);
+
+    if (IsValid(ProductShelfManager))
+    {
+        // 매니저에 등록
+        ProductShelfManager->RegisterShelf(this, ShelfType);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("[선반] 선반매니저를 찾지 못했습니다."));
+    }
 }
 
 AProductBase* AProductShelf::SpawnRandomProduct()

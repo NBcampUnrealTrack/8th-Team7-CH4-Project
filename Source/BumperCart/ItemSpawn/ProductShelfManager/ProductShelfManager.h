@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "ItemSpawn/ProductShelf/ProductShelf.h"
 #include "Product/ProductBase.h"
+#include "ItemSpawn/ProductShelfManager/ProductShelfTypes.h"
 #include "ProductShelfManager.generated.h"
+
+class AProductShelf;
 
 UCLASS()
 class BUMPERCART_API AProductShelfManager : public AActor
@@ -26,7 +28,23 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Shelf")
     TArray<AProductShelf*> AllProductShelfs;
 
+    // 일반 제품 선반 목록
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Shelf")
+    TArray<TObjectPtr<AProductShelf>> NormalProductShelfs;
+
+    // 세일 제품 선반 목록
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Shelf")
+    TArray<TObjectPtr<AProductShelf>> SaleProductShelfs;
+
+    // 한정 제품 선반 목록
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Shelf")
+    TArray<TObjectPtr<AProductShelf>> LimitedProductShelfs;
+
     FTimerHandle RespawnTimerHandle;
+
+public:
+    // 선반 액터에서 게임 시작시 호출하여 등록
+    void RegisterShelf(AProductShelf* InShelf, EShelfType InType);
 
 #pragma endregion
 
@@ -44,6 +62,7 @@ private:
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
     float RespawnDelay = 10.0f;
 
+    // 현재 스폰된 제품 갯수
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
     int32 CurrentProductCount = 0;
 
@@ -64,6 +83,9 @@ public:
 
     // 게임 시작시 호출
     void StartProductSpawning();
+
+    // 테스트용 타이머
+    FTimerHandle GameStartTimerHandle;
 
 #pragma endregion
 
@@ -92,6 +114,7 @@ private:
 public:
     // 한정 제품 스폰
     void LimitedProductSpawn(TSubclassOf<AProductBase> LimitedProduct);
+
 #pragma endregion
 
 };

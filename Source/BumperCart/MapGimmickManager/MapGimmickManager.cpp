@@ -128,9 +128,9 @@ void AMapGimmickManager::SpawnObstacles()
 
     if (!GetWorld() || GimmickSpawnPointList.Num() == 0) return;
 
-    for (int32 i = 0; i <= GimmickSpawnPointList.Num() - 1; ++i)
+    for (int32 i = GimmickSpawnPointList.Num() - 1; i > 0; --i)
     {
-        int32 RandomIndex = FMath::RandRange(i, GimmickSpawnPointList.Num() - 1);
+        int32 RandomIndex = FMath::RandRange(0, i);
         if (i != RandomIndex)
         {
             GimmickSpawnPointList.Swap(i, RandomIndex);

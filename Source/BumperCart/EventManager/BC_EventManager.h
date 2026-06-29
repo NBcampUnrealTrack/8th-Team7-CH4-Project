@@ -24,8 +24,16 @@ protected:
 #pragma region ProductShelfManager
 private:
     // 맵에 있는 제품선반관리 매니저
-    UPROPERTY(EditAnywhere, Category = "Manager")
-    class AProductShelfManager* ProductShelfManager;
+    //UPROPERTY(EditAnywhere, Category = "Manager")
+    //class AProductShelfManager* ProductShelfManager;
+
+    // 등록받을 선반 매니저 변수
+    UPROPERTY()
+    TObjectPtr<AProductShelfManager> ProductShelfManager;
+
+public:
+    void RegisterProductShelfManager(AProductShelfManager* InProductShelfManager);
+
 #pragma endregion
 
 #pragma region SaleEvent
