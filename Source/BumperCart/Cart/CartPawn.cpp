@@ -15,6 +15,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+#include "UObject/ConstructorHelpers.h"
 
 ACartPawn::ACartPawn()
 {
@@ -59,6 +61,16 @@ ACartPawn::ACartPawn()
 
 	//적재 컴포넌트(C 상품 시스템) 부착. 적재율 연동은 BeginPlay에서 이벤트 바인딩
 	LoadComponent = CreateDefaultSubobject<UCartLoadComponent>(TEXT("CartLoadComponent"));
+
+    //임시 효과음 기본값 (정식 사운드 작업 때 교체)
+    static ConstructorHelpers::FObjectFinder<USoundBase> BumpSoundFinder(TEXT("/Game/Developers/dbals/Audio/Bump.Bump"));
+    if (BumpSoundFinder.Succeeded()) { BumpSound = BumpSoundFinder.Object; }
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> BoostSoundFinder(TEXT("/Game/Developers/dbals/Audio/Boost2.Boost2"));
+    if (BoostSoundFinder.Succeeded()) { BoostSound = BoostSoundFinder.Object; }
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> BrakeSoundFinder(TEXT("/Game/Developers/dbals/Audio/Brake.Brake"));
+    if (BrakeSoundFinder.Succeeded()) { BrakeSound = BrakeSoundFinder.Object; }
 
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
     GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
@@ -413,7 +425,8 @@ void ACartPawn::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadI
 	}
 }
 
-//B4: 카트끼리 부딪히면 충격 세기만큼 상품을 쏟는다 (비물리라 속도로 의사 충격량 계산)
+//카트끼리 부딪히면 충격 세기만큼 상품을 쏟는다
+//카트가 IBumpable 대상(다른 카트·차단벽·장애물)에 부딪히면 충격 세기만큼 상품을 쏟는다
 void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
 {
 	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
@@ -424,34 +437,38 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		return;
 	}
 
-	//카트끼리만: 상대가 다른 카트일 때만 (벽/장애물은 무시)
-	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
-	if (!OtherCart || OtherCart == this)
+	if (!Other || Other == this)
 	{
 		return;
 	}
 
-	//비물리 카트라 NotifyHit 시점엔 GetVelocity()가 이미 0으로 깎이는 프레임이 있어, '충돌 직전' 프레임 속도(캐시)를 쓴다
-	const FVector RelativeVelocity = PreviousVelocity - OtherCart->PreviousVelocity;
+	//IBumpable(퍼블릭 상속/BP 인터페이스 추가)을 구현한 대상에만 충돌 연출+드롭. 그 외(일반 벽 등)는 그냥 막힘
+	if (!Other->GetClass()->ImplementsInterface(UBumpable::StaticClass()))
+	{
+		return;
+	}
 
-	//두 카트 중심을 잇는 선 방향(수평면) — 접근 중인지(충돌) vs 멀어지는지(튕겨남/접촉 유지) 판정에만 사용
-	const FVector ToOther = (OtherCart->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	//상대가 카트면 그 카트의 '충돌 직전' 속도를, 아니면(차단벽·장애물 등 정적) 0으로
+	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
+	const FVector OtherVel = OtherCart ? OtherCart->PreviousVelocity : FVector::ZeroVector;
+	const FVector RelativeVelocity = PreviousVelocity - OtherVel;
+
+	//두 액터 중심을 잇는 선 방향(수평면) — 접근 중(충돌)인지 판정에만 사용
+	const FVector ToOther = (Other->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 	const float Approach = FVector::DotProduct(RelativeVelocity, ToOther);
 	if (Approach <= 0.f)
 	{
-		return; //서로 멀어지는 중이면 충돌로 치지 않음 (접촉 유지 프레임의 closing=0 폭탄 제거)
+		return; //서로 멀어지는 중이면 충돌로 치지 않음
 	}
 
 	//충돌 세기 = 상대속도 크기(2D). 부딪힌 각도와 무관하게 일관됨
 	const float ClosingSpeed = RelativeVelocity.Size2D();
-
 	if (ClosingSpeed < MinBumpSpeed)
 	{
 		return; //약하게 스치는 접촉은 무시
 	}
 
-	//충돌 연출: 이 카트를 조종하는 클라 화면만 흔든다 (서버 → 소유 클라 Client RPC, 슬립과 동일한 클라측 연출)
-	//충돌이 셀수록 쉐이크도 더 세게: 접근속도 [MinBumpSpeed..BumpShakeFullSpeed] => 배율 [BumpShakeScale..BumpShakeMaxScale]
+	//충돌 연출: 이 카트를 조종하는 클라 화면만 흔든다 (서버 → 소유 클라 Client RPC)
 	if (BumpCameraShakeClass)
 	{
 		if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -464,19 +481,20 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		}
 	}
 
-	//충돌음: 소유 클라에서 재생 (쉐이크와 동일 — 서버에서 Client RPC)
+	//충돌음: 소유 클라에서 재생
 	ClientPlayBumpSound();
 
-	//B5 : 충돌 역할 판정 (서버 기준 부스터 상태로)
+	//드롭 역할 판정 — 카트끼리만 부스터 역할, 벽/장애물은 Normal
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 	if (bIsBoosting)
 	{
-		DropRole = EDropCollisionRole::BoosterInstigator;   //내가 부스터로 박음 => 덜 흘림
+		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터로 박음 => 덜 흘림
 	}
-	else if (OtherCart->bIsBoosting)
+	else if (OtherCart && OtherCart->bIsBoosting)
 	{
-		DropRole = EDropCollisionRole::BoostedTarget;        //부스터한테 박힘 => 더 흘림
+		DropRole = EDropCollisionRole::BoostedTarget; //부스터한테 박힘 => 더 흘림
 	}
+
 	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
 }
 
