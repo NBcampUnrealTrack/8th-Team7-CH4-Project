@@ -144,6 +144,8 @@ void UMainGameInstanceSubsystem::CreateSessionInternal()
     SessionSettings.Set(SETTING_ROOMNAME, RoomName, EOnlineDataAdvertisementType::ViaOnlineService);
     // 방 비밀번호
     SessionSettings.Set(SETTING_ROOMPASSWORD, RoomPassword, EOnlineDataAdvertisementType::ViaOnlineService);
+    // 방장 이름(DevAuthTool 활용한 로컬 테스트 시 이름 변수가 자동으로 채워지지 않아서 커스텀 세팅 진행)
+    SessionSettings.Set(SETTING_OWNERNAME, CachedDisplayName, EOnlineDataAdvertisementType::ViaOnlineService);
 
     Sessions->OnCreateSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnCreateSessionComplete);
     Sessions->CreateSession(0, NAME_GameSession, SessionSettings);
@@ -231,14 +233,7 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
     OnSessionsFound.Broadcast(SearchSettings->SearchResults.Num());
 }
 
-FString UMainGameInstanceSubsystem::GetFoundSessionRoomName(int32 Index) const
-{
-    if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return FString();
 
-    FString FoundRoomName;
-    SearchSettings->SearchResults[Index].Session.SessionSettings.Get(SETTING_ROOMNAME, FoundRoomName);
-    return FoundRoomName;
-}
 
 void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& InputPassWord)
 {
@@ -330,4 +325,28 @@ void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoi
         UE_LOG(LogTemp, Warning, TEXT("[EOS] 알 수 없는 오류로 조인 실패."));
         break;
     }
+}
+
+FString UMainGameInstanceSubsystem::GetFoundSessionRoomName(int32 Index) const
+{
+    if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return FString();
+
+    FString FoundRoomName;
+    SearchSettings->SearchResults[Index].Session.SessionSettings.Get(SETTING_ROOMNAME, FoundRoomName);
+    return FoundRoomName;
+}
+
+FString UMainGameInstanceSubsystem::GetFoundSessionOwnerName(int32 Index) const
+{
+    if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return FString();
+
+    FString FoundOwnerName;
+    SearchSettings->SearchResults[Index].Session.SessionSettings.Get(SETTING_OWNERNAME, FoundOwnerName);
+    return FoundOwnerName;
+}
+
+int32 UMainGameInstanceSubsystem::GetFoundSessionCount() const
+{
+    if (!SearchSettings.IsValid()) return 0;
+    return SearchSettings->SearchResults.Num();
 }

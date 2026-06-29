@@ -11,6 +11,7 @@ class UButton;
 class UEditableText;
 class UTextBlock;
 class UWidgetSwitcher;
+class UVerticalBox;
 
 UCLASS()
 class BUMPERCART_API UUW_TitleLayout : public UUserWidget
@@ -52,6 +53,8 @@ private:
 
 
     void ShowCreateRoomPanel(bool bShow);
+
+    void RefreshSessionListUI(int32 FoundCount);
 
 
 
@@ -101,5 +104,8 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USTitleWidget, Meta = (AllowPrivateAccess, BindWidget))
     TObjectPtr<UEditableText> JoinPasswordInputText;
 
+    //검색된 방 목록
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = USTitleWidget, Meta = (AllowPrivateAccess, BindWidget))
+    TObjectPtr<UVerticalBox> SessionListBox;
 
 };
