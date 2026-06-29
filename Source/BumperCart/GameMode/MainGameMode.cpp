@@ -275,7 +275,7 @@ void AMainGameMode::UpdateAllPlayerRanks()
     //점수 내림차순 정렬
     SortedStates.Sort([](const AMainPlayerState& A, const AMainPlayerState& B)
     {
-        return A.GetScore() > B.GetScore();
+        return A.GetPlayerScore() > B.GetPlayerScore();
     });
 
     //동점자는 같은 등수

@@ -68,7 +68,7 @@ private:
     void OnRep_DroppedItemCount();
 
     UPROPERTY(ReplicatedUsing = OnRep_PlayerScore, VisibleAnywhere,  Category = "PlayerStats")
-    int32 PlayerScore = 0;
+    float PlayerScore = 0.f;
 
     UPROPERTY(ReplicatedUsing = OnRep_Rank, VisibleAnywhere,  Category = "PlayerStats")
     int32 Rank = 0;
