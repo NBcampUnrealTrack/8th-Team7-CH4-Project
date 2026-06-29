@@ -1,20 +1,17 @@
-﻿//BumperCart - B(카트/플레이어 조작) 파트
-//CartPawn: 쇼핑카트 플레이어 폰. ACharacter 기반 직접 제어(완전 물리 X).
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Cart/Component/CartLoadComponent.h" //FLoadInfo / UCartLoadComponent 타입 사용
-#include "Cart/SlideAffectable.h" //미끄럼 기믹(물웅덩이 등)이 호출하는 인터페이스
+#include "Cart/Component/CartLoadComponent.h"
+#include "Cart/SlideAffectable.h"
 #include "CartPawn.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
-class UCameraShakeBase; //충돌 카메라 쉐이크 클래스
-class USoundBase; //효과음(SFX)
+class UCameraShakeBase;
+class USoundBase;
 struct FInputActionValue;
 class UCartGrabComponent;
 
@@ -47,22 +44,26 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	//B4: 카트가 무언가에 부딪혔을 때 호출 (충돌 => 상품 드롭 판정)
+	//B4 : 카트가 무언가에 부딪혔을 때 호출 (충돌 => 상품 드롭 판정)
 	virtual void NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit) override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
-	//[B5-②] 부스터 상태를 서버에 통지 (서버가 충돌 역할 판정에 사용)
+	//B5 : 부스터 상태를 서버에 통지 (서버가 충돌 역할 판정에 사용)
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerSetBoosting(bool bNewBoosting);
 
-	//미끄럼(슬립) 효과를 모든 인스턴스에 전파해 각자 로컬 적용 (소유 클라의 예측 이동에도 반영)
+	//미끄럼 효과를 모든 인스턴스에 전파해 각자 로컬 적용 (소유 클라의 예측 이동에도 반영)
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastApplySlip(float Duration, float SpinAngleDeg);
 
 	//충돌음을 소유 클라에서 재생 (서버 NotifyHit에서 호출 — 쉐이크와 동일 패턴, 멀티캐스트 중복재생 회피)
 	UFUNCTION(Client, Unreliable)
 	void ClientPlayBumpSound();
+
+    //Yaw 서버에 전달
+    UFUNCTION(Server, Unreliable)
+    void ServerSetCartYaw(float Yaw);
 
 	//---------- 카메라 ----------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
@@ -165,11 +166,11 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BumpDropCooldown = 0.5f;
 
-	//[B5] 부스터 오용(브레이크/급회전)으로 쏟을 때의 충격량
+	//B5 : 부스터 오용(브레이크/급회전)으로 쏟을 때의 충격량
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BoostMisuseImpulse = 800.f;
 
-	//[B5] 부스터 중 누적 회전각(도)이 이 값을 넘으면 쏟음
+	//B5 : 부스터 중 누적 회전각(도)이 이 값을 넘으면 쏟음
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BoostTurnSpillAngle = 60.f;
 
@@ -263,6 +264,9 @@ private:
 
 	//충돌 직전 프레임의 속도 (NotifyHit 시점엔 비물리라 속도가 0으로 깎여 신뢰 불가 => Tick에서 매 프레임 캐시)
 	FVector PreviousVelocity = FVector::ZeroVector;
+
+    //서버에 마지막으로 보낸 Yaw
+    float LastSentYaw = 0.f;
 
 	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
 	float BoostTurnAccumDeg = 0.f;

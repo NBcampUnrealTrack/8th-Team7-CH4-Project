@@ -25,7 +25,7 @@ ACartPawn::ACartPawn()
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	//이동 컴포넌트 기본 세팅 (수치는 B2에서 본격 튜닝)
+	//이동 컴포넌트 기본 세팅
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->bOrientRotationToMovement = false; //Yaw는 우리가 직접 제어
@@ -43,14 +43,14 @@ ACartPawn::ACartPawn()
 	//카메라: 고정 쿼터뷰. 카트가 회전해도 각도는 고정되고 위치만 따라간다.
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 800.f; //쿼터뷰 — 카트 메시 크기에 맞춰 당겨옴
-	CameraBoom->SetRelativeRotation(FRotator(-55.f, 0.f, 0.f)); //아래로 비스듬히 내려봄
+	CameraBoom->TargetArmLength = 800.f; //쿼터뷰
+	CameraBoom->SetRelativeRotation(FRotator(-55.f, 0.f, 0.f)); //아래로 비스듬히
 	CameraBoom->bUsePawnControlRotation = false;
 	CameraBoom->bInheritPitch = false; //카트 회전과 무관하게 각도 고정
 	CameraBoom->bInheritYaw = false;
 	CameraBoom->bInheritRoll = false;
-	CameraBoom->bDoCollisionTest = false; //탑다운이라 벽에 카메라가 당겨지지 않게
-	CameraBoom->bEnableCameraLag = true; //위치만 부드럽게 따라감
+	CameraBoom->bDoCollisionTest = false; //벽에 카메라가 당겨지지 않게
+	CameraBoom->bEnableCameraLag = true; //위치만 따라감
 	CameraBoom->CameraLagSpeed = 8.f;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -142,7 +142,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 	CurrentSteer = FMath::FInterpTo(CurrentSteer, SteerInput, DeltaSeconds, SteerInterpSpeed);
 	if (!FMath::IsNearlyZero(CurrentSteer))
 	{
-		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용 (카트 특유의 둔한 조향)
+		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용
 		const float Speed = Move->Velocity.Size2D();
 		const float SpeedAlpha = FMath::Clamp(Speed / FMath::Max(DefaultMaxWalkSpeed, 1.f), 0.f, 1.f);
 		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
@@ -160,7 +160,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		SlipSpinRemainingDeg -= Step;
 	}
 
-	//--- B5: 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
+	//--- B5 : 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
 	//입력 기반이라 서버가 모름 => 내 카트(소유 클라)에서 판정, RequestSpill이 서버로 전달
 	if (bIsBoosting && IsLocallyControlled())
 	{
@@ -178,6 +178,16 @@ void ACartPawn::Tick(float DeltaSeconds)
 			BoostTurnAccumDeg = 0.f;
 		}
 	}
+
+    if (IsLocallyControlled()   && !HasAuthority())
+    {
+        const float Yaw =GetActorRotation().Yaw;
+        if (!FMath::IsNearlyEqual(Yaw, LastSentYaw, 0.1f))
+        {
+            LastSentYaw = Yaw;
+            ServerSetCartYaw(Yaw);
+        }
+    }
 
 	//충돌 세기 계산용: 이번 프레임 속도를 저장 (다음 프레임 NotifyHit에서 '충돌 직전' 속도로 사용)
 	PreviousVelocity = GetVelocity();
@@ -315,10 +325,16 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	DOREPLIFETIME_CONDITION(ACartPawn, bIsBoosting, COND_SkipOwner);
 }
 
-//[B5-②] 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
+//B5 : 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
 bool ACartPawn::ServerSetBoosting_Validate(bool bNewBoosting)
 {
 	return true;
+}
+
+//회전 갱신
+void ACartPawn::ServerSetCartYaw_Implementation(float Yaw)
+{
+    SetActorRotation(FRotator(0.f, Yaw, 0.f));
 }
 
 void ACartPawn::ServerSetBoosting_Implementation(bool bNewBoosting)
@@ -436,7 +452,7 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	//충돌음: 소유 클라에서 재생 (쉐이크와 동일 — 서버에서 Client RPC)
 	ClientPlayBumpSound();
 
-	//[B5-②] 충돌 역할 판정 (서버 기준 부스터 상태로)
+	//B5 : 충돌 역할 판정 (서버 기준 부스터 상태로)
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 	if (bIsBoosting)
 	{
@@ -474,7 +490,7 @@ void ACartPawn::RequestSpill(float Impulse, EDropCollisionRole DropRole)
 	}
 	LastBumpDropTime = Now;
 
-	//[임시] B5-② 역할 확인용 - 검증 후 제거
+	//B5확인용 - 검증 후 제거
 	UE_LOG(LogBumperCart, Log, TEXT("Spill role=%d impulse=%.0f"), (int32)DropRole, Impulse);
 
 	//C가 개수 판정 + 실제 드롭 (서버=즉시, 클라=서버 RPC)
