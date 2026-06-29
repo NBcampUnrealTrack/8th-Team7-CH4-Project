@@ -76,14 +76,14 @@ private:
 
     // 서버 RPC, 조준된 방향으로 상품을 잡는 함수
     UFUNCTION(Server, Reliable)
-    void Server_GrabProduct(FVector_NetQuantizeNormal AimDirection);
+    void Server_GrabProduct(FVector_NetQuantizeNormal AimDirection, float AimDistance);
 
     // 멀티캐스트 RPC, 로봇손 뻗는 연출 실행하라고 요청하는 함수
     // Duration을 받아서 해당 시간동안 손을 뻗고, 회수하면 됨
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayGrab(FVector_NetQuantize Start, FVector_NetQuantize Target);
 
-    bool PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, FHitResult& Hit);
+    bool PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, float AimDistance, FHitResult& Hit);
 
     // 게임 종료 시 마우스 조준선 타이머 끄는 함수
     void StopAimTimer();
@@ -148,6 +148,8 @@ private:
     FVector CachedAimDirection;
     // 저장한 조준 위치
     FVector CachedAimTargetLocation;
+    // 저장한 조준선 까지의 길이
+    float CachedAimDistance;
 
     // 마우스 조준선 갱신 빈도
     UPROPERTY(EditAnywhere, Category = "Cart|Grab")

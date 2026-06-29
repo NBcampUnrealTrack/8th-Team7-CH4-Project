@@ -12,6 +12,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+#include "Util/BCCollisionChannels.h"
 
 
 UCartGrabComponent::UCartGrabComponent()
@@ -28,6 +29,7 @@ UCartGrabComponent::UCartGrabComponent()
     // 조준선 관련
     CachedAimDirection = FVector::ZeroVector;
     CachedAimTargetLocation = FVector::ZeroVector;
+    CachedAimDistance = 0.f;
     AimUpdateInterval = 0.1f;
 
     // 로봇손 관련
@@ -281,38 +283,37 @@ void UCartGrabComponent::UpdateGrabAim()
         return;
     }
 
-    // 마우스 커서 위치에서 지정한 콜리전 채널 기준으로 광선 발사
-    // 부딪힌 위치 정보를 HitResult에 저장, 없다면 false 반환
-    FHitResult HitResult;
+    // WorldLocation : 마우스가 위치한 3D월드 시작점, 보통 카메라 위치
+    // WorldDirection : 마우스 위치를 향해 뻗어나가는 방향 벡터, 카메라에서 마우스 커서 방향으로 나가는 방향
+    // 마우스 방향 광선 식 : WorldLocation + WorldDirection * T (T는 임의의 값)
+    FVector WorldLocation, WorldDirection;
 
-    bool bHit = PlayerController->GetHitResultUnderCursorByChannel(
-        UEngineTypes::ConvertToTraceType(ECC_Visibility),
-        false,
-        HitResult
-    );
-    if (!bHit) return;
+    bool bDeprojected = PlayerController->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
+    if (!bDeprojected) return;
 
-
-    // 시작점, 마우스 위치 기준으로 방향 구하기
     FVector Start = OwnerPawn->GetActorLocation();
-    FVector Target = HitResult.ImpactPoint;
+    float PawnZ = Start.Z;
 
-    Target.Z = Start.Z;
+    if (FMath::IsNearlyZero(WorldDirection.Z)) return;
 
-    FVector AimDirection = Target - Start;
-    AimDirection.Z = 0.f;
+    // 카트높이 = WorldLocation + WorldDirection * T (광선위의 카트의 높이과 Z가 같은 임의의 점)
+    // T = (카트높이 - WorldLocation) / WorldDirection
+    //   -> T는 카트와 같은 높이가 되는데 필요한 길이
+    float T = (PawnZ - WorldLocation.Z) / WorldDirection.Z;
+    if (T < 0.f) return;
 
-    if (AimDirection.IsNearlyZero()) return;
+    FVector Target = WorldLocation + WorldDirection * T;
+    Target.Z = PawnZ;   // 오차 보정을 위한 대입
 
-    //// 조준선을 Start위치로 올리면서 어긋나는 문제 있음
-    // 보여주는거랑 실제 판정은 다르게 해야함
+    FVector AimVector = Target - Start;
+    if (AimVector.IsNearlyZero()) return;
 
-    // 조준선이 GrabRange 넘어가면 Min 으로 자르기
-    float Distance = AimDirection.Size();
+    float Distance = AimVector.Size();
     float ActualDistance = FMath::Min(Distance, GrabRange);
 
-    CachedAimDirection = AimDirection.GetSafeNormal();
+    CachedAimDirection = AimVector.GetSafeNormal();
     CachedAimTargetLocation = Start + CachedAimDirection * ActualDistance;
+    CachedAimDistance = ActualDistance;
 
     ShowMouseAim(Start);
 }
@@ -355,13 +356,14 @@ void UCartGrabComponent::ShowMouseAim(const FVector& Start)
 void UCartGrabComponent::RequestGrab()
 {
     if (CachedAimDirection.IsNearlyZero()) return;
+    if (CachedAimDistance <= 0.f) return;
     if (GrabSpeed <= 0.f) return;
 
     // 클라이언트에서 계산한 값이므로 인자로 넘겨야 함
-    Server_GrabProduct(CachedAimDirection);
+    Server_GrabProduct(CachedAimDirection, CachedAimDistance);
 }
 
-void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNormal AimDirection)
+void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNormal AimDirection, float AimDistance)
 {
     UWorld* World = GetWorld();
     if (!IsValid(World)) return;
@@ -370,9 +372,11 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
     if (!bCanGrab) return;
 
+    float ActualAimDistance = FMath::Clamp(AimDistance, 0.f, GrabRange);
+
     // Trace, Sweep 으로 판정, 상품 찾기
     FHitResult Hit;
-    if (!PerformGrabTrace(AimDirection, Hit)) return;
+    if (!PerformGrabTrace(AimDirection, ActualAimDistance, Hit)) return;
 
     AProductBase* Product = Cast<AProductBase>(Hit.GetActor());
     if (!IsValid(Product)) return;
@@ -403,7 +407,7 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     SetGrabCooldown(ReachDuration * 2.f);
 }
 
-bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, FHitResult& Hit)
+bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, float AimDistance, FHitResult& Hit)
 {
     UWorld* World = GetWorld();
     if (!IsValid(World)) return false;
@@ -412,7 +416,7 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     if (!IsValid(OwnerActor)) return false;
 
     FVector Start = OwnerActor->GetActorLocation();
-    FVector End = Start + AimDirection * GrabRange;
+    FVector End = Start + FVector(AimDirection) * AimDistance;
 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(OwnerActor);
@@ -422,7 +426,7 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
         Start,
         End,
         FQuat::Identity,
-        ECC_GameTraceChannel2,
+        BCCollisionChannel::RobotHandGrabTrace,
         FCollisionShape::MakeSphere(GrabRadius),
         Params
     );
@@ -430,8 +434,8 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     // 맞은게 없다면 연출만하고 종료
     if (!bHit)
     {
-        float Distance = FVector::Distance(Start, End);
-        float ReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
+        float ReachDuration = AimDistance / FMath::Max(GrabSpeed, 1.f);
+
         Multicast_PlayGrab(Start, End);
         SetGrabCooldown(ReachDuration * 2.f);
         return false;
