@@ -28,7 +28,7 @@ AProductBase::AProductBase()
 
     GrabCollision = CreateDefaultSubobject<USphereComponent>(TEXT("GrabCollision"));
     GrabCollision->SetupAttachment(Mesh);
-    GrabCollision->SetSphereRadius(65.f);
+    GrabCollision->SetSphereRadius(40.f);
     GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     GrabCollision->SetCollisionProfileName(TEXT("ProductGrab"));
 
