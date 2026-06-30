@@ -36,14 +36,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "OnlineServicesEOS",
-			"Enabled": false
-		},
-		{
-			"Name": "OnlineServicesEOSGS",
-			"Enabled": false
-		},
-		{
 			"Name": "OnlineSubsystemEOS",
 			"Enabled": true
 		},

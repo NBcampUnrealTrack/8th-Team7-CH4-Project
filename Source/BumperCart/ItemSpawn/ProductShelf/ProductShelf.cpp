@@ -3,6 +3,9 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/PrimitiveComponent.h"
 #include "Product/ProductBase.h"
+#include "Kismet/GameplayStatics.h"
+#include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
+#include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 
 AProductShelf::AProductShelf()
 {
@@ -19,6 +22,33 @@ AProductShelf::AProductShelf()
 void AProductShelf::BeginPlay()
 {
 	Super::BeginPlay();
+
+    // 제품선반 서브시스템일 경우 (WorldSubsystem)
+    if (UWorld* World = GetWorld())
+    {
+        if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
+        {
+            ProductShelfSubsystem->RegisterShelf(this, ShelfType);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("[선반] 선반 서브시스템을 찾지 못했습니다."));
+        }
+    }
+
+    // 제품선반 매니저일 경우 (Actor)
+    //AActor* FoundProductShelfManager = UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass());
+    //AProductShelfManager* ProductShelfManager = Cast<AProductShelfManager>(FoundProductShelfManager);
+
+    //if (IsValid(ProductShelfManager))
+    //{
+    //    // 매니저에 등록
+    //    ProductShelfManager->RegisterShelf(this, ShelfType);
+    //}
+    //else
+    //{
+    //    UE_LOG(LogTemp, Error, TEXT("[선반] 선반매니저를 찾지 못했습니다."));
+    //}
 }
 
 AProductBase* AProductShelf::SpawnRandomProduct()
@@ -73,7 +103,7 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
             SpawnedProduct->SetLifeSpan(30.0f);
         }
 
-        UE_LOG(LogTemp, Log, TEXT("[ProductShelf] %s 제품 스폰."), *SpawnedProduct->GetName());
+        UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());
 
         return SpawnedProduct;
     }

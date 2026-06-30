@@ -59,6 +59,19 @@ private:
 public:
     // 게임 시작시 호출 - 게임 모드에서 호출
     void StartGimmickSpawning();
+
+    // 장애물 스폰
+    void SpawnObstacles();
+
+    // 장애물 정리
+    void ClearAllObstacles();
+
+    // 장애물 리스폰
+    void RespawnObstacles();
+
+    // 라운드/게임 종료시 정리
+    void EndSpawnObstacle();
+
 #pragma endregion
 
 
@@ -105,14 +118,6 @@ protected:
 
     UPROPERTY(EditAnywhere, Category = "Gimmick | Obstacle")
     int32 TotalObstacleSpawnCount = 5;
-
-    void SpawnObstacles();
-
-    void ClearAllObstacles();
-
-    void RespawnObstacles();
-
-    void EndSpawnObstacle();
 
 #pragma endregion
 

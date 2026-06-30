@@ -38,6 +38,7 @@ public:
     bool bIsAllPlayersReady() const;
 
     //복사된 플레이어 정보 조회
+    UPROPERTY(BlueprintReadOnly, Category = "Lobby|PlayerInfos ")
     const TArray<FLobbyPlayerInfo>& GetReplicatedPlayerInfos() const;
 
 
