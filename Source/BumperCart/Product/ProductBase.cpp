@@ -35,6 +35,23 @@ AProductBase::AProductBase()
     bOnSale = false;
 }
 
+void AProductBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    Super::EndPlay(EndPlayReason);
+
+
+    switch (EndPlayReason)
+    {
+    case EEndPlayReason::Destroyed:
+        UE_LOG(LogTemp, Warning, TEXT("%s 상품 파괴"), *GetName());
+        break;
+
+    case EEndPlayReason::RemovedFromWorld:
+        UE_LOG(LogTemp, Warning, TEXT("%s 상품 월드에서 제거"), *GetName());
+        break;
+    }
+}
+
 void AProductBase::BeginPlay()
 {
     Super::BeginPlay();

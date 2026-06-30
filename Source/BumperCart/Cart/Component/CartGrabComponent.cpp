@@ -12,6 +12,20 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+#include "Util/BCCollisionChannels.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Components/DecalComponent.h"
+
+
+namespace NiagaraParamName
+{
+    static const FName NAME_StartPosition(TEXT("User.StartPosition"));
+    static const FName NAME_EndPosition(TEXT("User.EndPosition"));
+    static const FName NAME_ActiveDistance(TEXT("User.ActiveDistance"));
+    static const FName NAME_DotSpacing(TEXT("User.DotSpacing"));
+    static const FName NAME_DotSize(TEXT("User.DotSize"));
+}
 
 
 UCartGrabComponent::UCartGrabComponent()
@@ -25,10 +39,16 @@ UCartGrabComponent::UCartGrabComponent()
 
     GrabbedProduct.Reset();
 
-    // 조준선 관련
+    // 조준선 갱신 관련
     CachedAimDirection = FVector::ZeroVector;
     CachedAimTargetLocation = FVector::ZeroVector;
-    AimUpdateInterval = 0.1f;
+    CachedAimDistance = 0.f;
+    AimUpdateInterval = 0.05f;
+
+    // 조준선 나이아가라 변수
+    AimDotSpacing = 45.f;
+    AimDotSize = 20.f;
+    NiagaraHeightOffset = 10.f;
 
     // 로봇손 관련
     GrabSpeed = 300.f;
@@ -45,7 +65,7 @@ void UCartGrabComponent::SetupInput()
     // 다른 클라이언트의 Pawn이면 등록 X
     if (!IsValid(OwnerPawn) || !OwnerPawn->IsLocallyControlled()) return;
 
-
+    // 입력 바인딩
     if (APlayerController* PlayerController = Cast<APlayerController>(OwnerPawn->GetController()))
     {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -73,6 +93,11 @@ void UCartGrabComponent::SetupInput()
         }
     }
 
+    // 로컬 플레이어 조준선 생성
+    EnsureAimNiagara();
+    EnsureAimDecal();
+
+    // 조준선 활성화
     StartAimTimer();
 }
 
@@ -217,6 +242,18 @@ void UCartGrabComponent::StartAimTimer()
     );
 
     UpdateGrabAim();
+    SetAimVisual(true);
+}
+
+void UCartGrabComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 데디케이트 서버가 아니라면 모든 Pawn의 로봇손 생성
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        EnsureVisualComponents();
+    }
 }
 
 void UCartGrabComponent::StopAimTimer()
@@ -233,7 +270,10 @@ void UCartGrabComponent::StopAimTimer()
 void UCartGrabComponent::Multicast_PlayGrab_Implementation(FVector_NetQuantize Start,
     FVector_NetQuantize Target)
 {
-    PlayGrabVisual(Start, Target);
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        PlayGrabVisual(Start, Target);
+    }
 }
 
 void UCartGrabComponent::HandleFinishGrab()
@@ -281,40 +321,41 @@ void UCartGrabComponent::UpdateGrabAim()
         return;
     }
 
-    // 마우스 커서 위치에서 지정한 콜리전 채널 기준으로 광선 발사
-    // 부딪힌 위치 정보를 HitResult에 저장, 없다면 false 반환
-    FHitResult HitResult;
+    // WorldLocation : 마우스가 위치한 3D월드 시작점, 보통 카메라 위치
+    // WorldDirection : 마우스 위치를 향해 뻗어나가는 방향 벡터, 카메라에서 마우스 커서 방향으로 나가는 방향
+    // 마우스 방향 광선 식 : WorldLocation + WorldDirection * T (T는 임의의 값)
+    FVector WorldLocation, WorldDirection;
 
-    bool bHit = PlayerController->GetHitResultUnderCursorByChannel(
-        UEngineTypes::ConvertToTraceType(ECC_Visibility),
-        false,
-        HitResult
-    );
-    if (!bHit) return;
+    bool bDeprojected = PlayerController->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
+    if (!bDeprojected) return;
 
-
-    // 시작점, 마우스 위치 기준으로 방향 구하기
     FVector Start = OwnerPawn->GetActorLocation();
-    FVector Target = HitResult.ImpactPoint;
+    Start.Z = 10.f; // 강제로 상품 높이로 보정
+    float PawnZ = Start.Z;
 
-    Target.Z = Start.Z;
+    if (FMath::IsNearlyZero(WorldDirection.Z)) return;
 
-    FVector AimDirection = Target - Start;
-    AimDirection.Z = 0.f;
+    // 카트높이 = WorldLocation + WorldDirection * T (광선위의 카트의 높이과 Z가 같은 임의의 점)
+    // T = (카트높이 - WorldLocation) / WorldDirection
+    //   -> T는 카트와 같은 높이가 되는데 필요한 길이
+    float T = (PawnZ - WorldLocation.Z) / WorldDirection.Z;
+    if (T < 0.f) return;
 
-    if (AimDirection.IsNearlyZero()) return;
+    FVector Target = WorldLocation + WorldDirection * T;
+    Target.Z = PawnZ;   // 오차 보정을 위한 대입
 
-    //// 조준선을 Start위치로 올리면서 어긋나는 문제 있음
-    // 보여주는거랑 실제 판정은 다르게 해야함
+    FVector AimVector = Target - Start;
+    if (AimVector.IsNearlyZero()) return;
 
-    // 조준선이 GrabRange 넘어가면 Min 으로 자르기
-    float Distance = AimDirection.Size();
+    float Distance = AimVector.Size();
     float ActualDistance = FMath::Min(Distance, GrabRange);
 
-    CachedAimDirection = AimDirection.GetSafeNormal();
+    CachedAimDirection = AimVector.GetSafeNormal();
     CachedAimTargetLocation = Start + CachedAimDirection * ActualDistance;
+    CachedAimDistance = ActualDistance;
 
-    ShowMouseAim(Start);
+    UpdateAimNiagaraVisual(Start, CachedAimTargetLocation);
+    UpdateAimDecal(CachedAimTargetLocation);
 }
 
 void UCartGrabComponent::TryGrabProduct()
@@ -334,34 +375,17 @@ void UCartGrabComponent::TryGrabProduct()
     Multicast_ShowVisualProductMesh(Product);
 }
 
-void UCartGrabComponent::ShowMouseAim(const FVector& Start)
-{
-    // 임시로 디버그 라인 그려서 보여주는 중
-    UWorld* World = GetWorld();
-    if (!IsValid(World)) return;
-
-    DrawDebugLine(
-        World,
-        Start,
-        CachedAimTargetLocation,
-        FColor::Green,
-        false,
-        AimUpdateInterval,
-        0,
-        5.f
-    );
-}
-
 void UCartGrabComponent::RequestGrab()
 {
     if (CachedAimDirection.IsNearlyZero()) return;
-    if (GrabSpeed <= 0.f) return;
+    if (CachedAimDistance <= KINDA_SMALL_NUMBER) return;
+    if (GrabSpeed <= KINDA_SMALL_NUMBER) return;
 
     // 클라이언트에서 계산한 값이므로 인자로 넘겨야 함
-    Server_GrabProduct(CachedAimDirection);
+    Server_GrabProduct(CachedAimDirection, CachedAimDistance);
 }
 
-void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNormal AimDirection)
+void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNormal AimDirection, float AimDistance)
 {
     UWorld* World = GetWorld();
     if (!IsValid(World)) return;
@@ -370,9 +394,11 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
     if (!bCanGrab) return;
 
+    float ActualAimDistance = FMath::Clamp(AimDistance, 0.f, GrabRange);
+
     // Trace, Sweep 으로 판정, 상품 찾기
     FHitResult Hit;
-    if (!PerformGrabTrace(AimDirection, Hit)) return;
+    if (!PerformGrabTrace(AimDirection, ActualAimDistance, Hit)) return;
 
     AProductBase* Product = Cast<AProductBase>(Hit.GetActor());
     if (!IsValid(Product)) return;
@@ -403,7 +429,7 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     SetGrabCooldown(ReachDuration * 2.f);
 }
 
-bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, FHitResult& Hit)
+bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, float AimDistance, FHitResult& Hit)
 {
     UWorld* World = GetWorld();
     if (!IsValid(World)) return false;
@@ -412,7 +438,9 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     if (!IsValid(OwnerActor)) return false;
 
     FVector Start = OwnerActor->GetActorLocation();
-    FVector End = Start + AimDirection * GrabRange;
+    Start.Z = 10.f; // 카트가 중심점보다 아래있어서 강제로 보정, 상품들이 10.f에 위치함
+    FVector End = Start + FVector(AimDirection) * AimDistance;
+
 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(OwnerActor);
@@ -422,7 +450,7 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
         Start,
         End,
         FQuat::Identity,
-        ECC_GameTraceChannel2,
+        BCCollisionChannel::RobotHandGrabTrace,
         FCollisionShape::MakeSphere(GrabRadius),
         Params
     );
@@ -430,8 +458,8 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     // 맞은게 없다면 연출만하고 종료
     if (!bHit)
     {
-        float Distance = FVector::Distance(Start, End);
-        float ReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
+        float ReachDuration = AimDistance / FMath::Max(GrabSpeed, 1.f);
+
         Multicast_PlayGrab(Start, End);
         SetGrabCooldown(ReachDuration * 2.f);
         return false;
@@ -490,6 +518,13 @@ void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Tar
     EnsureVisualComponents();
     if (!ArmSpline || !Hand) return;
 
+    // 내 Pawn 이라면 조준선 끄기
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled())
+    {
+        SetAimVisual(false);
+    }
+
     VisualStartLocation = Start;
     VisualTargetLocation = Target;
 
@@ -526,6 +561,15 @@ void UCartGrabComponent::FinishGrabVisual()
     HideVisualProductMesh();
 
     SetComponentTickEnabled(false);
+
+    // 내 Pawn 이라면 조준선 켜기
+    // 마우스 위치 기준으로 조준선 한번 갱신하고 Visual 켜야함
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled())
+    {
+        UpdateGrabAim();
+        SetAimVisual(true);
+    }
 }
 
 void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
@@ -555,12 +599,11 @@ void UCartGrabComponent::HideVisualProductMesh()
 
 void UCartGrabComponent::Multicast_ShowVisualProductMesh_Implementation(AProductBase* Product)
 {
-    ShowVisualProductMesh(Product);
-}
-
-void UCartGrabComponent::Multicast_HideVisualProductMesh_Implementation()
-{
-    HideVisualProductMesh();
+    // 데디케이트 서버는 연출 필요없음
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        ShowVisualProductMesh(Product);
+    }
 }
 
 FVector UCartGrabComponent::GetGrabStartLocation() const
@@ -569,4 +612,97 @@ FVector UCartGrabComponent::GetGrabStartLocation() const
     if (!IsValid(OwnerActor)) return {};
 
     return OwnerActor->GetActorLocation();
+}
+
+void UCartGrabComponent::EnsureAimNiagara()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    if (!AimNiagaraSystem) return;
+
+    if (!AimNiagaraComponent)
+    {
+        AimNiagaraComponent = NewObject<UNiagaraComponent>(OwnerActor, TEXT("AimNiagaraComponent"));
+        AimNiagaraComponent->SetAsset(AimNiagaraSystem);
+        AimNiagaraComponent->SetupAttachment(OwnerActor->GetRootComponent());
+        AimNiagaraComponent->SetAutoActivate(false);
+
+        OwnerActor->AddInstanceComponent(AimNiagaraComponent);
+        AimNiagaraComponent->RegisterComponent();
+    }
+}
+
+void UCartGrabComponent::UpdateAimNiagaraVisual(const FVector& Start, const FVector& End)
+{
+    if (VisualState != EGrabVisualState::None) return;
+    if (!IsValid(AimNiagaraComponent)) return;
+
+    FVector NiagaraOffset(0.f, 0.f, NiagaraHeightOffset);
+
+    FVector NiagaraStart = Start + NiagaraOffset;
+    FVector NiagaraEnd = End + NiagaraOffset;
+
+    // static const를 이용하는게 임시 FName 대입보다 조금 더 빠름
+    AimNiagaraComponent->SetVariablePosition(NiagaraParamName::NAME_StartPosition, NiagaraStart);
+    AimNiagaraComponent->SetVariablePosition(NiagaraParamName::NAME_EndPosition, NiagaraEnd);
+    AimNiagaraComponent->SetVariableFloat(NiagaraParamName::NAME_ActiveDistance, CachedAimDistance);
+    AimNiagaraComponent->SetVariableFloat(NiagaraParamName::NAME_DotSpacing, AimDotSpacing);
+    AimNiagaraComponent->SetVariableFloat(NiagaraParamName::NAME_DotSize, AimDotSize);
+}
+
+void UCartGrabComponent::SetAimVisual(bool bVisibility)
+{
+    // 나이아가라 설정
+    if (IsValid(AimNiagaraComponent))
+    {
+        AimNiagaraComponent->SetVisibility(bVisibility, true);
+
+        // 활성화 안되어있으면 키기
+        if (bVisibility && !AimNiagaraComponent->IsActive())
+        {
+            AimNiagaraComponent->Activate(true);
+        }
+    }
+
+    // 데칼 설정
+    if (IsValid(AimDecal))
+    {
+        AimDecal->SetVisibility(bVisibility);
+    }
+}
+
+void UCartGrabComponent::EnsureAimDecal()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    if (!AimDecal)
+    {
+        AimDecal = NewObject<UDecalComponent>(OwnerActor, TEXT("AimDecal"));
+        AimDecal->SetupAttachment(OwnerActor->GetRootComponent());
+
+        AimDecal->SetUsingAbsoluteLocation(true);
+        AimDecal->SetUsingAbsoluteRotation(true);
+        AimDecal->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
+        AimDecal->SetVisibility(false);
+
+        if (AimDecalMaterial)
+        {
+            AimDecal->SetDecalMaterial(AimDecalMaterial);
+        }
+
+        AimDecal->DecalSize = FVector(32.f, 32.f, 32.f);
+
+        OwnerActor->AddInstanceComponent(AimDecal);
+        AimDecal->RegisterComponent();
+    }
+}
+
+void UCartGrabComponent::UpdateAimDecal(const FVector& Target)
+{
+    if (VisualState != EGrabVisualState::None) return;
+    if (!IsValid(AimDecal)) return;
+
+    AimDecal->SetWorldLocation(Target);
 }
