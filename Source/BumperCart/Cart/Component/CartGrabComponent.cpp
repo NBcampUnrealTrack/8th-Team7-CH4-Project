@@ -48,7 +48,7 @@ UCartGrabComponent::UCartGrabComponent()
     // 조준선 나이아가라 변수
     AimDotSpacing = 45.f;
     AimDotSize = 20.f;
-    NiagaraHeightOffset = 20.f;
+    NiagaraHeightOffset = 10.f;
 
     // 로봇손 관련
     GrabSpeed = 300.f;
@@ -681,6 +681,8 @@ void UCartGrabComponent::EnsureAimDecal()
     {
         AimDecal = NewObject<UDecalComponent>(OwnerActor, TEXT("AimDecal"));
         AimDecal->SetupAttachment(OwnerActor->GetRootComponent());
+
+        AimDecal->SetUsingAbsoluteLocation(true);
         AimDecal->SetUsingAbsoluteRotation(true);
         AimDecal->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
         AimDecal->SetVisibility(false);
@@ -690,7 +692,7 @@ void UCartGrabComponent::EnsureAimDecal()
             AimDecal->SetDecalMaterial(AimDecalMaterial);
         }
 
-        AimDecal->DecalSize = FVector(16.f, 16.f, 16.f);
+        AimDecal->DecalSize = FVector(32.f, 32.f, 32.f);
 
         OwnerActor->AddInstanceComponent(AimDecal);
         AimDecal->RegisterComponent();
@@ -703,5 +705,4 @@ void UCartGrabComponent::UpdateAimDecal(const FVector& Target)
     if (!IsValid(AimDecal)) return;
 
     AimDecal->SetWorldLocation(Target);
-    AimDecal->SetVisibility(true);
 }
