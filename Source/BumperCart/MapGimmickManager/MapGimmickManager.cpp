@@ -141,7 +141,7 @@ void AMapGimmickManager::SpawnObstacles()
 
     for (const FObstacleSpawnInfo& Info : ObstacleSpawnList)
     {
-        if (!Info.ObstacleClass) continue;
+        if (IsValid(Info.ObstacleClass)) continue;
 
         for (int32 i = 0; i < Info.SpawnCount; ++i)
         {

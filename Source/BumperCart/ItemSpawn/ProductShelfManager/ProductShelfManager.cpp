@@ -30,10 +30,10 @@ void AProductShelfManager::BeginPlay()
     if (IsValid(SpawnConfig))
     {
         MaxSpawnCount = SpawnConfig->MaxSpawnCount;
-
         MaxSpawnLimit = SpawnConfig->MaxSpawnLimit;
-
         RespawnDelay = SpawnConfig->RespawnDelay;
+
+        UE_LOG(LogTemp, Log, TEXT("[선반매니저] 데이터 에셋 적용"));
     }
 
     // 게임 모드에서 호출시 삭제 예정 - 테스트용
@@ -119,6 +119,15 @@ void AProductShelfManager::OnProductDestroyed()
 void AProductShelfManager::StartProductSpawning()
 {
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AProductShelfManager::ProductSpawnCall, RespawnDelay, true);
+}
+
+void AProductShelfManager::InitializeConfig(UProductShelfManagerConfig* InConfig)
+{
+    if (IsValid(InConfig))
+    {
+        SpawnConfig = InConfig;
+        UE_LOG(LogTemp, Log, TEXT("[선반 매니저] GameMode에서 데이터 에셋 로드완료"));
+    }
 }
 
 void AProductShelfManager::SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct)

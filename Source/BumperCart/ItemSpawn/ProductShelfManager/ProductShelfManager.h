@@ -71,6 +71,7 @@ private:
     UPROPERTY()
     TArray<TSubclassOf<AProductBase>> SpawnedItems;
 
+    // 데이터 에셋 - 월드 서브시스템으로 변경 후 게임 모드로 옮겨야함
     UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
     TObjectPtr<UProductShelfManagerConfig> SpawnConfig;
 
@@ -90,6 +91,8 @@ public:
 
     // 테스트용 타이머
     FTimerHandle GameStartTimerHandle;
+
+    void InitializeConfig(UProductShelfManagerConfig* InConfig);
 
 #pragma endregion
 
