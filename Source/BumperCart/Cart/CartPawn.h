@@ -129,7 +129,35 @@ protected:
 	float BoostDuration = 0.6f;
 
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
-	float BoostCooldown = 2.5f;
+	float BoostCooldown = 1.0f;
+
+
+    //---------- 카메라 속도감 연출 ----------
+    //이 속도(cm/s)에서 줌이 최대에 도달 (0~이 값 사이를 보간)
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1"))
+    float SpeedZoomFullSpeed = 700.f;
+
+    //저속/고속 카메라 암길이
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
+    float CameraArmMin = 800.f;
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
+    float CameraArmMax = 870.f;
+
+    //저속/고속 FOV
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
+    float CameraFovMin = 90.f;
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
+    float CameraFovMax = 97.f;
+
+    //부스트 시 추가 빼기/넓히기
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
+    float BoostExtraArm = 20.f;
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
+    float BoostExtraFov = 3.f;
+
+    //FOV/줌 보간 속도 (낮을수록 부드럽게)
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
+    float CameraZoomInterpSpeed = 7.f;
 
     //---------- 그랩 컴포넌트 ----------
     // 생성자에서 생성하고, SetupPlayerInputComponent에서 IMC 바인딩

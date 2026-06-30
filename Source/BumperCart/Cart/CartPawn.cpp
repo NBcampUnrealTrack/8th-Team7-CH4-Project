@@ -206,6 +206,27 @@ void ACartPawn::Tick(float DeltaSeconds)
 		}
 	}
 
+    //--- 카메라 속도감 연출 ---
+    if (IsLocallyControlled() && CameraBoom && FollowCamera)
+    {
+        //속도 기반 알파 (0=저속, 1=고속)
+        const float SpeedAlpha = FMath::Clamp(Move->Velocity.Size2D() / FMath::Max(SpeedZoomFullSpeed, 1.f), 0.f, 1.f);
+
+        //속도로 FOV·암길이 보간
+        float TargetArm = FMath::Lerp(CameraArmMin, CameraArmMax, SpeedAlpha);
+        float TargetFov = FMath::Lerp(CameraFovMin, CameraFovMax, SpeedAlpha);
+        if (bIsBoosting)
+        {
+            TargetArm += BoostExtraArm;
+            TargetFov += BoostExtraFov;
+        }
+
+        //튐 방지로 부드럽게 보간
+        CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArm, DeltaSeconds, CameraZoomInterpSpeed);
+        FollowCamera->FieldOfView   = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFov, DeltaSeconds, CameraZoomInterpSpeed);
+
+    }
+
     if (IsLocallyControlled()   && !HasAuthority())
     {
         const float Yaw =GetActorRotation().Yaw;
