@@ -20,6 +20,9 @@ class BUMPERCART_API AMainGameMode : public AGameMode
 public:
     AMainGameMode();
 
+    UFUNCTION()
+    void UpdateAllPlayerRanks();
+
 protected:
     // 매치가 InProgress로 전환될 때 엔진이 자동 호출
     virtual void HandleMatchHasStarted() override;
@@ -56,8 +59,6 @@ private:
     UPROPERTY()
     ACheckoutManager* CheckoutManagerRef;
 
-    UFUNCTION()
-    void UpdateAllPlayerRanks();
 
 
 #pragma region EventManager
