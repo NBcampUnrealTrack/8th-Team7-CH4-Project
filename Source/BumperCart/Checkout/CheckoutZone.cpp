@@ -4,13 +4,16 @@
 #include "Cart/CartPawn.h"
 #include "Product/ProductTypes.h"
 #include "Checkout/CheckoutScoreCalculator.h"
+#include "Checkout/CheckoutBarrier.h"
 #include "GameState/MainGameState.h"
 #include "PlayerState/MainPlayerState.h"
 
 #include "GameFramework/Character.h"
 #include "GameFramework/GameStateBase.h"
+#include "Components/ChildActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -38,6 +41,20 @@ ACheckoutZone::ACheckoutZone()
     CheckoutTrigger->SetCollisionResponseToChannel(ECC_Pawn,ECR_Overlap);
     CheckoutTrigger->SetSphereRadius(100.0f);
 
+    // 차단벽 생성
+    LeftBarrierComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("LeftBarrierComponent"));
+    LeftBarrierComponent->SetupAttachment(SceneRoot);
+    LeftBarrierComponent->SetChildActorClass(ACheckoutBarrier::StaticClass());
+
+    RightBarrierComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("RightBarrierComponent"));
+    RightBarrierComponent->SetupAttachment(SceneRoot);
+    RightBarrierComponent->SetChildActorClass(ACheckoutBarrier::StaticClass());
+
+    EntranceBarrierComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("EntranceBarrierComponent"));
+    EntranceBarrierComponent->SetupAttachment(SceneRoot);
+    EntranceBarrierComponent->SetChildActorClass(ACheckoutBarrier::StaticClass());
+
+
     CheckoutZoneFill =  CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneFill"));
 
     CheckoutZoneFill->SetupAttachment(SceneRoot);
@@ -64,6 +81,21 @@ void ACheckoutZone::BeginPlay()
     InitializeCheckoutZoneMaterials();
 
     OnRep_CurrentCheckoutZoneState();
+
+    ACheckoutBarrier* LeftBarrier = GetLeftBarrier();
+    ACheckoutBarrier* RightBarrier = GetRightBarrier();
+
+    if (IsValid(LeftBarrier))
+    {
+        LeftBarrier->SetBarrierEnabled(bUseEntranceBarrier);
+    }
+
+    if (IsValid(RightBarrier))
+    {
+        RightBarrier->SetBarrierEnabled(bUseEntranceBarrier);
+    }
+
+    SetEntranceBarrierEnabled(false);
 }
 
 void ACheckoutZone::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -93,6 +125,35 @@ void ACheckoutZone::OnCheckoutZoneBeginOverlap(UPrimitiveComponent* OverlappedCo
     if (!IsValid(PlayerCharacter))
     {
         return;
+    }
+
+    if (bUseEntranceBarrier)
+    {
+        // 아이템이 0개일 경우
+        UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
+        if (!IsValid(CartLoadComponent))
+        {
+            return;
+        }
+
+        // 아이템 개수가 0개일 경우
+        // 갇히는 문제 방지
+        if (CartLoadComponent->GetCurrentLoadedCount() <= 0)
+        {
+            return;
+        }
+
+        // 이미 다른 플레이어가 구역에 들어와 있으면 진입 거부
+        if (!PlayersInZone.IsEmpty() && !PlayersInZone.Contains(PlayerCharacter))
+        {
+            return;
+        }
+
+        // 첫 번째 플레이어가 들어오면 입구 차단
+        if (PlayersInZone.IsEmpty())
+        {
+            SetEntranceBarrierEnabled(true);
+        }
     }
 
     AddPlayerInZone(PlayerCharacter);
@@ -187,6 +248,46 @@ void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Styl
         CheckoutZoneFillMID->SetScalarParameterValue(TEXT("EmissiveStrength"), Style.FillEmissiveStrength);
         CheckoutZoneFillMID->SetScalarParameterValue(TEXT("Opacity"), Style.FillOpacity);
     }
+}
+
+void ACheckoutZone::SetUseEntranceBarrier(bool bUseBarrier)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (bUseEntranceBarrier == bUseBarrier)
+    {
+        return;
+    }
+
+    bUseEntranceBarrier = bUseBarrier;
+
+    // 기능을 끄면 현재 차단벽도 즉시 해제
+    if (!bUseEntranceBarrier)
+    {
+        SetEntranceBarrierEnabled(false);
+    }
+}
+
+bool ACheckoutZone::IsUsingEntranceBarrier() const
+{
+    return bUseEntranceBarrier;
+}
+
+void ACheckoutZone::SetEntranceBarrierEnabled(bool bIsEnabled)
+{
+    ACheckoutBarrier* EntranceBarrier = GetEntranceBarrier();
+
+    if (!IsValid(EntranceBarrier))
+    {
+        return;
+    }
+
+    const bool bShouldEnable = bUseEntranceBarrier && bIsEnabled;
+
+    EntranceBarrier->SetBarrierEnabled(bShouldEnable);
 }
 
 // ------------------------------------------------------------
@@ -405,9 +506,8 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     {
         return;
     }
+
     UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
-
-
     if (!IsValid(CartLoadComponent))
     {
         return;
@@ -418,6 +518,9 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     bIsCheckoutInProgress = true;
     CheckoutProgress = 0.0f;
     ElapsedCheckoutTime = 0.0f;
+
+    // 정산 시작 시 입구 차단벽 활성화
+    SetEntranceBarrierEnabled(true);
 
     // 적재된 상품 수에 따라 추가 정산 시간
     int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
@@ -600,8 +703,11 @@ void ACheckoutZone::CompleteCheckout()
     // 정산 완료 후 계산대 상태는 Manager에서 판단
     OnCheckoutCompleted.Broadcast(this);
 
+    // 정산이 끝났으므로 입구 차단 해제
+    SetEntranceBarrierEnabled(false);
+
     // Manager에서 계산대를 닫지 않은 경우, 다른 플레이어가 바로 정산 시도
-    if (CurrentCheckoutZoneState == ECheckoutZoneState::Open)
+    if (!bUseEntranceBarrier && CurrentCheckoutZoneState == ECheckoutZoneState::Open)
     {
         TryStartCheckout();
     }
@@ -618,6 +724,9 @@ void ACheckoutZone::CancelCheckout()
 
     ResetCheckout();
 
+    // 정산 취소 시 입구 해제
+    SetEntranceBarrierEnabled(false);
+
     UE_LOG(LogTemp, Warning, TEXT("정산 취소"));
 }
 
@@ -627,6 +736,8 @@ void ACheckoutZone::ResetCheckout()
 
     CurrentCheckoutPlayer = nullptr;
     bIsCheckoutInProgress = false;
+
+    SetEntranceBarrierEnabled(false);
 
     LastLoadedProductCount = 0;
 
@@ -750,6 +861,36 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
     {
         TryStartCheckout();
     }
+}
+
+ACheckoutBarrier* ACheckoutZone::GetLeftBarrier() const
+{
+    if (!IsValid(LeftBarrierComponent))
+    {
+        return nullptr;
+    }
+
+    return Cast<ACheckoutBarrier>(LeftBarrierComponent->GetChildActor());
+}
+
+ACheckoutBarrier* ACheckoutZone::GetRightBarrier() const
+{
+    if (!IsValid(RightBarrierComponent))
+    {
+        return nullptr;
+    }
+
+    return Cast<ACheckoutBarrier>(RightBarrierComponent->GetChildActor());
+}
+
+ACheckoutBarrier* ACheckoutZone::GetEntranceBarrier() const
+{
+    if (!IsValid(EntranceBarrierComponent))
+    {
+        return nullptr;
+    }
+
+    return Cast<ACheckoutBarrier>(EntranceBarrierComponent->GetChildActor());
 }
 
 // ------------------------------------------------------------
