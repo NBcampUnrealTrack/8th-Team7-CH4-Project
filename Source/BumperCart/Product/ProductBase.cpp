@@ -28,11 +28,28 @@ AProductBase::AProductBase()
 
     GrabCollision = CreateDefaultSubobject<USphereComponent>(TEXT("GrabCollision"));
     GrabCollision->SetupAttachment(Mesh);
-    GrabCollision->SetSphereRadius(65.f);
+    GrabCollision->SetSphereRadius(40.f);
     GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     GrabCollision->SetCollisionProfileName(TEXT("ProductGrab"));
 
     bOnSale = false;
+}
+
+void AProductBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    Super::EndPlay(EndPlayReason);
+
+
+    switch (EndPlayReason)
+    {
+    case EEndPlayReason::Destroyed:
+        UE_LOG(LogTemp, Warning, TEXT("%s 상품 파괴"), *GetName());
+        break;
+
+    case EEndPlayReason::RemovedFromWorld:
+        UE_LOG(LogTemp, Warning, TEXT("%s 상품 월드에서 제거"), *GetName());
+        break;
+    }
 }
 
 void AProductBase::BeginPlay()

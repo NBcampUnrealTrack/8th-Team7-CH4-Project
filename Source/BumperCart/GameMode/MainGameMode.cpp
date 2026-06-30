@@ -16,6 +16,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMainGameMode, Log, All);
 AMainGameMode::AMainGameMode()
 {
     GameStateClass = AMainGameState::StaticClass();
+    PlayerStateClass = AMainPlayerState::StaticClass();
 
 
 
@@ -51,6 +52,18 @@ void AMainGameMode::BeginPlay()
         // 맵에 배치된 제품 선반 매니저 수색 및 캐스팅
         AActor* FoundShelfActor = UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass());
         ProductShelfManager = Cast<AProductShelfManager>(FoundShelfActor);
+    }
+
+    // 계산대 매니저 찾기
+    AActor* FoundActor = UGameplayStatics::GetActorOfClass(GetWorld(), ACheckoutManager::StaticClass());
+    if (FoundActor)
+    {
+        CheckoutManagerRef = Cast<ACheckoutManager>(FoundActor);
+        UE_LOG(LogMainGameMode, Log, TEXT("CheckoutManager를 성공적으로 찾았습니다."));
+    }
+    else
+    {
+        UE_LOG(LogMainGameMode, Error, TEXT("월드에서 CheckoutManager를 찾을 수 없습니다!"));
     }
 
     //매니저 배치 확인
@@ -98,19 +111,6 @@ void AMainGameMode::StartRound()
     {
         return;
     }
-
-    // 계산대 매니저 찾기
-    AActor* FoundActor = UGameplayStatics::GetActorOfClass(GetWorld(), ACheckoutManager::StaticClass());
-    if (FoundActor)
-    {
-        CheckoutManagerRef = Cast<ACheckoutManager>(FoundActor);
-        UE_LOG(LogMainGameMode, Log, TEXT("CheckoutManager를 성공적으로 찾았습니다."));
-    }
-    else
-    {
-        UE_LOG(LogMainGameMode, Error, TEXT("월드에서 CheckoutManager를 찾을 수 없습니다!"));
-    }
-
 
     // 맵 내부의 키(시간)을 오름차순으로 정리
     PhaseScheduleMap.GetKeys(SortedTriggerTimes);
@@ -240,6 +240,9 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         GetWorldTimerManager().ClearTimer(Timer_RoundTick);
 
         UpdateAllPlayerRanks();
+
+        // 결과 화면 노출 시간 이후 로비로 복귀
+        GetWorldTimerManager().SetTimer(Timer_ReturnToLobby, this, &AMainGameMode::ReturnAllPlayersToLobby, ResultScreenDuration, false);
         break;
 
     default:
@@ -249,13 +252,12 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     UE_LOG(LogMainGameMode, Warning, TEXT("[PHASE CHANGE] 새로운 페이즈 진입: %s"), *PhaseName);
 }
 
+
+//모든 플레이어 랭크 점수에 맞춰 정렬
 void AMainGameMode::UpdateAllPlayerRanks()
 {
     AMainGameState* GS = GetGameState<AMainGameState>();
-    if (!GS)
-    {
-        return;
-    }
+    if (!GS) return;
 
     TArray<AMainPlayerState*> SortedStates;
     for (APlayerState* PS : GS->PlayerArray)
@@ -266,10 +268,7 @@ void AMainGameMode::UpdateAllPlayerRanks()
         }
     }
 
-    if (SortedStates.Num() == 0)
-    {
-        return;
-    }
+    if (SortedStates.Num() == 0) return;
 
 
     //점수 내림차순 정렬
@@ -282,9 +281,9 @@ void AMainGameMode::UpdateAllPlayerRanks()
     int32 CurrentRank = 1;
     for (int32 Index = 0; Index < SortedStates.Num(); ++Index)
     {
-        if (Index > 0 && SortedStates[Index]->GetScore() == SortedStates[Index - 1]->GetScore())
+        // 바로 앞 사람과 점수가 같으면 같은 등수 부여 / 처음에는 확인 X
+        if (Index > 0 && SortedStates[Index]->GetPlayerScore() == SortedStates[Index - 1]->GetPlayerScore())
         {
-            // 바로 앞 사람과 점수가 같으면 같은 등수 부여
             SortedStates[Index]->SetRank(SortedStates[Index - 1]->GetRank());
         }
         else
@@ -295,5 +294,23 @@ void AMainGameMode::UpdateAllPlayerRanks()
         ++CurrentRank;
     }
 
+    //1등 명단 추출
+    TArray<FString> WinnerNames;
+    for (AMainPlayerState* MPS : SortedStates)
+    {
+        if (MPS->GetRank() == 1)
+        {
+            WinnerNames.Add(MPS->GetPlayerName());
+        }
+    }
 
+    // 1등 명단 MainGameState에 저장
+    GS->SetFinalWinners(WinnerNames);
+}
+
+// 라운드 종료 시 모든 플레이어 로비로 복귀
+void AMainGameMode::ReturnAllPlayersToLobby()
+{
+    UE_LOG(LogMainGameMode, Warning, TEXT("결과 화면 종료, 로비로 복귀"));
+    GetWorld()->ServerTravel(TEXT("/Game/Developers/LSJae/Levels/TestLobbyLevel"));
 }

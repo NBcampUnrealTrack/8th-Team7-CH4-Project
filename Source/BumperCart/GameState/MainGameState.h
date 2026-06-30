@@ -30,22 +30,29 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "Round")
     FOnRoundPhaseChanged OnRoundPhaseChanged;
 
-    //라운드 시간(3분)
+    // 라운드 시간(3분)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Round")
     float RoundDurationSeconds = 180.f;
 
     // 서버에서만 호출
-    //라운드 페이즈 지정 및 라운드 시작 시간 지정
+    // 라운드 페이즈 지정 및 라운드 시작 시간 지정
     void SetRoundPhase(ERoundPhase NewPhase);
     void SetRoundStartTime();
 
-    //현재 페이즈 가져오기
+    //최종 1등 명단 저장
+    void SetFinalWinners(const TArray<FString>& Winners);
+
+    // 현재 페이즈 가져오기
     UFUNCTION(BlueprintPure, Category = "Round")
     ERoundPhase GetCurrentPhase() const;
 
-    // 서버-클라이언트 동기화된 시계 기준으로 남은 시간을 직접 계산 (틱 복제 불필요)
+    // 서버-클라이언트 동기화된 시계 기준으로 남은 시간을 직접 계산
     UFUNCTION(BlueprintPure, Category = "Round")
     float GetRemainingTime() const;
+
+    //최종 1등(공동1등 포함) 조회
+    UFUNCTION()
+    TArray<FString> GetFinalWinners() const;
 
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -59,5 +66,8 @@ private:
 
     UPROPERTY(Replicated)
     float RoundStartServerTime = 0.f;
+
+    UPROPERTY(Replicated)
+    TArray<FString> FinalWinnerNames;
 
 };
