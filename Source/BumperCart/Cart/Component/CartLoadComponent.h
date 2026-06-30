@@ -10,6 +10,8 @@
 
 
 class AProductBase;
+class UStaticMeshComponent;
+class UStaticMesh;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnLoadInfoChanged,
@@ -65,6 +67,7 @@ private:
     // 충격량에 따라 몇개를 떨어뜨릴지 계산하는 함수
     int32 CalculateDropCount(float Impulse, EDropCollisionRole Role) const;
 
+    // 충돌 역할에따라 가중치를 반환하는 함수
     float GetCollisionRoleMultiplier(EDropCollisionRole Role) const;
 
     // 적재 정보를 갱신하는 함수
@@ -74,9 +77,33 @@ private:
     UFUNCTION(Server, Reliable)
     void Server_RequestDropProducts(float Impulse, EDropCollisionRole Role);
 
+    // 더미 메시 생성하는 함수
+    void CreateDummyMeshes();
+
+    // 더미 메시 연출 갱신하는 함수
+    void UpdateLoadVisual();
+
+    // 더미 상품을 몇개 보여줄지 계싼하는 함수
+    int32 GetVisibleDummyCount() const;
+
 private:
-    // TArray를 복제할지, 무게, 적재량을 복제할지
-    // 결국 둘다 같은 타이밍에 복제되긴 함
+    /* ---------------- 적재 연출 관련 ---------------- */
+
+    // 적재된 더미 메시들
+    UPROPERTY()
+    TArray<TObjectPtr<UStaticMeshComponent>> LoadDummyMeshes;
+
+    // 부착할 더미 소켓 이름 관리
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")
+    TArray<FName> LoadDummySocketNames;
+
+    // 더미로 사용할 실제 메시
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")
+    TObjectPtr<UStaticMesh> LoadDummyMesh;
+
+    /* ---------------- 적재 관리 변수 ---------------- */
+
+    // 적재중인 상품들을 관리하는 배열
     UPROPERTY()
     TArray<TObjectPtr<AProductBase>> LoadedProducts;
 

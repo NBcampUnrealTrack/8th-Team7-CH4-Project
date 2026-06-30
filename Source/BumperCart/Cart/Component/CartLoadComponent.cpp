@@ -4,6 +4,8 @@
 #include "CartLoadComponent.h"
 #include "Product/ProductBase.h"
 #include "Net/UnrealNetwork.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 
 
 UCartLoadComponent::UCartLoadComponent()
@@ -18,11 +20,19 @@ UCartLoadComponent::UCartLoadComponent()
     BoosterInstigatorDropMultiplier = 0.4f;
     BoostedTargetDropMultiplier = 1.4f;
 
+    // 드롭 개수 규칙 지정
     DropCountRules.Add({ 300.f, 0, 1, 0.5f });
     DropCountRules.Add({ 700.f, 1, 2, 1.f });
     DropCountRules.Add({ 1200.f, 2, 3, 1.f });
     DropCountRules.Add({ 1800.f, 3, 4, 1.f });
     DropCountRules.Add({ 2500.f, 4, 5, 1.f });
+
+    // 소켓 이름 지정
+    for (int32 i = 1; i <= 6; ++i)
+    {
+        FName SocketName = *FString::Printf(TEXT("LoadDummy_0%d"), i);
+        LoadDummySocketNames.Add(SocketName);
+    }
 
     Initialize();
 }
@@ -30,6 +40,11 @@ UCartLoadComponent::UCartLoadComponent()
 void UCartLoadComponent::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        CreateDummyMeshes();
+    }
 }
 
 void UCartLoadComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -251,6 +266,103 @@ void UCartLoadComponent::UpdateLoadInfo()
     }
 }
 
+void UCartLoadComponent::CreateDummyMeshes()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    // 스태틱 메시 전부 가져오기
+    TArray<UStaticMeshComponent*> MeshComponents;
+    OwnerActor->GetComponents<UStaticMeshComponent>(MeshComponents);
+
+    if (LoadDummySocketNames.IsEmpty())
+    {
+        UE_LOG(LogTemp, Error, TEXT("더미 메시가 부착될 소켓을 지정해주세요!!"));
+        return;
+    }
+    FName DummySocketName = LoadDummySocketNames[0];
+
+    // 지정한 소켓 이름이 있는 카트면 가져오고 없다면 넘기기
+    UStaticMeshComponent* CartMesh = nullptr;
+    for (UStaticMeshComponent* MeshComp : MeshComponents)
+    {
+        if (IsValid(MeshComp) && MeshComp->DoesSocketExist(DummySocketName))
+        {
+            CartMesh = MeshComp;
+        }
+    }
+    if (!IsValid(CartMesh)) return;
+
+    for (const FName& SocketName : LoadDummySocketNames)
+    {
+        UStaticMeshComponent* Dummy = NewObject<UStaticMeshComponent>(OwnerActor, SocketName);
+        Dummy->SetStaticMesh(LoadDummyMesh);
+        Dummy->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Dummy->SetVisibility(false);
+        Dummy->SetupAttachment(CartMesh, SocketName);
+
+        OwnerActor->AddInstanceComponent(Dummy);
+        Dummy->RegisterComponent();
+
+        LoadDummyMeshes.Add(Dummy);
+    }
+
+    UpdateLoadVisual();
+}
+
+void UCartLoadComponent::UpdateLoadVisual()
+{
+    int32 VisibleCount = GetVisibleDummyCount();
+
+    // VisibleCount보다 i가 작으면 보여주고, 넘으면 가리기
+    for (int32 i = 0; i < LoadDummyMeshes.Num(); ++i)
+    {
+        UStaticMeshComponent* Dummy = LoadDummyMeshes[i];
+        if (IsValid(Dummy))
+        {
+            Dummy->SetVisibility(i < VisibleCount);
+        }
+    }
+}
+
+int32 UCartLoadComponent::GetVisibleDummyCount() const
+{
+    if (MaxWeight <= 0)
+    {
+        return 0;
+    }
+
+    float LoadRatio = static_cast<float>(LoadInfo.CurrentWeight) / MaxWeight;
+    LoadRatio = FMath::Clamp(LoadRatio, 0.f, 1.f);
+
+    if (LoadRatio < KINDA_SMALL_NUMBER)
+    {
+        return 0;
+    }
+    else if (LoadRatio < 0.1f)
+    {
+        return 1;
+    }
+    else if (LoadRatio < 0.3f)
+    {
+        return 2;
+    }
+    else if (LoadRatio < 0.5f)
+    {
+        return 3;
+    }
+    else if (LoadRatio < 0.7f)
+    {
+        return 4;
+    }
+    else if (LoadRatio < 0.9f)
+    {
+        return 5;
+    }
+
+    return 6;
+}
+
 void UCartLoadComponent::Server_RequestDropProducts_Implementation(float Impulse, EDropCollisionRole Role)
 {
     DropProducts(Impulse, Role);
@@ -259,6 +371,9 @@ void UCartLoadComponent::Server_RequestDropProducts_Implementation(float Impulse
 void UCartLoadComponent::OnRep_LoadInfo()
 {
     if (!IsValid(GetOwner())) return;
+
+    // 더미 메시 보여주기
+    UpdateLoadVisual();
 
     OnLoadInfoChanged.Broadcast(GetOwner(), LoadInfo);
 }
