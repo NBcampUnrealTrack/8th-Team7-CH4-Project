@@ -43,7 +43,7 @@ public:
     void SetFinalWinners(const TArray<FString>& Winners);
 
     // 현재 페이즈 가져오기
-    UFUNCTION()
+    UFUNCTION(BlueprintPure, Category = "Round")
     ERoundPhase GetCurrentPhase() const;
 
     // 서버-클라이언트 동기화된 시계 기준으로 남은 시간을 직접 계산
