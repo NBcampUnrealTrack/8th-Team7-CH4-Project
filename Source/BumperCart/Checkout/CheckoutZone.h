@@ -13,7 +13,6 @@ class UChildActorComponent;
 class USceneComponent;
 class UStaticMeshComponent;
 class UBoxComponent;
-class USphereComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 
@@ -142,15 +141,7 @@ private:
     TObjectPtr<UStaticMeshComponent> CheckoutZoneMesh;
 
     UPROPERTY(VisibleAnywhere, Category = " Checkout|Components")
-    TObjectPtr<USphereComponent> CheckoutTrigger;
-
-// ------------------------------------------------------------
-// 차단벽
-// ------------------------------------------------------------
-private:
-    ACheckoutBarrier* GetLeftBarrier() const;
-    ACheckoutBarrier* GetRightBarrier() const;
-    ACheckoutBarrier* GetEntranceBarrier() const;
+    TObjectPtr<UBoxComponent> CheckoutTrigger;
 
 private:
     // 왼쪽 고정 차단벽
@@ -165,23 +156,19 @@ private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UChildActorComponent> EntranceBarrierComponent;
 
+    // 배출점
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<USceneComponent> EjectPoint;
+
 // ------------------------------------------------------------
-// 차단벽
+// 머티리얼
 // ------------------------------------------------------------
 private:
-    // 계산대 범위 외곽선
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Components", meta = (AllowPrivateAccess = "true"))
-    TObjectPtr<UStaticMeshComponent> CheckoutZoneRing;
-
-    // 계산대 범위 내부 채움
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Components", meta = (AllowPrivateAccess = "true"))
-    TObjectPtr<UStaticMeshComponent> CheckoutZoneFill;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Components",meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UStaticMeshComponent> CheckoutZoneVisual;
 
     UPROPERTY(Transient)
-    TObjectPtr<UMaterialInstanceDynamic> CheckoutZoneRingMID;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UMaterialInstanceDynamic> CheckoutZoneFillMID;
+    TObjectPtr<UMaterialInstanceDynamic> CheckoutZoneVisualMID;
 
 private:
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Components")
@@ -204,6 +191,77 @@ private:
     void ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Style);
 
 // ------------------------------------------------------------
+// 차단벽
+// ------------------------------------------------------------
+public:
+    // 게임 시작 전 차단 방식 사용 여부 설정
+    UFUNCTION(BlueprintCallable, Category = "Checkout|Barrier")
+    void SetUseEntranceBarrier(bool bUseBarrier);
+
+    // 현재 차단 방식을 사용하는지
+    UFUNCTION(BlueprintPure, Category = "Checkout|Barrier")
+    bool IsUsingEntranceBarrier() const;
+
+    // 실제 입구 차단벽 활성화
+    UFUNCTION(BlueprintCallable, Category = "Checkout|Barrier")
+    void SetEntranceBarrierEnabled(bool bIsEnabled);
+
+private:
+    // 차단 방식 설정이 클라이언에 복제될 때
+    UFUNCTION()
+    void OnRep_UseEntranceBarrier();
+
+    // 실제 입구 차단벽 상태가 클라이언트에 복제될 때
+    UFUNCTION()
+    void OnRep_EntranceBarrierEnabled();
+
+    // 메시와 Collision 적용
+    void ApplyBarrierState();
+
+private:
+    ACheckoutBarrier* GetLeftBarrier() const;
+    ACheckoutBarrier* GetRightBarrier() const;
+    ACheckoutBarrier* GetEntranceBarrier() const;
+
+private:
+    // false: 기존 계산대 방식
+    // true: 한 명 진입 후 입구 차단
+    // 복제 데이터
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_UseEntranceBarrier, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
+    bool bUseEntranceBarrier = false;
+
+    // 입구 차단벽의 활성 상태
+    // 복제 데이터
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_EntranceBarrierEnabled, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
+    bool bIsEntranceBarrierEnabled = false;
+
+// ------------------------------------------------------------
+// 플레이어 동시 진입
+// ------------------------------------------------------------
+private:
+    // 정산가 아닌 플레이어를 입구 바깥으로 밀어냄
+    void EjectPlayer(ACartPawn* PlayerCharacter);
+
+    // 계산대 내부에 있던 플레이어가 정산자가 아닌 경우 바깥으로 밀어냄
+    void EjectNonCheckoutPlayers();
+
+    // 점유 확정 후 입구 차단벽 닫기
+    void CloseEntranceBarrier();
+
+private:
+    // 비점유 플레이어 배출 세기
+    UPROPERTY(EditAnywhere, Category = "Checkout|Barrier", meta = (ClampMin = "0.0"))
+    float EjectStrength = 300.0f;
+
+    // 첫 점유 확정 후 입구벽이 닫히기까지의 시간
+    // 이 시간 동안 거의 동시에 들어온 플레이어를 배출한다.
+    UPROPERTY(EditAnywhere, Category = "Checkout|Barrier", meta = (ClampMin = "0.0"))
+    float EntranceBarrierCloseDelay = 0.15f;
+
+    FTimerHandle EntranceBarrierCloseTimerHandle;
+
+
+// ------------------------------------------------------------
 // 계산대 정보
 // ------------------------------------------------------------
 
@@ -216,29 +274,6 @@ private:
     // 복제 데이터
     UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CurrentCheckoutZoneState, Category = " Checkout|Condition")
     ECheckoutZoneState CurrentCheckoutZoneState = ECheckoutZoneState::Open;
-
-// ------------------------------------------------------------
-// 입구 차단
-// ------------------------------------------------------------
-public:
-    // 게임 시작 전 차단 방식 사용 여부 설정
-    UFUNCTION(BlueprintCallable, Category = "Checkout|Barrier")
-    void SetUseEntranceBarrier(bool bUseBarrier);
-
-    // 현재 차단 방식을 사용하는지
-    UFUNCTION(BlueprintPure, Category = "Checkout|Barrier")
-    bool IsUsingEntranceBarrier() const;
-
-private:
-    // false: 기존 계산대 방식
-    // true: 한 명 진입 후 입구 차단
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
-    bool bUseEntranceBarrier = false;
-
-public:
-    // 실제 입구 Collision 활성화
-    UFUNCTION(BlueprintCallable, Category = "Checkout|Barrier")
-    void SetEntranceBarrierEnabled(bool bIsEnabled);
 
 // ------------------------------------------------------------
 // 구역 내 플레이어
