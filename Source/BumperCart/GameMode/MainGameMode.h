@@ -59,7 +59,14 @@ private:
     UPROPERTY()
     ACheckoutManager* CheckoutManagerRef;
 
+    // 모든 플레이어 로비로 복귀
+    void ReturnAllPlayersToLobby();
 
+    // 결과창 노출 시간
+    UPROPERTY(EditDefaultsOnly, Category = "Round Schedule")
+    float ResultScreenDuration = 5.f;
+
+    FTimerHandle Timer_ReturnToLobby;
 
 #pragma region EventManager
 private:

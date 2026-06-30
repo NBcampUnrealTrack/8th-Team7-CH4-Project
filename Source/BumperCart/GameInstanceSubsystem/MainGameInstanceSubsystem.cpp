@@ -285,7 +285,7 @@ void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoi
                 APlayerController* PC = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController(GetWorld()) : nullptr;
                 if (PC)
                 {
-                    // 💡 만약 주소가 EOS: 로 시작하는데 언리얼 엔진이 드라이버 매핑을 못 다룬다면,
+                    // 만약 주소가 EOS: 로 시작하는데 언리얼 엔진이 드라이버 매핑을 못 다룬다면,
                     // 주소 앞에 명시적으로 프로토콜 포맷(bIsUsingP2PSockets에 대응하는 포맷)을 강제해 봅니다.
                     if (!ConnectString.StartsWith(TEXT("EOS:")))
                     {
@@ -295,7 +295,7 @@ void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoi
                     }
                     else
                     {
-                        // 💡 핵심: 언리얼 엔진의 NetDriverEOS가 주소를 명확히 인지하도록
+                        // 언리얼 엔진의 NetDriverEOS가 주소를 명확히 인지하도록
                         // 에디터/플러그인 버그 방지용 강제 파싱 포맷 적용
                         FString ForcedEOSURL = ConnectString;
 

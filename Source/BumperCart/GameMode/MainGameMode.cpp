@@ -16,6 +16,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMainGameMode, Log, All);
 AMainGameMode::AMainGameMode()
 {
     GameStateClass = AMainGameState::StaticClass();
+    PlayerStateClass = AMainPlayerState::StaticClass();
 
 
 
@@ -239,6 +240,9 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         GetWorldTimerManager().ClearTimer(Timer_RoundTick);
 
         UpdateAllPlayerRanks();
+
+        // 결과 화면 노출 시간 이후 로비로 복귀
+        GetWorldTimerManager().SetTimer(Timer_ReturnToLobby, this, &AMainGameMode::ReturnAllPlayersToLobby, ResultScreenDuration, false);
         break;
 
     default:
@@ -247,6 +251,7 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
 
     UE_LOG(LogMainGameMode, Warning, TEXT("[PHASE CHANGE] 새로운 페이즈 진입: %s"), *PhaseName);
 }
+
 
 //모든 플레이어 랭크 점수에 맞춰 정렬
 void AMainGameMode::UpdateAllPlayerRanks()
@@ -303,4 +308,9 @@ void AMainGameMode::UpdateAllPlayerRanks()
     GS->SetFinalWinners(WinnerNames);
 }
 
-
+// 라운드 종료 시 모든 플레이어 로비로 복귀
+void AMainGameMode::ReturnAllPlayersToLobby()
+{
+    UE_LOG(LogMainGameMode, Warning, TEXT("결과 화면 종료, 로비로 복귀"));
+    GetWorld()->ServerTravel(TEXT("/Game/Developers/LSJae/Levels/TestLobbyLevel"));
+}
