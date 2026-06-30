@@ -35,7 +35,7 @@ public:
     void RefreshPlayerInfos();
 
     //시작전 모든 플레이어 준비 완료 확인
-    UFUNCTION(BlueprintCallable, Category = "Lobby")
+    UFUNCTION(BlueprintPure, Category = "Lobby")
     bool bIsAllPlayersReady() const;
 
     //복사된 플레이어 정보 조회
