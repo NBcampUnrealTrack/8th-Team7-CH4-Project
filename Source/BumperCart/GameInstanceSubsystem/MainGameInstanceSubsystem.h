@@ -66,15 +66,22 @@ public:
     FString GetRoomName() const { return RoomName; }
 
 private:
+    // 로그인 완료 시 호출
     void OnLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
+    // 세션 생성 완료 시 호출
     void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
+    // 세션 검색 완료 시 호출
     void OnFindSessionComplete(bool bWasSuccessful);
+    // 세션 참가 완료 시 호출
     void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
+    // 기존 세션 제거 성공 시 호출
     void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
 
     //실제 세션 생성 로직 (재시도/재생성 시에도 캐싱된 RoomName/RoomPassword 사용)
     void CreateSessionInternal();
 
+
+    //인터페이스 획득 헬퍼
     TSharedPtr<FOnlineSessionSearch> SearchSettings;
     IOnlineSessionPtr GetSessionInterface() const;
     IOnlineIdentityPtr GetIdentityInterface() const;
