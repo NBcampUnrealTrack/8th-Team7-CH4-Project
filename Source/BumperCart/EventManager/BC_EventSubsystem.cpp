@@ -27,11 +27,11 @@ void UBC_EventSubsystem::InitializeSaleEventConfig(USaleEventConfig* InSaleEnvan
         SaleProductSpawnInterval = SaleEventConfig->SaleProductSpawnInterval;
 
         // 서버
-        if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
-        {
-            // 게임 모드에서 호출시 삭제 예정 - 테스트용
-            GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &UBC_EventSubsystem::StartSaleEvent, SaleProductSpawnInterval, false);
-        }
+        //if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
+        //{
+        //    // 게임 모드에서 호출시 삭제 예정 - 테스트용
+        //    GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &UBC_EventSubsystem::StartSaleEvent, SaleProductSpawnInterval, false);
+        //}
     }
 }
 
@@ -138,11 +138,11 @@ void UBC_EventSubsystem::InitializeLimitedEventConfig(ULimitedEventConfig* InLim
         LimitedProductList = LimitedEventConfig->LimitedProductList;
 
         // 서버
-        if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
-        {
-            // 게임 모드에서 호출시 삭제 예정 - 테스트용
-            GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &UBC_EventSubsystem::StartLimitedEvent, 20.0f, false);
-        }
+        //if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
+        //{
+        //    // 게임 모드에서 호출시 삭제 예정 - 테스트용
+        //    GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &UBC_EventSubsystem::StartLimitedEvent, 20.0f, false);
+        //}
     }
 }
 
