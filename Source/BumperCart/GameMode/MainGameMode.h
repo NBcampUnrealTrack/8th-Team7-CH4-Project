@@ -20,9 +20,6 @@ class BUMPERCART_API AMainGameMode : public AGameMode
 public:
     AMainGameMode();
 
-    UFUNCTION()
-    void UpdateAllPlayerRanks();
-
 protected:
     // 매치가 InProgress로 전환될 때 엔진이 자동 호출
     virtual void HandleMatchHasStarted() override;
@@ -31,6 +28,7 @@ protected:
 
     virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
+    //라운드 시작
     void StartRound();
 
     // 0.25초마다 호출되어 다음 Phase에 도달했는지 체크
@@ -53,13 +51,13 @@ private:
 
     FTimerHandle Timer_RoundTick;
 
-    static constexpr float TickInterval = 0.25f;
+    const float TickInterval = 0.25f;
 
     UPROPERTY()
     ACheckoutManager* CheckoutManagerRef;
 
-    //UFUNCTION(BlueprintCallable)
-    //void GetFinalRank();
+    UFUNCTION()
+    void UpdateAllPlayerRanks();
 
 
 #pragma region EventManager
