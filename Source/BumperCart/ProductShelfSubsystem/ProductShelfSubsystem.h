@@ -1,25 +1,27 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "Subsystems/WorldSubsystem.h"
 #include "Product/ProductBase.h"
 #include "ItemSpawn/ProductShelfManager/ProductShelfTypes.h"
-#include "ProductShelfManager.generated.h"
+#include "ProductShelfSubsystem.generated.h"
 
 class AProductShelf;
 class UProductShelfManagerConfig;
 
+/**
+ * 
+ */
 UCLASS()
-class BUMPERCART_API AProductShelfManager : public AActor
+class BUMPERCART_API UProductShelfSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
-	
-public:	
-    AProductShelfManager();
 
 #pragma region Override
 protected:
-    virtual void BeginPlay() override;
+    virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
+    virtual void Deinitialize() override;
 
 #pragma endregion
 
@@ -51,39 +53,35 @@ public:
 
 #pragma region Product Spawn
 private:
-    // 맵에 최대 아이템 갯수 제한
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
-    int32 MaxSpawnCount = 150;
-
-    // 한 번에 스폰되는 최대 갯수
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
-    int32 MaxSpawnLimit = 3;
-
-    // 아이템 리스폰 시간
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
-    float RespawnDelay = 10.0f;
+    // 데이터 에셋
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Config")
+    TObjectPtr<UProductShelfManagerConfig> SpawnConfig;
 
     // 현재 스폰된 제품 갯수
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
     int32 CurrentProductCount = 0;
 
-    // 스폰된 아이템 목록
-    UPROPERTY()
-    TArray<TSubclassOf<AProductBase>> SpawnedItems;
+    // UProductShelfManagerConfig에 정보가 들어있고 설정 확인용
+    // 맵에 최대 아이템 갯수 제한
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
+    int32 MaxSpawnCount = 150;
 
-    // 데이터 에셋 - 월드 서브시스템으로 변경 후 게임 모드로 옮겨야함
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Spawn")
-    TObjectPtr<UProductShelfManagerConfig> SpawnConfig;
+    // 한 번에 스폰되는 최대 갯수
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
+    int32 MaxSpawnLimit = 3;
+
+    // 아이템 리스폰 시간
+    UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
+    float RespawnDelay = 10.0f;
 
 public:
     // 제품 스폰 호출
     void ProductSpawnCall();
 
-    FORCEINLINE int32 GetCurrentProductCount() const { return CurrentProductCount; }
-
     // 스폰된 아이템이 파괴되었을 떄
     void OnProductDestroyed();
-
+    
+    FORCEINLINE int32 GetCurrentProductCount() const { return CurrentProductCount; }
     FORCEINLINE void SetMaxSpawnCount(int32 SpawnCount) { MaxSpawnCount = SpawnCount; }
 
     // 게임 시작시 호출
@@ -97,11 +95,6 @@ public:
 #pragma endregion
 
 #pragma region SaleProduct Spawn
-private:
-    // 중앙 세일 선반
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
-    AProductShelf* CenterSaleShelf;
-
 public:
     // 세일 제품 스폰
     void SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct);
@@ -110,11 +103,7 @@ public:
 
 #pragma region Limited Product
 private:
-    // 한정 제품 선반
-    UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
-    AProductShelf* LimitedProductShelf;
-
-    // 한정 제품 리스트
+    // 한정 제품 리스트 - 데이터 에셋으로 만들어야한다
     UPROPERTY(EditAnywhere, Category = "Manager | Product Shelf")
     TArray<TSubclassOf<AProductBase>> MasterLimitedProductList;
 

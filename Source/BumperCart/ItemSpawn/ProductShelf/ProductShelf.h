@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Product/ProductBase.h"
+#include "ItemSpawn/ProductShelfManager/ProductShelfTypes.h"
 #include "ProductShelf.generated.h"
 
 class AProductBase;
@@ -33,8 +34,12 @@ protected:
 
 #pragma endregion
 
-#pragma region Product List
+#pragma region Shelf Info
 private:
+    // 선반 유형
+    UPROPERTY(EditAnywhere, Category = "Product Shelf | Shelf Info")
+    EShelfType ShelfType = EShelfType::Normal;
+
     // 각 선반의 제품 목록
     UPROPERTY(EditAnyWhere, Category = "Product Shelf | Product List")
     TArray<TSubclassOf<AProductBase>> ProductList;
