@@ -15,6 +15,7 @@ class UCameraShakeBase;
 class USoundBase;
 struct FInputActionValue;
 class UCartGrabComponent;
+class UNiagaraComponent;
 
 UCLASS(abstract)
 class ACartPawn : public ACharacter, public ISlideAffectable, public IBumpable
@@ -40,6 +41,9 @@ public:
 
 	//[ISlideAffectable] 외부 기믹(물웅덩이 등)이 호출 => 멀티캐스트로 모든 인스턴스에 미끄럼 전파
 	virtual void ApplySlip_Implementation(float Duration, float SpinAngleDeg) override;
+
+    //외부에서 카트를 강제로 밀어내기
+    void ApplyExternalKnockback(const FVector& Direction, float Strength);
 
 protected:
 	virtual void BeginPlay() override;
@@ -158,6 +162,16 @@ protected:
     //FOV/줌 보간 속도 (낮을수록 부드럽게)
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
     float CameraZoomInterpSpeed = 7.f;
+
+
+    //---------- 속도감 FX (바닥 스피드라인) ----------
+    //바닥에 흐르는 속도선 Niagara (Stage2에서 NS_CartSpeedLines 지정, 비면 무효과)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
+    UNiagaraComponent* SpeedLineFX;
+
+    //이 속도(cm/s)에서 속도선이 최대 (0~이 값 사이 보간)
+    UPROPERTY(EditAnywhere, Category = "Cart|FX", meta = (ClampMin = "1"))
+    float SpeedLineFullSpeed = 700.f;
 
     //---------- 그랩 컴포넌트 ----------
     // 생성자에서 생성하고, SetupPlayerInputComponent에서 IMC 바인딩

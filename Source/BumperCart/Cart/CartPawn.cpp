@@ -17,6 +17,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
+#include "NiagaraComponent.h"
 
 ACartPawn::ACartPawn()
 {
@@ -74,6 +75,12 @@ ACartPawn::ACartPawn()
 
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
     GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
+
+    //속도감 FX: 카트 바닥에 부착 (지면 높이로 내림). Niagara 에셋은 Stage2에서 지정
+    SpeedLineFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SpeedLineFX"));
+    SpeedLineFX->SetupAttachment(RootComponent);
+    SpeedLineFX->SetRelativeLocation(FVector(0.f, 0.f, -88.f)); //캡슐 바닥(지면) — 메시에 맞춰 조정
+    SpeedLineFX->SetAutoActivate(true);
 }
 
 void ACartPawn::BeginPlay()
@@ -225,6 +232,14 @@ void ACartPawn::Tick(float DeltaSeconds)
         CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArm, DeltaSeconds, CameraZoomInterpSpeed);
         FollowCamera->FieldOfView   = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFov, DeltaSeconds, CameraZoomInterpSpeed);
 
+    }
+
+    //--- 속도감 FX 바닥 스피드라인 (월드 FX) ---
+    if (SpeedLineFX)
+    {
+        const float SpeedAlpha = FMath::Clamp(ForwardSpeed / FMath::Max(SpeedLineFullSpeed, 1.f), 0.f, 1.f);
+        SpeedLineFX->SetVariableFloat(FName("SpeedAlpha"), SpeedAlpha);
+        SpeedLineFX->SetVariableFloat(FName("Boost"), bIsBoosting ? 1.f : 0.f);
     }
 
     if (IsLocallyControlled()   && !HasAuthority())
@@ -549,4 +564,27 @@ void ACartPawn::RequestSpill(float Impulse, EDropCollisionRole DropRole)
 
 	//C가 개수 판정 + 실제 드롭 (서버=즉시, 클라=서버 RPC)
 	LoadComponent->RequestDropProduct(Impulse, DropRole);
+}
+
+//외부에서 카트를 강제로 밀어내기
+void ACartPawn::ApplyExternalKnockback(const FVector& Direction, float Strength)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (Strength <= 0.0f)
+    {
+        return;
+    }
+
+    const FVector KnockbackDirection = Direction.GetSafeNormal2D();
+    if (KnockbackDirection.IsNearlyZero())
+    {
+        return;
+    }
+
+    const FVector LaunchVelocity = KnockbackDirection * Strength;
+    LaunchCharacter(LaunchVelocity, true, false);
 }
