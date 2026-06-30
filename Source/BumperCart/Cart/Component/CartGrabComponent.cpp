@@ -18,6 +18,16 @@
 #include "Components/DecalComponent.h"
 
 
+namespace NiagaraParamName
+{
+    static const FName NAME_StartPosition(TEXT("User.StartPosition"));
+    static const FName NAME_EndPosition(TEXT("User.EndPosition"));
+    static const FName NAME_ActiveDistance(TEXT("User.ActiveDistance"));
+    static const FName NAME_DotSpacing(TEXT("User.DotSpacing"));
+    static const FName NAME_DotSize(TEXT("User.DotSize"));
+}
+
+
 UCartGrabComponent::UCartGrabComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -29,14 +39,13 @@ UCartGrabComponent::UCartGrabComponent()
 
     GrabbedProduct.Reset();
 
-    // 조준선 관련
+    // 조준선 갱신 관련
     CachedAimDirection = FVector::ZeroVector;
     CachedAimTargetLocation = FVector::ZeroVector;
     CachedAimDistance = 0.f;
-    AimUpdateInterval = 0.1f;
-    AimDashLength = 40.f;
-    AimDashGap = 25.f;
-    AimDashThickness = 1.f;
+    AimUpdateInterval = 0.05f;
+
+    // 조준선 나이아가라 변수
     AimDotSpacing = 45.f;
     AimDotSize = 20.f;
     NiagaraHeightOffset = 20.f;
@@ -56,7 +65,7 @@ void UCartGrabComponent::SetupInput()
     // 다른 클라이언트의 Pawn이면 등록 X
     if (!IsValid(OwnerPawn) || !OwnerPawn->IsLocallyControlled()) return;
 
-
+    // 입력 바인딩
     if (APlayerController* PlayerController = Cast<APlayerController>(OwnerPawn->GetController()))
     {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -84,6 +93,11 @@ void UCartGrabComponent::SetupInput()
         }
     }
 
+    // 로컬 플레이어 조준선 생성
+    EnsureAimNiagara();
+    EnsureAimDecal();
+
+    // 조준선 활성화
     StartAimTimer();
 }
 
@@ -173,44 +187,6 @@ void UCartGrabComponent::EnsureVisualComponents()
     }
 }
 
-void UCartGrabComponent::EnsureAimDashMeshes(int32 RequiredCount)
-{
-    AActor* OwnerActor = GetOwner();
-    if (!IsValid(OwnerActor)) return;
-
-    USceneComponent* Root = OwnerActor->GetRootComponent();
-    if (!IsValid(Root)) return;
-
-    // 필요한 만큼 반복 생성
-    while (AimDashMeshes.Num() < RequiredCount)
-    {
-        int32 Index = AimDashMeshes.Num();
-
-        FName ComponentName = *FString::Printf(TEXT("AimDashMesh_%d"), Index);
-
-        USplineMeshComponent* DashMesh = NewObject<USplineMeshComponent>(OwnerActor, ComponentName);
-        if (!IsValid(DashMesh)) return;
-
-        DashMesh->SetMobility(EComponentMobility::Movable);
-        DashMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        DashMesh->SetVisibility(false);
-        DashMesh->SetForwardAxis(ESplineMeshAxis::X);
-
-        DashMesh->SetStartScale(FVector2D(AimDashThickness, AimDashThickness));
-        DashMesh->SetEndScale(FVector2D(AimDashThickness, AimDashThickness));
-
-        if (AimDashMeshAsset)
-        {
-            DashMesh->SetStaticMesh(AimDashMeshAsset);
-        }
-
-        OwnerActor->AddInstanceComponent(DashMesh);
-        DashMesh->RegisterComponent();
-
-        AimDashMeshes.Add(DashMesh);
-    }
-}
-
 void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -266,21 +242,17 @@ void UCartGrabComponent::StartAimTimer()
     );
 
     UpdateGrabAim();
+    SetAimVisual(true);
 }
 
 void UCartGrabComponent::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (GetNetMode() == NM_DedicatedServer) return;
-
-    // 최대 그랩 사거리만큼 미리 만들어두기
-    float StepLength = AimDashLength + AimDashGap;
-    if (StepLength > KINDA_SMALL_NUMBER)
+    // 데디케이트 서버가 아니라면 모든 Pawn의 로봇손 생성
+    if (GetNetMode() != NM_DedicatedServer)
     {
-        int32 MaxDashCount = FMath::CeilToInt(GrabRange / StepLength);
-        EnsureAimDashMeshes(MaxDashCount);
-        HideAimDashMeshes();
+        EnsureVisualComponents();
     }
 }
 
@@ -298,7 +270,10 @@ void UCartGrabComponent::StopAimTimer()
 void UCartGrabComponent::Multicast_PlayGrab_Implementation(FVector_NetQuantize Start,
     FVector_NetQuantize Target)
 {
-    PlayGrabVisual(Start, Target);
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        PlayGrabVisual(Start, Target);
+    }
 }
 
 void UCartGrabComponent::HandleFinishGrab()
@@ -379,7 +354,6 @@ void UCartGrabComponent::UpdateGrabAim()
     CachedAimTargetLocation = Start + CachedAimDirection * ActualDistance;
     CachedAimDistance = ActualDistance;
 
-    //UpdateDashedAimVisual(Start, CachedAimTargetLocation);
     UpdateAimNiagaraVisual(Start, CachedAimTargetLocation);
     UpdateAimDecal(CachedAimTargetLocation);
 }
@@ -464,8 +438,8 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     if (!IsValid(OwnerActor)) return false;
 
     FVector Start = OwnerActor->GetActorLocation();
-    FVector End = Start + FVector(AimDirection) * AimDistance;
     Start.Z = 10.f; // 카트가 중심점보다 아래있어서 강제로 보정, 상품들이 10.f에 위치함
+    FVector End = Start + FVector(AimDirection) * AimDistance;
 
 
     FCollisionQueryParams Params;
@@ -544,7 +518,12 @@ void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Tar
     EnsureVisualComponents();
     if (!ArmSpline || !Hand) return;
 
-    HideAimDashMeshes();
+    // 내 Pawn 이라면 조준선 끄기
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled())
+    {
+        SetAimVisual(false);
+    }
 
     VisualStartLocation = Start;
     VisualTargetLocation = Target;
@@ -582,6 +561,15 @@ void UCartGrabComponent::FinishGrabVisual()
     HideVisualProductMesh();
 
     SetComponentTickEnabled(false);
+
+    // 내 Pawn 이라면 조준선 켜기
+    // 마우스 위치 기준으로 조준선 한번 갱신하고 Visual 켜야함
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled())
+    {
+        UpdateGrabAim();
+        SetAimVisual(true);
+    }
 }
 
 void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
@@ -611,12 +599,11 @@ void UCartGrabComponent::HideVisualProductMesh()
 
 void UCartGrabComponent::Multicast_ShowVisualProductMesh_Implementation(AProductBase* Product)
 {
-    ShowVisualProductMesh(Product);
-}
-
-void UCartGrabComponent::Multicast_HideVisualProductMesh_Implementation()
-{
-    HideVisualProductMesh();
+    // 데디케이트 서버는 연출 필요없음
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        ShowVisualProductMesh(Product);
+    }
 }
 
 FVector UCartGrabComponent::GetGrabStartLocation() const
@@ -625,92 +612,6 @@ FVector UCartGrabComponent::GetGrabStartLocation() const
     if (!IsValid(OwnerActor)) return {};
 
     return OwnerActor->GetActorLocation();
-}
-
-
-void UCartGrabComponent::UpdateDashedAimVisual(const FVector& Start, const FVector& End)
-{
-    // 그랩 연출중에는 그리기 X
-    if (VisualState != EGrabVisualState::None) return;
-
-    FVector AimVector = End - Start;
-    float TotalLength = AimVector.Size();
-
-    if (TotalLength <= KINDA_SMALL_NUMBER)
-    {
-        HideAimDashMeshes();
-        return;
-    }
-
-    // 메시 길이 + 간격 길이로 점선 하나당 길이 구하기
-    float StepLength = AimDashLength + AimDashGap;
-    if (StepLength <= KINDA_SMALL_NUMBER)
-    {
-        HideAimDashMeshes();
-        return;
-    }
-
-    // 점선 하나당 길이로 필요한 개수 결정하기
-    int32 RequiredCount = FMath::CeilToInt(TotalLength / StepLength);
-    EnsureAimDashMeshes(RequiredCount);
-
-    FVector Direction = AimVector / TotalLength;
-
-    for (int32 i = 0; i < AimDashMeshes.Num(); ++i)
-    {
-        USplineMeshComponent* DashMesh = AimDashMeshes[i];
-        if (!IsValid(DashMesh)) continue;
-
-        // 기존에 만들어둔게 필요로 하는것보다 많다면 Visibility 끄기
-        if (i >= RequiredCount)
-        {
-            DashMesh->SetVisibility(false);
-            continue;
-        }
-
-        float StartDistance = i * StepLength;
-        float EndDistance = FMath::Min(StartDistance + AimDashLength, TotalLength); // 끝부분 넘어가면 자르기
-
-        FVector DashStart = Start + Direction * StartDistance;
-        FVector DashEnd = Start + Direction * EndDistance;
-
-        FTransform MeshTransform = DashMesh->GetComponentTransform();
-
-        FVector LocalStart = MeshTransform.InverseTransformPosition(DashStart);
-        FVector LocalEnd = MeshTransform.InverseTransformPosition(DashEnd);
-
-        FVector LocalVector = LocalEnd - LocalStart;
-        float LocalLength = LocalVector.Size();
-
-        if (LocalLength <= KINDA_SMALL_NUMBER)
-        {
-            DashMesh->SetVisibility(false);
-            continue;
-        }
-
-        FVector Tangent = LocalVector.GetSafeNormal() * LocalLength;
-
-        DashMesh->SetStartAndEnd(
-            LocalStart,
-            Tangent,
-            LocalEnd,
-            Tangent,
-            true
-        );
-
-        DashMesh->SetVisibility(true);
-    }
-}
-
-void UCartGrabComponent::HideAimDashMeshes()
-{
-    for (USplineMeshComponent* DashMesh : AimDashMeshes)
-    {
-        if (IsValid(DashMesh))
-        {
-            DashMesh->SetVisibility(false);
-        }
-    }
 }
 
 void UCartGrabComponent::EnsureAimNiagara()
@@ -735,9 +636,6 @@ void UCartGrabComponent::EnsureAimNiagara()
 void UCartGrabComponent::UpdateAimNiagaraVisual(const FVector& Start, const FVector& End)
 {
     if (VisualState != EGrabVisualState::None) return;
-
-    EnsureAimNiagara();
-
     if (!IsValid(AimNiagaraComponent)) return;
 
     FVector NiagaraOffset(0.f, 0.f, NiagaraHeightOffset);
@@ -745,15 +643,32 @@ void UCartGrabComponent::UpdateAimNiagaraVisual(const FVector& Start, const FVec
     FVector NiagaraStart = Start + NiagaraOffset;
     FVector NiagaraEnd = End + NiagaraOffset;
 
-    AimNiagaraComponent->SetVariablePosition(TEXT("User.StartPosition"), NiagaraStart);
-    AimNiagaraComponent->SetVariablePosition(TEXT("User.EndPosition"), NiagaraEnd);
-    AimNiagaraComponent->SetVariableFloat(TEXT("User.ActiveDistance"), CachedAimDistance);
-    AimNiagaraComponent->SetVariableFloat(TEXT("User.DotSpacing"), AimDotSpacing);
-    AimNiagaraComponent->SetVariableFloat(TEXT("User.DotSize"), AimDotSize);
+    // static const를 이용하는게 임시 FName 대입보다 조금 더 빠름
+    AimNiagaraComponent->SetVariablePosition(NiagaraParamName::NAME_StartPosition, NiagaraStart);
+    AimNiagaraComponent->SetVariablePosition(NiagaraParamName::NAME_EndPosition, NiagaraEnd);
+    AimNiagaraComponent->SetVariableFloat(NiagaraParamName::NAME_ActiveDistance, CachedAimDistance);
+    AimNiagaraComponent->SetVariableFloat(NiagaraParamName::NAME_DotSpacing, AimDotSpacing);
+    AimNiagaraComponent->SetVariableFloat(NiagaraParamName::NAME_DotSize, AimDotSize);
+}
 
-    if (!AimNiagaraComponent->IsActive())
+void UCartGrabComponent::SetAimVisual(bool bVisibility)
+{
+    // 나이아가라 설정
+    if (IsValid(AimNiagaraComponent))
     {
-        AimNiagaraComponent->Activate(true);
+        AimNiagaraComponent->SetVisibility(bVisibility, true);
+
+        // 활성화 안되어있으면 키기
+        if (bVisibility && !AimNiagaraComponent->IsActive())
+        {
+            AimNiagaraComponent->Activate(true);
+        }
+    }
+
+    // 데칼 설정
+    if (IsValid(AimDecal))
+    {
+        AimDecal->SetVisibility(bVisibility);
     }
 }
 
@@ -766,6 +681,8 @@ void UCartGrabComponent::EnsureAimDecal()
     {
         AimDecal = NewObject<UDecalComponent>(OwnerActor, TEXT("AimDecal"));
         AimDecal->SetupAttachment(OwnerActor->GetRootComponent());
+        AimDecal->SetUsingAbsoluteRotation(true);
+        AimDecal->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
         AimDecal->SetVisibility(false);
 
         if (AimDecalMaterial)
@@ -783,9 +700,6 @@ void UCartGrabComponent::EnsureAimDecal()
 void UCartGrabComponent::UpdateAimDecal(const FVector& Target)
 {
     if (VisualState != EGrabVisualState::None) return;
-
-    EnsureAimDecal();
-
     if (!IsValid(AimDecal)) return;
 
     AimDecal->SetWorldLocation(Target);

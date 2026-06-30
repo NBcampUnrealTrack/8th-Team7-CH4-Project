@@ -104,11 +104,9 @@ private:
     // 연출용 메시 끄기
     void HideVisualProductMesh();
 
+    // 모든 클라이언트에게 잡은 상품을 보여주라고 알리는 함수
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_ShowVisualProductMesh(AProductBase* Product);
-
-    UFUNCTION(NetMulticast, Reliable)
-    void Multicast_HideVisualProductMesh();
 
     // 현재 로봇손 시작위치 구하는 함수
     FVector GetGrabStartLocation() const;
@@ -116,19 +114,14 @@ private:
     // Owner Actor에 로봇손 스플라인 메시를 확인하고 생성하는 함수
     void EnsureVisualComponents();
 
-    // 조준선용 스플라인 메시를 확인하고 생성하는 함수
-    void EnsureAimDashMeshes(int32 RequiredCount);
-
-    // 조준선 연출 갱신
-    void UpdateDashedAimVisual(const FVector& Start, const FVector& End);
-
-    void HideAimDashMeshes();
-
     // 조준선 나이아가라 확인하고 생성하는 함수
     void EnsureAimNiagara();
 
     // 조준선용 나이아가라 업데이트하는 함수
     void UpdateAimNiagaraVisual(const FVector& Start, const FVector& End);
+
+    // 조준선 연출 설정하는 함수
+    void SetAimVisual(bool bVisibility);
 
     // 마우스 위치에 데칼 확인하고 생성하는 함수
     void EnsureAimDecal();
@@ -137,6 +130,8 @@ private:
     void UpdateAimDecal(const FVector& Target);
 
 private:
+    /* ---------------- 로봇손 연출 관련 ---------------- */
+
     // 로봇손 팔에 사용할 에셋
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
     TObjectPtr<UStaticMesh> ArmMeshAsset;
@@ -171,6 +166,9 @@ private:
     // 현재 연출 상태
     EGrabVisualState VisualState;
 
+
+    /* ---------------- 조준선 갱신 관련 변수들  ----------------   */
+
     // 저장한 조준 방향
     FVector CachedAimDirection;
     // 저장한 조준 위치
@@ -183,7 +181,8 @@ private:
     float AimUpdateInterval;
 
 
-    // ------------------- 조준선 나이아가라 이용 -------------------
+    /* ------------------ 조준선 나이아가라 ------------------ */
+
     // 조준선용 나이아가라 컴포넌트
     UPROPERTY()
     TObjectPtr<UNiagaraComponent> AimNiagaraComponent;
@@ -211,31 +210,9 @@ private:
     // 나이아가라 표시 높이 오프셋
     UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
     float NiagaraHeightOffset;
-    // ---------------------------------------------------------
 
 
-    // ----------  기존 스플라인 메시 이용 --------------
-    // 조준선용 메시 에셋
-    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Aim")
-    TObjectPtr<UStaticMesh> AimDashMeshAsset;
-
-    // 조준선용 스플라인 메쉬들
-    UPROPERTY()
-    TArray<TObjectPtr<USplineMeshComponent>> AimDashMeshes;
-
-    // 조준선용 스플라인 메시 길이
-    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
-    float AimDashLength;
-
-    // 조준선용 스플라인 메시 간격
-    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
-    float AimDashGap;
-
-    // 조준선용 스플랑인 메시 두께
-    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
-    float AimDashThickness = 1.f;
-    // ----------  기존 스플라인 메시 이용 --------------
-
+    /* ---------------- 로봇손 밸런스 ---------------- */
 
     // 로봇손 속도
     // 최대 사거리가 몇초가 될건지를 기준으로 조정
@@ -250,6 +227,9 @@ private:
     UPROPERTY(EditAnywhere, Category = "Cart|Grab")
     float GrabRadius;
 
+
+    /* ---------------- 로봇손 확인용 ---------------- */
+
     // 현재 그랩 가능한지
     UPROPERTY(VisibleAnywhere, Category = "Cart|Grab")
     bool bCanGrab;
@@ -257,6 +237,9 @@ private:
     // 아이템이 부착될 소켓 이름
     UPROPERTY(EditAnywhere, Category = "Cart|Grab")
     FName SocketName;
+
+
+    /* ---------------- 타이머 ---------------- */
 
     // 그랩 종료 확인용 타이머
     FTimerHandle GrabFinishTimer;
