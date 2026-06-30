@@ -53,6 +53,18 @@ void AMainGameMode::BeginPlay()
         ProductShelfManager = Cast<AProductShelfManager>(FoundShelfActor);
     }
 
+    // 계산대 매니저 찾기
+    AActor* FoundActor = UGameplayStatics::GetActorOfClass(GetWorld(), ACheckoutManager::StaticClass());
+    if (FoundActor)
+    {
+        CheckoutManagerRef = Cast<ACheckoutManager>(FoundActor);
+        UE_LOG(LogMainGameMode, Log, TEXT("CheckoutManager를 성공적으로 찾았습니다."));
+    }
+    else
+    {
+        UE_LOG(LogMainGameMode, Error, TEXT("월드에서 CheckoutManager를 찾을 수 없습니다!"));
+    }
+
     //매니저 배치 확인
     if (!BC_EventManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 BC_EventManager가 배치되지 않았습니다"));
     if (!MapGimmickManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 MapGimmickManager가 배치되지 않았습니다"));
@@ -98,19 +110,6 @@ void AMainGameMode::StartRound()
     {
         return;
     }
-
-    // 계산대 매니저 찾기
-    AActor* FoundActor = UGameplayStatics::GetActorOfClass(GetWorld(), ACheckoutManager::StaticClass());
-    if (FoundActor)
-    {
-        CheckoutManagerRef = Cast<ACheckoutManager>(FoundActor);
-        UE_LOG(LogMainGameMode, Log, TEXT("CheckoutManager를 성공적으로 찾았습니다."));
-    }
-    else
-    {
-        UE_LOG(LogMainGameMode, Error, TEXT("월드에서 CheckoutManager를 찾을 수 없습니다!"));
-    }
-
 
     // 맵 내부의 키(시간)을 오름차순으로 정리
     PhaseScheduleMap.GetKeys(SortedTriggerTimes);
@@ -249,13 +248,11 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     UE_LOG(LogMainGameMode, Warning, TEXT("[PHASE CHANGE] 새로운 페이즈 진입: %s"), *PhaseName);
 }
 
+//모든 플레이어 랭크 점수에 맞춰 정렬
 void AMainGameMode::UpdateAllPlayerRanks()
 {
     AMainGameState* GS = GetGameState<AMainGameState>();
-    if (!GS)
-    {
-        return;
-    }
+    if (!GS) return;
 
     TArray<AMainPlayerState*> SortedStates;
     for (APlayerState* PS : GS->PlayerArray)
@@ -266,10 +263,7 @@ void AMainGameMode::UpdateAllPlayerRanks()
         }
     }
 
-    if (SortedStates.Num() == 0)
-    {
-        return;
-    }
+    if (SortedStates.Num() == 0) return;
 
 
     //점수 내림차순 정렬
@@ -282,9 +276,9 @@ void AMainGameMode::UpdateAllPlayerRanks()
     int32 CurrentRank = 1;
     for (int32 Index = 0; Index < SortedStates.Num(); ++Index)
     {
-        if (Index > 0 && SortedStates[Index]->GetScore() == SortedStates[Index - 1]->GetScore())
+        // 바로 앞 사람과 점수가 같으면 같은 등수 부여 / 처음에는 확인 X
+        if (Index > 0 && SortedStates[Index]->GetPlayerScore() == SortedStates[Index - 1]->GetPlayerScore())
         {
-            // 바로 앞 사람과 점수가 같으면 같은 등수 부여
             SortedStates[Index]->SetRank(SortedStates[Index - 1]->GetRank());
         }
         else
@@ -295,5 +289,18 @@ void AMainGameMode::UpdateAllPlayerRanks()
         ++CurrentRank;
     }
 
+    //1등 명단 추출
+    TArray<FString> WinnerNames;
+    for (AMainPlayerState* MPS : SortedStates)
+    {
+        if (MPS->GetRank() == 1)
+        {
+            WinnerNames.Add(MPS->GetPlayerName());
+        }
+    }
 
+    // 1등 명단 MainGameState에 저장
+    GS->SetFinalWinners(WinnerNames);
 }
+
+
