@@ -191,7 +191,15 @@ void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    if (VisualState == EGrabVisualState::None) return;
+    // 서버는 판정 처리
+    AActor* OwnerActor = GetOwner();
+    if (IsValid(OwnerActor) && OwnerActor->HasAuthority() && bServerGrab)
+    {
+        TickGrab(DeltaTime);
+    }
+
+    // 클라이언트는 연출 처리만 하기
+    if (VisualState == EGrabVisualState::None || GetNetMode() == NM_DedicatedServer) return;
 
     VisualElapsedTime += DeltaTime;
 
@@ -394,39 +402,36 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
     if (!bCanGrab) return;
 
+    FVector Direction = FVector(AimDirection).GetSafeNormal();
+    if (Direction.IsNearlyZero()) return;
+
     float ActualAimDistance = FMath::Clamp(AimDistance, 0.f, GrabRange);
+    if (ActualAimDistance <= KINDA_SMALL_NUMBER) return;
 
-    // Trace, Sweep 으로 판정, 상품 찾기
-    FHitResult Hit;
-    if (!PerformGrabTrace(AimDirection, ActualAimDistance, Hit)) return;
+    FVector Start = OwnerActor->GetActorLocation();
+    Start.Z = 10.f;
+    FVector End = Start + Direction * ActualAimDistance;
 
-    AProductBase* Product = Cast<AProductBase>(Hit.GetActor());
-    if (!IsValid(Product)) return;
+    // 그랩 끝나기 전까진 사용 불가능, 
+    bCanGrab = false;
+    GrabbedProduct.Reset();
 
-    // 붙잡을 Proudct WeakPtr 확인
-    GrabbedProduct = Product;
+    // 서버 그랩 세팅
+    bServerGrab = true;
+    ServerGrabStartLocation = Start;
+    ServerGrabDirection = Direction;
+    ServerGrabMaxDistance = ActualAimDistance;
+    ServerGrabCurrentDistance = 0.f;
 
-    // 속도와 거리를 이용해서 시간 구하기
-    FVector StartLocation = OwnerActor->GetActorLocation();
-    FVector TargetLocation = Product->GetActorLocation();
+    // 타이머 한번 제거하고 가기
+    World->GetTimerManager().ClearTimer(GrabFinishTimer);
+    World->GetTimerManager().ClearTimer(TryGrabTimer);
 
-    float Distance = FVector::Distance(StartLocation, TargetLocation);
-    float ReachDuration = Distance / FMath::Max(GrabSpeed, 1.f);
+    // 클라이언트는 연출 시작
+    Multicast_PlayGrab(Start, End);
 
-    // 상품과 접촉하는 시간에 잡을 수 있는지 체크하도록 타이머 설정
-    World->GetTimerManager().SetTimer(
-        TryGrabTimer,
-        this,
-        &ThisClass::TryGrabProduct,
-        ReachDuration,
-        false
-    );
-
-    // 모든 클라이언트에게 해당 클라이언트 손 뻗는 연출 요청하기
-    Multicast_PlayGrab(StartLocation, TargetLocation);
-
-    // 쿨다운 적용
-    SetGrabCooldown(ReachDuration * 2.f);
+    // 서버도 그랩 판정 위해 Tick 켜기
+    RefreshGrabTick();
 }
 
 bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, float AimDistance, FHitResult& Hit)
@@ -466,6 +471,144 @@ bool UCartGrabComponent::PerformGrabTrace(FVector_NetQuantizeNormal AimDirection
     }
 
     return true;
+}
+
+void UCartGrabComponent::RefreshGrabTick()
+{
+    // 서버에서 틱을 필요로 하는지 체크
+    bool bServerTick = GetOwner() && GetOwner()->HasAuthority() && bServerGrab;
+
+    // 클라이언트에서 틱을 필요로 하는지 체크
+    bool bVisualTick = VisualState != EGrabVisualState::None;
+
+    // 둘중에 하나라도 필요로하면 틱 활성화
+    SetComponentTickEnabled(bServerTick || bVisualTick);
+}
+
+void UCartGrabComponent::TickGrab(float DeltaTime)
+{
+    // 이전값과 현재값 세팅
+    float PreviousDistance = ServerGrabCurrentDistance;
+    ServerGrabCurrentDistance = FMath::Min(ServerGrabCurrentDistance + GrabSpeed * DeltaTime, ServerGrabMaxDistance);
+
+    FVector GrabLocation;
+    if (TrySweepGrab(PreviousDistance, ServerGrabCurrentDistance, GrabLocation))
+    {
+        bServerGrab = false;
+
+        // 서버에서 회수 처리
+        StartGrabReturn(ServerGrabCurrentDistance);
+
+        // 모든 클라이언트에 회수 처리 및 회수 위치 설정
+        Multicast_StartGrabReturn(GrabLocation, GrabbedProduct.Get());
+
+        RefreshGrabTick();
+        return;
+    }
+
+    // 끝까지 검사했는데 못잡으면 최종 지점에서 회수 시작
+    if (ServerGrabCurrentDistance >= ServerGrabMaxDistance - KINDA_SMALL_NUMBER)
+    {
+        bServerGrab = false;
+
+        StartGrabReturn(ServerGrabMaxDistance);
+
+        RefreshGrabTick();
+    }
+}
+
+bool UCartGrabComponent::TrySweepGrab(float FromDistance, float ToDistance, FVector& OutLocation)
+{
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return false;
+
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return false;
+
+    // 직전 위치, 현재 위치를 Sweep 할 것
+    FVector Start = ServerGrabStartLocation + ServerGrabDirection * FromDistance;
+    FVector End = ServerGrabStartLocation + ServerGrabDirection * ToDistance;
+
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(OwnerActor);
+
+    FHitResult Hit;
+    bool bHit = World->SweepSingleByChannel(
+        Hit,
+        Start,
+        End,
+        FQuat::Identity,
+        BCCollisionChannel::RobotHandGrabTrace,
+        FCollisionShape::MakeSphere(GrabRadius),
+        Params
+    );
+
+    if (!bHit) return false;
+
+    AActor* HitActor = Hit.GetActor();
+    AProductBase* Product = Cast<AProductBase>(HitActor);
+
+    if (IsValid(Product) && Product->TrySetGrabbed())
+    {
+        GrabbedProduct = Product;
+
+        float HitDistance = FVector::DotProduct(Hit.ImpactPoint - ServerGrabStartLocation, ServerGrabDirection);
+        float ActualDistance = FMath::Clamp(HitDistance, FromDistance, ToDistance);
+
+        OutLocation = ServerGrabStartLocation + ServerGrabDirection * ActualDistance;
+
+        return true;
+    }
+
+    // 상품이 아닌 다른것과 충돌했다면 벽이나 카트에 충돌한거라 회수해야 함
+    if (IsValid(HitActor))
+    {
+        // 회수 처리 추가 필요
+        return false;
+    }
+
+    return false;
+}
+
+void UCartGrabComponent::StartGrabReturn(float ReturnDistance)
+{
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return;
+
+    float ReturnDuration = ReturnDistance / FMath::Max(GrabSpeed, 1.f);
+
+    World->GetTimerManager().SetTimer(
+        GrabFinishTimer,
+        this,
+        &ThisClass::HandleFinishGrab,
+        ReturnDuration,
+        false
+    );
+}
+
+void UCartGrabComponent::Multicast_StartGrabReturn_Implementation(FVector_NetQuantize ReturnLocation, AProductBase* Product)
+{
+    if (GetNetMode() == NM_DedicatedServer) return;
+
+    EnsureVisualComponents();
+    if (!ArmSpline || !Hand) return;
+
+    // 붙잡기 성공했다면 메시 보여주기
+    if (IsValid(Product))
+    {
+        ShowVisualProductMesh(Product);
+    }
+
+    // 회수로 변경하고 위치 조정하기
+    VisualTargetLocation = ReturnLocation;
+    VisualElapsedTime = 0.f;
+    VisualReturnDuration = FVector::Distance(GetGrabStartLocation(), ReturnLocation) / FMath::Max(GrabSpeed, 1.f);
+
+    VisualState = EGrabVisualState::Returning;
+
+    UpdateGrabVisual(ReturnLocation);
+
+    RefreshGrabTick();
 }
 
 void UCartGrabComponent::SetGrabCooldown(float Duration)
@@ -542,7 +685,7 @@ void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Tar
     // 시작위치에서 한번 그려주기
     UpdateGrabVisual(Start);
 
-    SetComponentTickEnabled(true);
+    RefreshGrabTick();
 }
 
 void UCartGrabComponent::FinishGrabVisual()
@@ -560,7 +703,7 @@ void UCartGrabComponent::FinishGrabVisual()
     }
     HideVisualProductMesh();
 
-    SetComponentTickEnabled(false);
+    RefreshGrabTick();
 
     // 내 Pawn 이라면 조준선 켜기
     // 마우스 위치 기준으로 조준선 한번 갱신하고 Visual 켜야함
