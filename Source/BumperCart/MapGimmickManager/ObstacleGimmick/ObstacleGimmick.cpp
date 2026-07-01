@@ -13,14 +13,8 @@ AObstacleGimmick::AObstacleGimmick()
 
     bReplicates = true;
 
-    SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
-    SetRootComponent(SceneRoot);
-
-    BoxCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxCollision"));
-    BoxCollision->SetupAttachment(GetRootComponent());
-
     ObstacleMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WaterHoleMesh"));
-    ObstacleMesh->SetupAttachment(BoxCollision);
+    RootComponent = ObstacleMesh;
 
 }
 
@@ -28,9 +22,5 @@ void AObstacleGimmick::BeginPlay()
 {
 	Super::BeginPlay();
 
-    if (HasAuthority())
-    {
-
-    }
 }
 

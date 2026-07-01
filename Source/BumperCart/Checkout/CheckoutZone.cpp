@@ -4,13 +4,15 @@
 #include "Cart/CartPawn.h"
 #include "Product/ProductTypes.h"
 #include "Checkout/CheckoutScoreCalculator.h"
+#include "Checkout/CheckoutBarrier.h"
 #include "GameState/MainGameState.h"
 #include "PlayerState/MainPlayerState.h"
 
 #include "GameFramework/Character.h"
 #include "GameFramework/GameStateBase.h"
+#include "Components/ChildActorComponent.h"
 #include "Components/SceneComponent.h"
-#include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -28,7 +30,7 @@ ACheckoutZone::ACheckoutZone()
     CheckoutZoneMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneMesh"));
     CheckoutZoneMesh->SetupAttachment(SceneRoot);
 
-    CheckoutTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("CheckoutTrigger"));
+    CheckoutTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("CheckoutTrigger"));
     CheckoutTrigger->SetupAttachment(SceneRoot);
     CheckoutTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     CheckoutTrigger->SetGenerateOverlapEvents(true);
@@ -36,22 +38,29 @@ ACheckoutZone::ACheckoutZone()
     // 불필요한 충돌 방지
     CheckoutTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
     CheckoutTrigger->SetCollisionResponseToChannel(ECC_Pawn,ECR_Overlap);
-    CheckoutTrigger->SetSphereRadius(100.0f);
 
-    CheckoutZoneFill =  CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneFill"));
+    // 차단벽 생성
+    LeftBarrierComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("LeftBarrierComponent"));
+    LeftBarrierComponent->SetupAttachment(SceneRoot);
+    LeftBarrierComponent->SetChildActorClass(ACheckoutBarrier::StaticClass());
 
-    CheckoutZoneFill->SetupAttachment(SceneRoot);
-    CheckoutZoneFill->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    CheckoutZoneFill->SetGenerateOverlapEvents(false);
-    CheckoutZoneFill->SetCastShadow(false);
+    RightBarrierComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("RightBarrierComponent"));
+    RightBarrierComponent->SetupAttachment(SceneRoot);
+    RightBarrierComponent->SetChildActorClass(ACheckoutBarrier::StaticClass());
 
+    EntranceBarrierComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("EntranceBarrierComponent"));
+    EntranceBarrierComponent->SetupAttachment(SceneRoot);
+    EntranceBarrierComponent->SetChildActorClass(ACheckoutBarrier::StaticClass());
 
-    CheckoutZoneRing =CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneRing"));
+    EjectPoint = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPoint"));
+    EjectPoint->SetupAttachment(SceneRoot);
 
-    CheckoutZoneRing->SetupAttachment(SceneRoot);
-    CheckoutZoneRing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    CheckoutZoneRing->SetGenerateOverlapEvents(false);
-    CheckoutZoneRing->SetCastShadow(false);
+    CheckoutZoneVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneVisual"));
+
+    CheckoutZoneVisual->SetupAttachment(SceneRoot);
+    CheckoutZoneVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    CheckoutZoneVisual->SetGenerateOverlapEvents(false);
+    CheckoutZoneVisual->SetCastShadow(false);
 }
 
 void ACheckoutZone::BeginPlay()
@@ -64,6 +73,8 @@ void ACheckoutZone::BeginPlay()
     InitializeCheckoutZoneMaterials();
 
     OnRep_CurrentCheckoutZoneState();
+
+    ApplyBarrierState();
 }
 
 void ACheckoutZone::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -72,9 +83,13 @@ void ACheckoutZone::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 
     DOREPLIFETIME(ACheckoutZone, CurrentCheckoutZoneState);
     DOREPLIFETIME(ACheckoutZone, CurrentCheckoutPlayer);
+
     DOREPLIFETIME(ACheckoutZone, bIsCheckoutInProgress);
     DOREPLIFETIME(ACheckoutZone, CheckoutStartTime);
     DOREPLIFETIME(ACheckoutZone, RequiredCheckoutTime);
+
+    DOREPLIFETIME(ACheckoutZone, bUseEntranceBarrier);
+    DOREPLIFETIME(ACheckoutZone, bIsEntranceBarrierEnabled);
 }
 
 // ------------------------------------------------------------
@@ -93,6 +108,30 @@ void ACheckoutZone::OnCheckoutZoneBeginOverlap(UPrimitiveComponent* OverlappedCo
     if (!IsValid(PlayerCharacter))
     {
         return;
+    }
+
+    if (bUseEntranceBarrier)
+    {
+        // 이미 정산중인 플레이어가 있으면 후발 플레이어 배출
+        if (IsValid(CurrentCheckoutPlayer) && CurrentCheckoutPlayer != PlayerCharacter)
+        {
+            EjectPlayer(PlayerCharacter);
+            return;
+        }
+
+        // 아이템이 0개일 경우
+        UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
+        if (!IsValid(CartLoadComponent))
+        {
+            return;
+        }
+
+        //// 아이템 개수가 0개일 경우
+        //// 갇히는 문제 방지
+        //if (CartLoadComponent->GetCurrentLoadedCount() <= 0)
+        //{
+        //    return;
+        //}
     }
 
     AddPlayerInZone(PlayerCharacter);
@@ -125,34 +164,31 @@ void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComp
 
 void ACheckoutZone::InitializeCheckoutZoneMaterials()
 {
-    if (IsValid(CheckoutZoneRing))
-    {
-        CheckoutZoneRingMID = CheckoutZoneRing->CreateAndSetMaterialInstanceDynamic(0);
-    }
-
-    if (IsValid(CheckoutZoneFill))
-    {
-        CheckoutZoneFillMID = CheckoutZoneFill->CreateAndSetMaterialInstanceDynamic(0);
-    }
-}
-
-void ACheckoutZone::UpdateCheckoutZoneVisual()
-{
-    if (!IsValid(CheckoutZoneRing) || !IsValid(CheckoutZoneFill))
+    if (!IsValid(CheckoutZoneVisual))
     {
         return;
     }
 
-    CheckoutZoneRing->SetVisibility(true);
-    CheckoutZoneFill->SetVisibility(true);
+    CheckoutZoneVisualMID =  CheckoutZoneVisual->CreateAndSetMaterialInstanceDynamic(0);
+}
+
+void ACheckoutZone::UpdateCheckoutZoneVisual()
+{
+    if (!IsValid(CheckoutZoneVisual))
+    {
+        return;
+    }
+
+    if (CurrentCheckoutZoneState == ECheckoutZoneState::None)
+    {
+        CheckoutZoneVisual->SetVisibility(false);
+        return;
+    }
+
+    CheckoutZoneVisual->SetVisibility(true);
 
     switch (CurrentCheckoutZoneState)
     {
-    case ECheckoutZoneState::None:
-        CheckoutZoneRing->SetVisibility(false);
-        CheckoutZoneFill->SetVisibility(false);
-        break;
-
     case ECheckoutZoneState::Open:
         ApplyCheckoutZoneVisual(OpenCheckoutZoneStyle);
         break;
@@ -166,27 +202,226 @@ void ACheckoutZone::UpdateCheckoutZoneVisual()
         break;
 
     default:
-        CheckoutZoneRing->SetVisibility(false);
-        CheckoutZoneFill->SetVisibility(false);
+        CheckoutZoneVisual->SetVisibility(false);
         break;
     }
 }
 
 void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Style)
 {
-    if (IsValid(CheckoutZoneRingMID))
+    if (IsValid(CheckoutZoneVisualMID))
     {
-        CheckoutZoneRingMID->SetVectorParameterValue(TEXT("CheckoutZoneColor"), Style.RingColor);
-        CheckoutZoneRingMID->SetScalarParameterValue(TEXT("EmissiveStrength"), Style.RingEmissiveStrength);
-        CheckoutZoneRingMID->SetScalarParameterValue(TEXT("Opacity"), Style.RingOpacity);
+        CheckoutZoneVisualMID->SetVectorParameterValue(TEXT("BorderColor"), Style.RingColor);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("BorderEmissiveStrength"), Style.RingEmissiveStrength);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("BorderOpacity"), Style.RingOpacity);
+        CheckoutZoneVisualMID->SetVectorParameterValue(TEXT("FillColor"), Style.FillColor);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillEmissiveStrength"), Style.FillEmissiveStrength);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillOpacity"), Style.FillOpacity);
+    }
+}
+
+// ------------------------------------------------------------
+// 차단벽
+// ------------------------------------------------------------
+
+ACheckoutBarrier* ACheckoutZone::GetLeftBarrier() const
+{
+    if (!IsValid(LeftBarrierComponent))
+    {
+        return nullptr;
     }
 
-    if (IsValid(CheckoutZoneFillMID))
+    return Cast<ACheckoutBarrier>(LeftBarrierComponent->GetChildActor());
+}
+
+ACheckoutBarrier* ACheckoutZone::GetRightBarrier() const
+{
+    if (!IsValid(RightBarrierComponent))
     {
-        CheckoutZoneFillMID->SetVectorParameterValue(TEXT("CheckoutZoneColor"), Style.FillColor);
-        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("EmissiveStrength"), Style.FillEmissiveStrength);
-        CheckoutZoneFillMID->SetScalarParameterValue(TEXT("Opacity"), Style.FillOpacity);
+        return nullptr;
     }
+
+    return Cast<ACheckoutBarrier>(RightBarrierComponent->GetChildActor());
+}
+
+ACheckoutBarrier* ACheckoutZone::GetEntranceBarrier() const
+{
+    if (!IsValid(EntranceBarrierComponent))
+    {
+        return nullptr;
+    }
+
+    return Cast<ACheckoutBarrier>(EntranceBarrierComponent->GetChildActor());
+}
+
+void ACheckoutZone::SetUseEntranceBarrier(bool bUseBarrier)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (bUseEntranceBarrier == bUseBarrier)
+    {
+        return;
+    }
+
+    bUseEntranceBarrier = bUseBarrier;
+
+    // 기능을 끄면 현재 차단벽도 즉시 해제
+    if (!bUseEntranceBarrier)
+    {
+        SetEntranceBarrierEnabled(false);
+    }
+
+    // 서버 자기 화면에 즉시 적용
+    ApplyBarrierState();
+
+    // 클라이언트에 복제
+    ForceNetUpdate();
+}
+
+bool ACheckoutZone::IsUsingEntranceBarrier() const
+{
+    return bUseEntranceBarrier;
+}
+
+void ACheckoutZone::SetEntranceBarrierEnabled(bool bIsEnabled)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    const bool bNewBarrierEnabled = bUseEntranceBarrier && bIsEnabled;
+
+    if (bIsEntranceBarrierEnabled == bNewBarrierEnabled)
+    {
+        return;
+    }
+
+    bIsEntranceBarrierEnabled = bNewBarrierEnabled;
+
+    // 서버 자기 화면에 즉시 적용
+    ApplyBarrierState();
+
+    // 클라이언트에 복제
+    ForceNetUpdate();
+}
+
+void ACheckoutZone::OnRep_UseEntranceBarrier()
+{
+    ApplyBarrierState();
+}
+
+void ACheckoutZone::OnRep_EntranceBarrierEnabled()
+{
+    ApplyBarrierState();
+}
+
+void ACheckoutZone::ApplyBarrierState()
+{
+    ACheckoutBarrier* LeftBarrier = GetLeftBarrier();
+    ACheckoutBarrier* RightBarrier = GetRightBarrier();
+    ACheckoutBarrier* EntranceBarrier = GetEntranceBarrier();
+
+    // 벽차단 방식 비활성화 -> 좌우 고정벽도 비활성화
+    if (IsValid(LeftBarrier))
+    {
+        LeftBarrier->SetBarrierEnabled(bUseEntranceBarrier);
+    }
+
+    if (IsValid(RightBarrier))
+    {
+        RightBarrier->SetBarrierEnabled(bUseEntranceBarrier);
+    }
+
+    // 차단벽 방식 활성화 and
+    // 실제 입구벽 활성 상태도 true
+    const bool bShouldEnableEntranceBarrier = bUseEntranceBarrier && bIsEntranceBarrierEnabled;
+
+    if (IsValid(EntranceBarrier))
+    {
+        EntranceBarrier->SetBarrierEnabled(bShouldEnableEntranceBarrier);
+    }
+}
+
+// ------------------------------------------------------------
+// 플레이어 동시 진입
+// ------------------------------------------------------------
+
+void ACheckoutZone::EjectPlayer(ACartPawn* PlayerCharacter)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!IsValid(PlayerCharacter) || !IsValid(EjectPoint))
+    {
+        return;
+    }
+
+    // 혹시 이미 배열에 들어가 있었다면 계산 후보에서 제거
+    if (PlayersInZone.Contains(PlayerCharacter))
+    {
+        RemovePlayerFromZone(PlayerCharacter);
+    }
+
+    // 방향 계산
+    FVector EjectDirection = EjectPoint->GetComponentLocation() - PlayerCharacter->GetActorLocation();
+    EjectDirection.Z = 0.0f;
+
+    if (EjectDirection.IsNearlyZero())
+    {
+        return;
+    }
+
+    PlayerCharacter->ApplyExternalKnockback(EjectDirection, EjectStrength);
+}
+
+void ACheckoutZone::EjectNonCheckoutPlayers()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    for (int32 Index = PlayersInZone.Num() - 1; Index >= 0; --Index)
+    {
+        ACartPawn* PlayerCharacter = PlayersInZone[Index].Get();
+
+        if (!IsValid(PlayerCharacter))
+        {
+            PlayersInZone.RemoveAt(Index);
+            continue;
+        }
+
+        if (PlayerCharacter == CurrentCheckoutPlayer)
+        {
+            continue;
+        }
+
+        // EjectPlayer 내부에서 PlayersInZone 제거
+        // 델리게이트 해제도 같이
+        EjectPlayer(PlayerCharacter);
+    }
+}
+
+void ACheckoutZone::CloseEntranceBarrier()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    // 지연 시간 동안 정산이 취소됐다면 닫지 않음
+    if (!bIsCheckoutInProgress || !IsValid(CurrentCheckoutPlayer))
+    {
+        return;
+    }
+
+    SetEntranceBarrierEnabled(true);
 }
 
 // ------------------------------------------------------------
@@ -405,9 +640,8 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     {
         return;
     }
+
     UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
-
-
     if (!IsValid(CartLoadComponent))
     {
         return;
@@ -418,6 +652,33 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     bIsCheckoutInProgress = true;
     CheckoutProgress = 0.0f;
     ElapsedCheckoutTime = 0.0f;
+
+    // 기존에 먼저 들어와 있던 비정산 플레이어 배출
+    if (bUseEntranceBarrier)
+    {
+        EjectNonCheckoutPlayers();
+    }
+
+    // 정산 시작 시 입구 차단벽 활성화
+    //SetEntranceBarrierEnabled(true);
+    if (bUseEntranceBarrier)
+    {
+        GetWorldTimerManager().ClearTimer(EntranceBarrierCloseTimerHandle);
+        if (EntranceBarrierCloseDelay <= 0.0f)
+        {
+            CloseEntranceBarrier();
+        }
+        else
+        {
+            GetWorldTimerManager().SetTimer(
+                EntranceBarrierCloseTimerHandle,
+                this,
+                &ThisClass::CloseEntranceBarrier,
+                EntranceBarrierCloseDelay,
+                false
+            );
+        }
+    }
 
     // 적재된 상품 수에 따라 추가 정산 시간
     int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
@@ -600,8 +861,11 @@ void ACheckoutZone::CompleteCheckout()
     // 정산 완료 후 계산대 상태는 Manager에서 판단
     OnCheckoutCompleted.Broadcast(this);
 
+    // 정산이 끝났으므로 입구 차단 해제
+    SetEntranceBarrierEnabled(false);
+
     // Manager에서 계산대를 닫지 않은 경우, 다른 플레이어가 바로 정산 시도
-    if (CurrentCheckoutZoneState == ECheckoutZoneState::Open)
+    if (!bUseEntranceBarrier && CurrentCheckoutZoneState == ECheckoutZoneState::Open)
     {
         TryStartCheckout();
     }
@@ -618,12 +882,18 @@ void ACheckoutZone::CancelCheckout()
 
     ResetCheckout();
 
+    // 정산 취소 시 입구 해제
+    SetEntranceBarrierEnabled(false);
+
     UE_LOG(LogTemp, Warning, TEXT("정산 취소"));
 }
 
 void ACheckoutZone::ResetCheckout()
 {
     GetWorldTimerManager().ClearTimer(CheckoutTimerHandle);
+
+    GetWorldTimerManager().ClearTimer(EntranceBarrierCloseTimerHandle);
+    SetEntranceBarrierEnabled(false);
 
     CurrentCheckoutPlayer = nullptr;
     bIsCheckoutInProgress = false;
@@ -791,5 +1061,7 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 
 void ACheckoutZone::OnRep_CheckoutSession()
 {
+    //SetEntranceBarrierEnabled(bIsCheckoutInProgress);
+
     OnCheckoutSessionChanged.Broadcast(CheckoutZoneID, CurrentCheckoutPlayer, bIsCheckoutInProgress);
 }
