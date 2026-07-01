@@ -121,7 +121,7 @@ void UMainGameInstanceSubsystem::HostListenServer(const FString& InRoomName, con
 {
     //호스팅할 방 정보
     RoomName     = InRoomName;
-    RoomPassword = InRoomPassword;
+    RoomPassword = InRoomPassword.TrimStartAndEnd();
 
     IOnlineSessionPtr Sessions = GetSessionInterface();
     if (!Sessions.IsValid()) return;
@@ -287,10 +287,11 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     const FOnlineSessionSearchResult& Result = SearchSettings->SearchResults[Index];
 
     // 방에 설정된 비밀번호와 입력값 비교
-    FString StoredPassword;
-    Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, StoredPassword);
+    FString CurrentRoomPassword;
+    Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, CurrentRoomPassword);
 
-    if (!StoredPassword.IsEmpty() && StoredPassword != InputPassWord)
+    //비밀번호가 비어있으면 그냥 입장 가능
+    if (!CurrentRoomPassword.IsEmpty() && CurrentRoomPassword != InputPassWord)
     {
         UE_LOG(LogTemp, Warning, TEXT("[EOS] 비밀번호가 일치하지 않습니다. (Index: %d)"), Index);
         OnJoinPasswordIncorrect.Broadcast();
