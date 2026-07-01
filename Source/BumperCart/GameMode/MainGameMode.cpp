@@ -5,9 +5,8 @@
 
 #include "Checkout/CheckoutManager.h"
 #include "Kismet/GameplayStatics.h"
-#include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
-#include "EventManager/BC_EventManager.h"
-#include "MapGimmickManager/MapGimmickManager.h"
+#include "ProductShelfSubsystem/ProductShelfSubsystem.h"
+#include "EventManager/BC_EventSubsystem.h"
 #include "PlayerState/MainPlayerState.h"
 
 class AMainPlayerState;
@@ -39,19 +38,19 @@ void AMainGameMode::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (GetWorld())
+    if (auto* ProductShelfSubsystem = GetWorld()->GetSubsystem<UProductShelfSubsystem>())
     {
-        // 맵에 배치된 이벤트 매니저 수색 및 캐스팅
-        AActor* FoundEventActor = UGameplayStatics::GetActorOfClass(GetWorld(), ABC_EventManager::StaticClass());
-        BC_EventManager = Cast<ABC_EventManager>(FoundEventActor);
+        UE_LOG(LogTemp, Log, TEXT("[게임모드] 선반 서브시스템 설정 초기화 실행"));
+        ProductShelfSubsystem->InitializeConfig(ProductShelfManagerConfig);
+    }
 
-        // 맵에 배치된 맵 기믹 매니저 수색 및 캐스팅
-        AActor* FoundGimmickActor = UGameplayStatics::GetActorOfClass(GetWorld(), AMapGimmickManager::StaticClass());
-        MapGimmickManager = Cast<AMapGimmickManager>(FoundGimmickActor);
+    if (auto* BC_EventSubsystem = GetWorld()->GetSubsystem<UBC_EventSubsystem>())
+    {
+        UE_LOG(LogTemp, Log, TEXT("[게임모드] 세일 이벤트 설정 초기화 실행"));
+        BC_EventSubsystem->InitializeSaleEventConfig(SaleEventConfig);
 
-        // 맵에 배치된 제품 선반 매니저 수색 및 캐스팅
-        AActor* FoundShelfActor = UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass());
-        ProductShelfManager = Cast<AProductShelfManager>(FoundShelfActor);
+        UE_LOG(LogTemp, Log, TEXT("[게임모드] 한정 이벤트 설정 초기화 실행"));
+        BC_EventSubsystem->InitializeLimitedEventConfig(LimitedEventConfig);
     }
 
     // 계산대 매니저 찾기
@@ -66,15 +65,7 @@ void AMainGameMode::BeginPlay()
         UE_LOG(LogMainGameMode, Error, TEXT("월드에서 CheckoutManager를 찾을 수 없습니다!"));
     }
 
-    //매니저 배치 확인
-    if (!BC_EventManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 BC_EventManager가 배치되지 않았습니다"));
-    if (!MapGimmickManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 MapGimmickManager가 배치되지 않았습니다"));
-    if (!ProductShelfManager) UE_LOG(LogTemp, Error, TEXT("[GameMode] 맵에 ProductShelfManager가 배치되지 않았습니다"));
 
-    if(BC_EventManager && MapGimmickManager && ProductShelfManager)
-    {
-        UE_LOG(LogTemp, Log, TEXT("[GameMode] 모든 매니저가 성공적으로 등록되었습니다."));
-    }
 }
 
 void AMainGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
@@ -186,6 +177,13 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
             CheckoutManagerRef->PrepareNextCheckoutZoneState(3);
         }
 
+
+        if (UProductShelfSubsystem* ShelfSubsystem = GetWorld()->GetSubsystem<UProductShelfSubsystem>())
+        {
+            // 스폰 시작 함수 호출
+            ShelfSubsystem->StartProductSpawning();
+        }
+
         break;
 
     case ERoundPhase::RandomOpenTwo:
@@ -202,10 +200,11 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         // 세일 상품 이벤트 시작
         PhaseName = TEXT("SaleEvent (세일 상품 이벤트 시작)");
 
-        if (BC_EventManager)
+        if (UBC_EventSubsystem * EventSubsystem = GetWorld()->GetSubsystem<UBC_EventSubsystem>())
         {
-            BC_EventManager->StartSaleEvent();
+            EventSubsystem->StartSaleEvent();
         }
+
 
         break;
 
@@ -213,10 +212,11 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         // 중앙 고급 상품 스폰
         PhaseName = TEXT("PremiumRespawn (중앙 고급 상품 스폰)");
 
-        if (BC_EventManager)
+        if (UBC_EventSubsystem * EventSubsystem = GetWorld()->GetSubsystem<UBC_EventSubsystem>())
         {
-            BC_EventManager->StartLimitedEvent();
+            EventSubsystem->StartLimitedEvent();
         }
+
         break;
 
     case ERoundPhase::FinalWarningOneOpen:

@@ -12,7 +12,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/GameInstance.h"
-#include "GameInstanceSubsystem/MainGameInstanceSubsystem.h"
+#include "GameInstance/GameInstanceSubsystem/MainGameInstanceSubsystem.h"
 
 
 

@@ -12,6 +12,7 @@
 class AProductBase;
 class UStaticMeshComponent;
 class UStaticMesh;
+class UNiagaraSystem;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnLoadInfoChanged,
@@ -83,8 +84,12 @@ private:
     // 더미 메시 연출 갱신하는 함수
     void UpdateLoadVisual();
 
-    // 더미 상품을 몇개 보여줄지 계싼하는 함수
+    // 더미 상품을 몇개 보여줄지 계산하는 함수
     int32 GetVisibleDummyCount() const;
+
+    // 카트 적재 이펙트를 재생하는 멀티캐스트 함수
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayCartLoadEffect(int32 DummyIndex);
 
 private:
     /* ---------------- 적재 연출 관련 ---------------- */
@@ -100,6 +105,11 @@ private:
     // 더미로 사용할 실제 메시
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")
     TObjectPtr<UStaticMesh> LoadDummyMesh;
+
+    // 적재 시 나이아가라 연출
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")
+    TObjectPtr<UNiagaraSystem> LoadEffect;
+
 
     /* ---------------- 적재 관리 변수 ---------------- */
 

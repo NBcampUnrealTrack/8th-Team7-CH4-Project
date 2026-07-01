@@ -1,6 +1,6 @@
 // MainGameInstanceSubsystem.cpp
 
-#include "GameInstanceSubsystem/MainGameInstanceSubsystem.h"
+#include "GameInstance/GameInstanceSubsystem/MainGameInstanceSubsystem.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
 #include "OnlineSessionSettings.h"
@@ -121,7 +121,7 @@ void UMainGameInstanceSubsystem::HostListenServer(const FString& InRoomName, con
 {
     //호스팅할 방 정보
     RoomName     = InRoomName;
-    RoomPassword = InRoomPassword;
+    RoomPassword = InRoomPassword.TrimStartAndEnd();
 
     IOnlineSessionPtr Sessions = GetSessionInterface();
     if (!Sessions.IsValid()) return;
@@ -149,8 +149,8 @@ void UMainGameInstanceSubsystem::CreateSessionInternal()
     SessionSettings.bIsLANMatch           = false;
     SessionSettings.bShouldAdvertise      = true;   // 검색 가능
     SessionSettings.bAllowJoinInProgress  = true;
-    SessionSettings.bUsesPresence         = false;  // 친구 초대/프레즌스
-    SessionSettings.bAllowInvites         = true;
+    SessionSettings.bUsesPresence         = false;  // 친구 목록 보고 게임 참가 가능 여부
+    SessionSettings.bAllowInvites         = true; // 친구 초대 여부
     SessionSettings.bUseLobbiesIfAvailable= true;   // EOS Lobby 사용
     SessionSettings.NumPublicConnections  = 4;      // 최대 인원 수
     SessionSettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineDataAdvertisementType::ViaOnlineService);
@@ -183,7 +183,7 @@ void UMainGameInstanceSubsystem::OnCreateSessionComplete(FName SessionName, bool
     UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 생성 성공: %s"), *SessionName.ToString());
 
    //?listen이 핵심 해당 클라이언트가 서버가 되는 부분
-    GetWorld()->ServerTravel(TEXT("/Game/Developers/LSJae/Levels/TestLobbyLevel?listen"));
+    GetWorld()->ServerTravel(TEXT("/Game/BumperCart/Map/L_RoomLobby?listen"));
 }
 
 void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
@@ -206,8 +206,10 @@ void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, boo
 }
 
 //만들어진 세션 찾기
-void UMainGameInstanceSubsystem::FindSessions()
+void UMainGameInstanceSubsystem::FindSessions(const FString& RoomNameFilter)
 {
+    SearchRoomNameFilter = RoomNameFilter;
+
     IOnlineSessionPtr Sessions = GetSessionInterface();
     if (!Sessions.IsValid()) return;
 
@@ -236,16 +238,36 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 %d개 발견"), SearchSettings->SearchResults.Num());
-
-    for (int32 i = 0; i < SearchSettings->SearchResults.Num(); ++i)
+    //방 이름 필터를 통해 방 검색 결과 사용
+    if (!SearchRoomNameFilter.IsEmpty())
     {
-        const FOnlineSessionSearchResult& Result = SearchSettings->SearchResults[i];
-        UE_LOG(LogTemp, Log, TEXT("  [%d] %s (Ping: %d)"), i, *Result.Session.OwningUserName, Result.PingInMs);
+        FilteredResults.Reset();
+        for (const FOnlineSessionSearchResult& Result : SearchSettings->SearchResults)
+        {
+            FString FoundName;
+            Result.Session.SessionSettings.Get(SETTING_ROOMNAME, FoundName);
+
+            // 대소문자 무시하고 검색어 포함 여부 확인
+            if (FoundName.Contains(SearchRoomNameFilter, ESearchCase::IgnoreCase))
+            {
+                FilteredResults.Add(Result);
+            }
+        }
+    }
+    else
+    {
+        // 필터 없으면 전체 결과 사용
+        FilteredResults = SearchSettings->SearchResults;
     }
 
+    UE_LOG(LogTemp, Log, TEXT("[EOS] 전체 세션 %d개 발견, 필터링 후 %d개"),
+    SearchSettings->SearchResults.Num(),
+    FilteredResults.Num());
+
+
+
     //UI에 결과 전달 필요 시 해당 부분에 작성
-    OnSessionsFound.Broadcast(SearchSettings->SearchResults.Num());
+    OnSessionsFound.Broadcast(FilteredResults.Num());
 }
 
 
@@ -265,10 +287,11 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     const FOnlineSessionSearchResult& Result = SearchSettings->SearchResults[Index];
 
     // 방에 설정된 비밀번호와 입력값 비교
-    FString StoredPassword;
-    Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, StoredPassword);
+    FString CurrentRoomPassword;
+    Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, CurrentRoomPassword);
 
-    if (!StoredPassword.IsEmpty() && StoredPassword != InputPassWord)
+    //비밀번호가 비어있으면 그냥 입장 가능
+    if (!CurrentRoomPassword.IsEmpty() && CurrentRoomPassword != InputPassWord)
     {
         UE_LOG(LogTemp, Warning, TEXT("[EOS] 비밀번호가 일치하지 않습니다. (Index: %d)"), Index);
         OnJoinPasswordIncorrect.Broadcast();
@@ -279,7 +302,8 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     Result.Session.SessionSettings.Get(SETTING_ROOMNAME, RoomName);
 
     Sessions->OnJoinSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnJoinSessionComplete);
-    Sessions->JoinSession(0, NAME_GameSession, Result);
+    //Index에 들어온 값에따라 방 참가
+    Sessions->JoinSession(Index, NAME_GameSession, Result);
 }
 
 void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
@@ -368,3 +392,4 @@ int32 UMainGameInstanceSubsystem::GetFoundSessionCount() const
     if (!SearchSettings.IsValid()) return 0;
     return SearchSettings->SearchResults.Num();
 }
+

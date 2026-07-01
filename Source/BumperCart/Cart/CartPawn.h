@@ -165,13 +165,20 @@ protected:
 
 
     //---------- 속도감 FX (바닥 스피드라인) ----------
-    //바닥에 흐르는 속도선 Niagara (Stage2에서 NS_CartSpeedLines 지정, 비면 무효과)
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
-    UNiagaraComponent* SpeedLineFX;
+    //기존 1컴포넌트
+    //UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
+    //UNiagaraComponent* SpeedLineFX;
 
-    //이 속도(cm/s)에서 속도선이 최대 (0~이 값 사이 보간)
-    UPROPERTY(EditAnywhere, Category = "Cart|FX", meta = (ClampMin = "1"))
-    float SpeedLineFullSpeed = 700.f;
+    //양쪽 뒷바퀴 속도선 (바퀴 위치는 BP의 RelativeLocation에서 조정)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
+    UNiagaraComponent* SpeedLineFXLeft;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
+    UNiagaraComponent* SpeedLineFXRight;
+
+    //이 속도 넘으면 속도선 ON 미만이면 OFF
+    UPROPERTY(EditAnywhere, Category = "Cart|FX", meta = (ClampMin = "0"))
+    float SpeedLineMinSpeed = 500.f;
 
     //---------- 그랩 컴포넌트 ----------
     // 생성자에서 생성하고, SetupPlayerInputComponent에서 IMC 바인딩
