@@ -5,7 +5,8 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "OnlineSubsystem.h"
-#include "Interfaces//OnlineSessionInterface.h"
+#include "OnlineSessionSettings.h"
+#include "Interfaces/OnlineSessionInterface.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "MainGameInstanceSubsystem.generated.h"
 
@@ -30,7 +31,7 @@ public:
 
     //생성된 방 검색
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
-    void FindSessions();
+    void FindSessions(const FString& RoomNameFilter = TEXT(""));
 
     //검색된 방 참가
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
@@ -89,6 +90,12 @@ private:
     //방 생성 이름 및 비밀번호
     FString RoomName;
     FString RoomPassword;
+
+    //방 검색시 사용될 방 이름
+    FString SearchRoomNameFilter;
+
+    //검색된 방 결과들
+    TArray<FOnlineSessionSearchResult> FilteredResults;
 
     //세션 커스텀 세팅 키
     static inline const FName SETTING_ROOMNAME     = TEXT("ROOMNAME");
