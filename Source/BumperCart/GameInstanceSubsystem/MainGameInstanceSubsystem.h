@@ -26,8 +26,9 @@ public:
     void Login(const FString& CredentialName);
 
     //호스트가 되어 방 생성
+    //방 제목은 필수, 방 비밀번호는 선택
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
-    void HostListenServer(const FString& InRoomName, const FString& InRoomPassword);
+    void HostListenServer(const FString& InRoomName, const FString& InRoomPassword = TEXT(""));
 
     //생성된 방 검색
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
