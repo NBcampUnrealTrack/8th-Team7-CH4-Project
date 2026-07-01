@@ -204,6 +204,9 @@ private:
     UPROPERTY(EditAnywhere, Category = "Cart|Grab|Visual")
     float ProductPopIncreaseDuration;
 
+    // 획득시 나이아가라 연출
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UNiagaraSystem> ProductGrabPickupEffect;
 
     /* ---------------- 조준선 갱신 관련 변수들  ----------------   */
 

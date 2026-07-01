@@ -13,6 +13,7 @@
 #include "GameFramework/Pawn.h"
 #include "Util/BCCollisionChannels.h"
 #include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Components/DecalComponent.h"
 
 
@@ -667,6 +668,21 @@ void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
     Product->SetActorHiddenInGame(true);
 
     StartProductPopVisual();
+
+    if (ProductGrabPickupEffect)
+    {
+        UWorld* World = GetWorld();
+        if (!IsValid(World)) return;
+
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            World,
+            ProductGrabPickupEffect,
+            VisualProductMesh->GetComponentLocation(),
+            FRotator::ZeroRotator,
+            FVector::OneVector,
+            true
+        );
+    }
 }
 
 void UCartGrabComponent::HideVisualProductMesh()
