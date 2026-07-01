@@ -14,9 +14,11 @@
 #include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
 
 
 ACheckoutZone::ACheckoutZone()
@@ -44,15 +46,32 @@ ACheckoutZone::ACheckoutZone()
     CheckoutBarrierComponent->SetupAttachment(SceneRoot);
     CheckoutBarrierComponent->SetChildActorClass(ACheckoutBarrier::StaticClass());
 
-    EjectPoint = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPoint"));
-    EjectPoint->SetupAttachment(SceneRoot);
-
     CheckoutZoneVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneVisual"));
-
     CheckoutZoneVisual->SetupAttachment(SceneRoot);
     CheckoutZoneVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     CheckoutZoneVisual->SetGenerateOverlapEvents(false);
     CheckoutZoneVisual->SetCastShadow(false);
+
+    // 배출점 4개
+    USceneComponent* EjectPointFront = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointFront"));
+    EjectPointFront->SetupAttachment(SceneRoot);
+    EjectPointFront->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
+    EjectPoints.Add(EjectPointFront);
+
+    USceneComponent* EjectPointBack = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointBack "));
+    EjectPointBack->SetupAttachment(SceneRoot);
+    EjectPointBack->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
+    EjectPoints.Add(EjectPointBack);
+
+    USceneComponent* EjectPointRight = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointRight "));
+    EjectPointRight->SetupAttachment(SceneRoot);
+    EjectPointRight->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
+    EjectPoints.Add(EjectPointRight);
+
+    USceneComponent* EjectPointLeft = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointLeft "));
+    EjectPointLeft->SetupAttachment(SceneRoot);
+    EjectPointLeft->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
+    EjectPoints.Add(EjectPointLeft);
 }
 
 void ACheckoutZone::BeginPlay()
@@ -319,7 +338,7 @@ void ACheckoutZone::EjectPlayer(ACartPawn* PlayerCharacter)
         return;
     }
 
-    if (!IsValid(PlayerCharacter) || !IsValid(EjectPoint))
+    if (!IsValid(PlayerCharacter))
     {
         return;
     }
@@ -330,17 +349,24 @@ void ACheckoutZone::EjectPlayer(ACartPawn* PlayerCharacter)
         return;
     }
 
-    // 배출 플레이어 배열에 추가
-    EjectingPlayers.AddUnique(PlayerCharacter);
+    USceneComponent* ClosestEjectPoint = FindBestEjectPoint(PlayerCharacter);
+
+    if (!IsValid(ClosestEjectPoint))
+    {
+        return;
+    }
 
     // 방향 계산
-    FVector EjectDirection = EjectPoint->GetComponentLocation() - PlayerCharacter->GetActorLocation();
+    FVector EjectDirection = ClosestEjectPoint->GetComponentLocation() - PlayerCharacter->GetActorLocation();
     EjectDirection.Z = 0.0f;
 
     if (EjectDirection.IsNearlyZero())
     {
         return;
     }
+
+    // 배출 플레이어 배열에 추가
+    EjectingPlayers.AddUnique(PlayerCharacter);
 
     PlayerCharacter->ApplyExternalKnockback(EjectDirection, EjectStrength);
 }
@@ -371,6 +397,115 @@ void ACheckoutZone::EjectNonCheckoutPlayers()
         // 델리게이트 해제도 같이
         EjectPlayer(PlayerCharacter);
     }
+}
+
+USceneComponent* ACheckoutZone::FindBestEjectPoint(const ACartPawn* PlayerCharacter) const
+{
+    if (!IsValid(PlayerCharacter))
+    {
+        return nullptr;
+    }
+
+    const FVector PlayerLocation = PlayerCharacter->GetActorLocation();
+
+    // 가장 가까운 지점
+    USceneComponent* ClosestEjectPoint = nullptr;
+    float ClosestDistanceSquared = MAX_flt;
+
+    // 막히지 않은 지점 중 가장 가까운 지점
+    USceneComponent* ClosestClearEjectPoint = nullptr;
+    float ClosestClearDistanceSquared = MAX_flt;
+
+    for (USceneComponent* EjectPoint : EjectPoints)
+    {
+        if (!IsValid(EjectPoint))
+        {
+            continue;
+        }
+
+        const FVector EjectPointLocation = EjectPoint->GetComponentLocation();
+
+        const float DistanceSquared = FVector::DistSquared2D(PlayerLocation, EjectPointLocation);
+
+        // 가장 가까운 지점
+        if (DistanceSquared < ClosestDistanceSquared)
+        {
+            ClosestDistanceSquared = DistanceSquared;
+            ClosestEjectPoint = EjectPoint;
+        }
+
+        // 경로가 막히면 제외
+        if (!IsEjectPathClear(PlayerCharacter,EjectPointLocation))
+        {
+            continue;
+        }
+
+        // 막힌 지점 제외하고, 가장 가까운 지점
+        if (DistanceSquared < ClosestClearDistanceSquared)
+        {
+            ClosestClearDistanceSquared = DistanceSquared;
+            ClosestClearEjectPoint = EjectPoint;
+        }
+    }
+
+    // 막히지 않은 곳 중 가장 가까운 지점
+    if (IsValid(ClosestClearEjectPoint))
+    {
+        return ClosestClearEjectPoint;
+    }
+
+    // 모든 지점이 막혔다면 가장 가까운 방향
+    return ClosestEjectPoint;
+}
+
+bool ACheckoutZone::IsEjectPathClear(const ACartPawn* PlayerCharacter, const FVector& TargetLocation) const
+{
+    if (!IsValid(PlayerCharacter) || !IsValid(GetWorld()))
+    {
+        return false;
+    }
+
+    const UCapsuleComponent* CapsuleComponent = PlayerCharacter->FindComponentByClass<UCapsuleComponent>();
+
+    if (!IsValid(CapsuleComponent))
+    {
+        return false;
+    }
+
+    const FVector StartLocation = PlayerCharacter->GetActorLocation();
+    FVector EndLocation = TargetLocation;
+
+    // 수평 경로만 검사
+    EndLocation.Z = StartLocation.Z;
+
+    // 현재 캡슐과 바닥이 접촉한 상태이므로
+    // 초기 겹침 오검출을 줄이기 위해 약간 축소
+    const float SweepRadius = FMath::Max(CapsuleComponent->GetScaledCapsuleRadius() - 2.0f, 1.0f);
+
+    const float SweepHalfHeight = FMath::Max(CapsuleComponent->GetScaledCapsuleHalfHeight() - 2.0f, SweepRadius);
+
+    const FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(SweepRadius, SweepHalfHeight);
+
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CheckoutEjectSweep), false);
+
+    QueryParams.AddIgnoredActor(PlayerCharacter);
+    QueryParams.AddIgnoredActor(this);
+
+    FHitResult HitResult;
+
+    const ECollisionChannel TraceChannel = CapsuleComponent->GetCollisionObjectType();
+
+    const bool bHasBlockingHit = GetWorld()->SweepSingleByChannel(
+            HitResult,
+            StartLocation,
+            EndLocation,
+            FQuat::Identity,
+            TraceChannel,
+            CapsuleShape,
+            QueryParams
+        );
+
+    return !bHasBlockingHit;
 }
 
 void ACheckoutZone::CloseCheckoutBarrier()

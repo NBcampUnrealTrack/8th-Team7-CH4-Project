@@ -152,7 +152,7 @@ private:
 
     // 배출점
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
-    TObjectPtr<USceneComponent> EjectPoint;
+    TArray<TObjectPtr<USceneComponent>> EjectPoints;
 
 // ------------------------------------------------------------
 // 머티리얼
@@ -235,6 +235,12 @@ private:
 
     // 계산대 내부에 있던 플레이어가 정산자가 아닌 경우 바깥으로 밀어냄
     void EjectNonCheckoutPlayers();
+
+    // 배출 위치 찾기
+    USceneComponent* FindBestEjectPoint(const ACartPawn* PlayerCharacter) const;
+
+    // sweep 검사하여 다른 카트 or 계산대와 충돌할 지 감지
+    bool IsEjectPathClear(const ACartPawn* PlayerCharacter, const FVector& TargetLocation) const;
 
     // 점유 확정 후 입구 차단벽 닫기
     void CloseCheckoutBarrier();
