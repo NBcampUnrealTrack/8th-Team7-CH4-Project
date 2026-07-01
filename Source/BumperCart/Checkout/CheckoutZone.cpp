@@ -15,6 +15,9 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/AudioComponent.h"
+#include "Sound/SoundBase.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Engine/Engine.h"
@@ -72,6 +75,10 @@ ACheckoutZone::ACheckoutZone()
     EjectPointLeft->SetupAttachment(SceneRoot);
     EjectPointLeft->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
     EjectPoints.Add(EjectPointLeft);
+
+    CheckoutProcessingAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("CheckoutProcessingAudio"));
+    CheckoutProcessingAudio->SetupAttachment(SceneRoot);
+    CheckoutProcessingAudio->bAutoActivate = false;
 }
 
 void ACheckoutZone::BeginPlay()
@@ -822,6 +829,12 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     // 정산 시작 시 호출
     OnRep_CheckoutSession();
 
+    // 정산 중 사운드 반복 재생
+    if (IsValid(CheckoutProcessingAudio))
+    {
+        CheckoutProcessingAudio->Play();
+    }
+
     UE_LOG(LogTemp, Warning, TEXT("%s 정산 시작"), *GetNameSafe(CurrentCheckoutPlayer));
 }
 
@@ -1017,6 +1030,12 @@ void ACheckoutZone::ResetCheckout()
 
     // 정산 초기화 시 호출
     OnRep_CheckoutSession();
+
+    // 사운드 종료
+    if (IsValid(CheckoutProcessingAudio))
+    {
+        CheckoutProcessingAudio->Stop();
+    }
 }
 
 // ------------------------------------------------------------

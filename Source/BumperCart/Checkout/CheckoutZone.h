@@ -13,8 +13,11 @@ class UStaticMeshComponent;
 class USphereComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
+class USoundBase;
+class UAudioComponent;
 
 struct FLoadedProductInfo;
+struct FLoadInfo;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(
     FOnCheckoutCompleted,
@@ -183,6 +186,17 @@ private:
 
     // 링과 내부 채움에 색상 및 밝기 적용
     void ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Style);
+
+// ------------------------------------------------------------
+// 정산 진행 사운드
+// ------------------------------------------------------------
+private:
+    // 정산 중 반복할 비프음
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
+    TObjectPtr<UAudioComponent> CheckoutProcessingAudio;
+
+
+
 
 // ------------------------------------------------------------
 // 차단벽

@@ -50,7 +50,7 @@ void ACheckoutBarrier::SetBarrierEnabled(bool bIsEnabled)
     // 충돌 설정
     BarrierMesh->SetCollisionEnabled(
         bIsEnabled
-        ? ECollisionEnabled::QueryAndPhysics
+        ? ECollisionEnabled::QueryOnly
         : ECollisionEnabled::NoCollision
     );
 }
