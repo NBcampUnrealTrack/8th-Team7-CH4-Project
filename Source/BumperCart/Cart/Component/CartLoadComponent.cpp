@@ -6,6 +6,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "NiagaraFunctionLibrary.h"
 
 
 UCartLoadComponent::UCartLoadComponent()
@@ -69,6 +70,9 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
     // Owner 확인, Owner 권한 확인
     if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return false;
 
+    // 이전 더미 메시 개수
+    int32 PrevDummyCount = GetVisibleDummyCount();
+
     // Loaded 상태로 변경가능한지 확인하면서 변경
     if (!Product->TrySetLoaded()) return false;
 
@@ -77,6 +81,12 @@ bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
 
     // 적재 정보 갱신
     UpdateLoadInfo();
+
+    // 더미 메시 위치에 이펙트 출력, 이전 더미 메시 개수와 비교
+    int32 DummyCount = GetVisibleDummyCount();
+    int32 DummyIndex = DummyCount > PrevDummyCount ? DummyCount - 1 : INDEX_NONE;
+
+    Multicast_PlayCartLoadEffect(DummyIndex);
 
     return true;
 }
@@ -361,6 +371,36 @@ int32 UCartLoadComponent::GetVisibleDummyCount() const
     }
 
     return 6;
+}
+
+void UCartLoadComponent::Multicast_PlayCartLoadEffect_Implementation(int32 DummyIndex)
+{
+    if (GetNetMode() == NM_DedicatedServer) return;
+
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor)) return;
+
+    FVector EffectLocation = OwnerActor->GetActorLocation();
+
+    if (LoadDummyMeshes.IsValidIndex(DummyIndex) && IsValid(LoadDummyMeshes[DummyIndex]))
+    {
+        EffectLocation = LoadDummyMeshes[DummyIndex]->GetComponentLocation();
+    }
+
+    if (LoadEffect)
+    {
+        UWorld* World = GetWorld();
+        if (!IsValid(World)) return;
+
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            World,
+            LoadEffect,
+            EffectLocation,
+            FRotator::ZeroRotator,
+            FVector::OneVector,
+            true
+        );
+    }
 }
 
 void UCartLoadComponent::Server_RequestDropProducts_Implementation(float Impulse, EDropCollisionRole Role)

@@ -1,16 +1,16 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PlayerController/TestPlayerController.h"
+#include "PlayerController/LobbyPlayerController.h"
 
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerState.h"
-#include "GameInstanceSubsystem/MainGameInstanceSubsystem.h"
+#include "GameInstance/GameInstanceSubsystem/MainGameInstanceSubsystem.h"
 #include "GameState/LobbyGameState.h"
 
 class UMainGameInstanceSubsystem;
 
-void ATestPlayerController::BeginPlay()
+void ALobbyPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
@@ -37,7 +37,7 @@ void ATestPlayerController::BeginPlay()
     }
 }
 
-void ATestPlayerController::ServerRPCSetDisplayName_Implementation(const FString& DisplayName)
+void ALobbyPlayerController::ServerRPCSetDisplayName_Implementation(const FString& DisplayName)
 {
     if (PlayerState)
     {

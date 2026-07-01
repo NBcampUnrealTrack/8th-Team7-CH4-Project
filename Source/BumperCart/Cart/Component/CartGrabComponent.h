@@ -83,7 +83,7 @@ private:
     void RefreshGrabTick();
 
     // 틱마다 서버에서 Sweep으로 그랩 판정하는 함수
-    void TickGrab(float DeltaTime);
+    void TickGrabSweep(float DeltaTime);
 
     // 그랩 Sweep 시도하는 함수, 성공하면 붙잡은 거리를 알려줌
     bool TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance);
@@ -113,6 +113,15 @@ private:
     // 연출용 메시 끄기
     void HideVisualProductMesh();
 
+    // 그랩 연출 갱신
+    void TickGrabVisual(float DeltaTime);
+
+    // 상품 획득 연출 시작
+    void StartProductPopVisual();
+
+    // 상품 획득 연출 갱신
+    void TickProductPopVisual(float DeltaTime);
+
     // 현재 로봇손 시작위치 구하는 함수
     FVector GetGrabStartLocation() const;
 
@@ -133,6 +142,9 @@ private:
 
     // 마우스 위치에 데칼 업데이트하는 함수
     void UpdateAimDecal(const FVector& Target);
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayGrabFailEffect(FVector_NetQuantize EffectLocation);
 
 private:
     /* ---------------- 로봇손 연출 관련 ---------------- */
@@ -170,6 +182,41 @@ private:
 
     // 현재 연출 상태
     EGrabVisualState VisualState;
+
+
+    /* ---------------- 상품 획득 연출 관련  ----------------   */
+    // Pop Scale 연출
+
+    // 연출 지속시간
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Visual")
+    float ProductPopDuration;
+
+    // 늘어날때 최대 크기
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Visual")
+    float ProductPopMaxScale;
+
+    // 줄어들때 최소 크기
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Visual")
+    float ProductPopMinScale;
+
+    bool bProductPopPlaying;
+    float ProductPopElapsedTime;
+    FVector ProductPopBaseScale;
+
+    // 0.0 ~ 1.0 진행도중에서 Scale이 커지는 시간이 어느정도인지
+    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Visual")
+    float ProductPopIncreaseDuration;
+
+    // 획득시 나이아가라 연출
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UNiagaraSystem> ProductGrabPickupEffect;
+
+    // 획득 실패 시 나이아가라 연출
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UNiagaraSystem> GrabFailDustEffect;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    float GrabFailEffectOffset;
 
 
     /* ---------------- 조준선 갱신 관련 변수들  ----------------   */

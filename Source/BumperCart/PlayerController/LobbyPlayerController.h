@@ -4,12 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
-#include "TestPlayerController.generated.h"
+#include "LobbyPlayerController.generated.h"
 
 class UUserWidget;
 
 UCLASS()
-class BUMPERCART_API ATestPlayerController : public APlayerController
+class BUMPERCART_API ALobbyPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
