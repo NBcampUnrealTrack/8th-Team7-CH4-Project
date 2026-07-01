@@ -66,9 +66,6 @@ private:
     UFUNCTION()
     void UpdateGrabAim();
 
-    UFUNCTION()
-    void TryGrabProduct();
-
     // Grab Action에 바인딩되어 호출하는 함수
     // 그랩 방향을 구해 서버로 요청 준비
     void RequestGrab();
@@ -82,12 +79,24 @@ private:
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayGrab(FVector_NetQuantize Start, FVector_NetQuantize Target);
 
-    bool PerformGrabTrace(FVector_NetQuantizeNormal AimDirection, float AimDistance, FHitResult& Hit);
+    // 그랩 컴포넌트 Tick 설정을 상황에 따라 변경하는 함수
+    void RefreshGrabTick();
+
+    // 틱마다 서버에서 Sweep으로 그랩 판정하는 함수
+    void TickGrab(float DeltaTime);
+
+    // 그랩 Sweep 시도하는 함수, 성공하면 붙잡은 거리를 알려줌
+    bool TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance);
+
+    // 그랩 회수 시작 알리는 함수
+    void StartGrabReturn(float ReturnDuration);
+
+    // 회수 시작 멀티캐스트 함수
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_StartGrabReturn(float ReturnDuration, AProductBase* Product);
 
     // 게임 종료 시 마우스 조준선 타이머 끄는 함수
     void StopAimTimer();
-
-    void SetGrabCooldown(float Duration);
 
     // 로봇손 연출 갱신하는 함수
     void UpdateGrabVisual(const FVector& Location);
@@ -103,10 +112,6 @@ private:
 
     // 연출용 메시 끄기
     void HideVisualProductMesh();
-
-    // 모든 클라이언트에게 잡은 상품을 보여주라고 알리는 함수
-    UFUNCTION(NetMulticast, Reliable)
-    void Multicast_ShowVisualProductMesh(AProductBase* Product);
 
     // 현재 로봇손 시작위치 구하는 함수
     FVector GetGrabStartLocation() const;
@@ -212,6 +217,20 @@ private:
     float NiagaraHeightOffset;
 
 
+    /* ---------------- 로봇손 서버 판정 ---------------- */
+
+    // 서버에서 그랩 판정 중인지
+    bool bServerGrab;
+
+    // 서버에서 판정하는 그랩 위치와 방향
+    FVector ServerGrabStartLocation;
+    FVector ServerGrabDirection;
+
+    // 서버에서 계산한 최대 거리, 현재거리
+    float ServerGrabMaxDistance;
+    float ServerGrabCurrentDistance;
+
+
     /* ---------------- 로봇손 밸런스 ---------------- */
 
     // 로봇손 속도
@@ -246,7 +265,4 @@ private:
 
     // 조준선 갱신 타이머
     FTimerHandle GrabAimUpdateTimer;
-
-    // 상품과 손이 닿을 시간을 확인하는 타이머
-    FTimerHandle TryGrabTimer;
 };
