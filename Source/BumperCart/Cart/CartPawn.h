@@ -16,6 +16,7 @@ class USoundBase;
 struct FInputActionValue;
 class UCartGrabComponent;
 class UNiagaraComponent;
+class UCartScreenFXComponent;
 
 UCLASS(abstract)
 class ACartPawn : public ACharacter, public ISlideAffectable, public IBumpable
@@ -179,6 +180,10 @@ protected:
     //이 속도 넘으면 속도선 ON 미만이면 OFF
     UPROPERTY(EditAnywhere, Category = "Cart|FX", meta = (ClampMin = "0"))
     float SpeedLineMinSpeed = 500.f;
+
+    //화면 가장자리 스피드라인 (부스트 중, 로컬 화면 전용) — 컴포넌트가 PP 연출을 소유
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
+    UCartScreenFXComponent* ScreenFXComponent;
 
     //---------- 그랩 컴포넌트 ----------
     // 생성자에서 생성하고, SetupPlayerInputComponent에서 IMC 바인딩
