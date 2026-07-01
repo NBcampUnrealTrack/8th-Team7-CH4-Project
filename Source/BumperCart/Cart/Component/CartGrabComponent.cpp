@@ -13,6 +13,7 @@
 #include "GameFramework/Pawn.h"
 #include "Util/BCCollisionChannels.h"
 #include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Components/DecalComponent.h"
 
 
@@ -44,6 +45,18 @@ UCartGrabComponent::UCartGrabComponent()
     VisualReturnDuration = 0.f;
     VisualElapsedTime = 0.f;
     VisualState = EGrabVisualState::None;
+
+    // 상품 획득시 연출 관련 변수
+    ProductPopDuration = 0.5f;
+    ProductPopMaxScale = 2.f;
+    ProductPopMinScale = 0.5f;
+    bProductPopPlaying = false;
+    ProductPopElapsedTime = 0.f;
+    ProductPopBaseScale = FVector::OneVector;
+    ProductPopIncreaseDuration = 0.35f;
+
+    // 실패 연출 변수
+    GrabFailEffectOffset = 20.f;
 
     // 조준선 갱신 관련
     CachedAimDirection = FVector::ZeroVector;
@@ -182,6 +195,7 @@ void UCartGrabComponent::EnsureVisualComponents()
         VisualProductMesh->SetMobility(EComponentMobility::Movable);
         VisualProductMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         VisualProductMesh->SetVisibility(false);
+        VisualProductMesh->SetUsingAbsoluteRotation(true);
 
         VisualProductMesh->SetupAttachment(Hand, SocketName);
 
@@ -207,43 +221,22 @@ void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
     AActor* OwnerActor = GetOwner();
     if (IsValid(OwnerActor) && OwnerActor->HasAuthority() && bServerGrab)
     {
-        TickGrab(DeltaTime);
+        TickGrabSweep(DeltaTime);
     }
 
-    // 클라이언트는 연출 처리만 하기
-    if (VisualState == EGrabVisualState::None || GetNetMode() == NM_DedicatedServer) return;
+    // 클라이언트만 연출
+    if (GetNetMode() == NM_DedicatedServer) return;
 
-    VisualElapsedTime += DeltaTime;
-
-    if (VisualState == EGrabVisualState::Extending)
+    // 로봇손 늘어나는 위치 계산
+    if (VisualState != EGrabVisualState::None)
     {
-        // 진행 정도 확인
-        float Progress = VisualElapsedTime / VisualReachDuration;
-
-        // 연출 튀면 Clamp 필요
-        FVector CurrentLocation = FMath::Lerp(GetGrabStartLocation(), VisualTargetLocation, Progress);
-        UpdateGrabVisual(CurrentLocation);
-
-        // 상품 or 끝에 도달하면 로봇손 회수
-        if (Progress >= 1.f)
-        {
-            VisualElapsedTime = 0.f;
-            VisualState = EGrabVisualState::Returning;
-        }
+        TickGrabVisual(DeltaTime);
     }
-    else if (VisualState == EGrabVisualState::Returning)
+
+    // 상품 Pop 연출
+    if (bProductPopPlaying)
     {
-        // 진행 정도 확인
-        float Progress = VisualElapsedTime / FMath::Max(VisualReturnDuration, KINDA_SMALL_NUMBER);
-
-        // 연출 튀면 Clamp 필요
-        FVector CurrentLocation = FMath::Lerp(GetGrabStartLocation(), VisualTargetLocation, 1.f - Progress);
-        UpdateGrabVisual(CurrentLocation);
-
-        if (Progress >= 1.f)
-        {
-            FinishGrabVisual();
-        }
+        TickProductPopVisual(DeltaTime);
     }
 }
 
@@ -435,7 +428,7 @@ void UCartGrabComponent::RefreshGrabTick()
     SetComponentTickEnabled(bServerTick || bVisualTick);
 }
 
-void UCartGrabComponent::TickGrab(float DeltaTime)
+void UCartGrabComponent::TickGrabSweep(float DeltaTime)
 {
     // 이전값과 현재값 세팅
     float PreviousDistance = ServerGrabCurrentDistance;
@@ -462,6 +455,11 @@ void UCartGrabComponent::TickGrab(float DeltaTime)
     if (ServerGrabCurrentDistance >= ServerGrabMaxDistance - KINDA_SMALL_NUMBER)
     {
         bServerGrab = false;
+
+        // 실패시 나이아가라 이펙트 Multicast
+        FVector FailLocation = ServerGrabStartLocation + ServerGrabDirection * ServerGrabMaxDistance;
+        FailLocation.Z = ServerGrabStartLocation.Z + GrabFailEffectOffset;
+        Multicast_PlayGrabFailEffect(FailLocation);
 
         // 서버에서 회수 처리
         float ReturnDuration = ServerGrabMaxDistance / FMath::Max(GrabSpeed, 1.f);
@@ -676,14 +674,129 @@ void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
 
     // 원본 상품은 가리기
     Product->SetActorHiddenInGame(true);
+
+    StartProductPopVisual();
+
+    if (ProductGrabPickupEffect)
+    {
+        UWorld* World = GetWorld();
+        if (!IsValid(World)) return;
+
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            World,
+            ProductGrabPickupEffect,
+            VisualProductMesh->GetComponentLocation(),
+            FRotator::ZeroRotator,
+            FVector::OneVector,
+            true
+        );
+    }
 }
 
 void UCartGrabComponent::HideVisualProductMesh()
 {
+    bProductPopPlaying = false;
+
     if (VisualProductMesh)
     {
+        VisualProductMesh->SetRelativeScale3D(ProductPopBaseScale);
         VisualProductMesh->SetVisibility(false);
         VisualProductMesh->SetStaticMesh(nullptr);
+    }
+}
+
+void UCartGrabComponent::TickGrabVisual(float DeltaTime)
+{
+    VisualElapsedTime += DeltaTime;
+
+    if (VisualState == EGrabVisualState::Extending)
+    {
+        // 진행 정도 확인
+        float Progress = VisualElapsedTime / VisualReachDuration;
+
+        // 연출 튀면 Clamp 필요
+        FVector CurrentLocation = FMath::Lerp(GetGrabStartLocation(), VisualTargetLocation, Progress);
+        UpdateGrabVisual(CurrentLocation);
+
+        // 상품 or 끝에 도달하면 로봇손 회수
+        if (Progress >= 1.f)
+        {
+            VisualElapsedTime = 0.f;
+            VisualState = EGrabVisualState::Returning;
+        }
+    }
+    else if (VisualState == EGrabVisualState::Returning)
+    {
+        // 진행 정도 확인
+        float Progress = VisualElapsedTime / FMath::Max(VisualReturnDuration, KINDA_SMALL_NUMBER);
+
+        // 연출 튀면 Clamp 필요
+        FVector CurrentLocation = FMath::Lerp(GetGrabStartLocation(), VisualTargetLocation, 1.f - Progress);
+        UpdateGrabVisual(CurrentLocation);
+
+        if (Progress >= 1.f)
+        {
+            FinishGrabVisual();
+        }
+    }
+}
+
+void UCartGrabComponent::StartProductPopVisual()
+{
+    if (!IsValid(VisualProductMesh)) return;
+
+    // 연출용 메시의 스케일값 가져오기, 되돌릴때 참고하는 용도
+    ProductPopBaseScale = VisualProductMesh->GetRelativeScale3D();
+    ProductPopElapsedTime = 0.f;
+    bProductPopPlaying = true;
+
+    VisualProductMesh->SetRelativeScale3D(ProductPopBaseScale * ProductPopMinScale);
+}
+
+void UCartGrabComponent::TickProductPopVisual(float DeltaTime)
+{
+    if (!IsValid(VisualProductMesh))
+    {
+        bProductPopPlaying = false;
+        return;
+    }
+
+    ProductPopElapsedTime += DeltaTime;
+
+    float Progress = FMath::Clamp(
+        ProductPopElapsedTime / FMath::Max(ProductPopDuration, KINDA_SMALL_NUMBER),
+        0.f,
+        1.f
+    );
+
+    float ScaleValue = 0.f;
+
+    if (Progress < ProductPopIncreaseDuration)
+    {
+        // min -> max 로 커지기
+        ScaleValue = FMath::Lerp(
+            ProductPopMinScale,
+            ProductPopMaxScale,
+            Progress / ProductPopIncreaseDuration
+        );
+    }
+    else
+    {
+        // max -> 1.f 로 돌아오기
+        ScaleValue = FMath::Lerp(
+            ProductPopMaxScale,
+            1.f,
+            (Progress - ProductPopIncreaseDuration) / (1.f - ProductPopIncreaseDuration)
+        );
+    }
+
+    VisualProductMesh->SetRelativeScale3D(ProductPopBaseScale * ScaleValue);
+
+    // 로봇손 연출보다 먼저 끝날 수도 있으니 체크해서 연출 끄기
+    if (Progress >= 1.f)
+    {
+        bProductPopPlaying = false;
+        VisualProductMesh->SetRelativeScale3D(ProductPopBaseScale);
     }
 }
 
@@ -786,4 +899,22 @@ void UCartGrabComponent::UpdateAimDecal(const FVector& Target)
     if (!IsValid(AimDecal)) return;
 
     AimDecal->SetWorldLocation(Target);
+}
+
+void UCartGrabComponent::Multicast_PlayGrabFailEffect_Implementation(FVector_NetQuantize EffectLocation)
+{
+    if (GetNetMode() == NM_DedicatedServer) return;
+    if (!GrabFailDustEffect) return;
+
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return;
+
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        World,
+        GrabFailDustEffect,
+        EffectLocation,
+        FRotator::ZeroRotator,
+        FVector::OneVector,
+        true
+    );
 }
