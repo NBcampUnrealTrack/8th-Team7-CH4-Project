@@ -6,7 +6,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
-#include "GameInstanceSubsystem/MainGameInstanceSubsystem.h"
+#include "GameInstance/GameInstanceSubsystem/MainGameInstanceSubsystem.h"
 #include "GameMode/LobbyGameMode.h"
 #include "GameState/LobbyGameState.h"
 #include "Kismet/GameplayStatics.h"

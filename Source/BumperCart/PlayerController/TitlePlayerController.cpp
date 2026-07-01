@@ -1,10 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PlayerController/TitleTestPlayerController.h"
+#include "PlayerController/TitlePlayerController.h"
 #include "Blueprint/UserWidget.h"
 
-void ATitleTestPlayerController::BeginPlay()
+void ATitlePlayerController::BeginPlay()
 {
     Super::BeginPlay();
 

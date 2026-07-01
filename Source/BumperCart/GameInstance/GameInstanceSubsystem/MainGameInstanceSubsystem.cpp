@@ -1,6 +1,6 @@
 // MainGameInstanceSubsystem.cpp
 
-#include "GameInstanceSubsystem/MainGameInstanceSubsystem.h"
+#include "GameInstance/GameInstanceSubsystem/MainGameInstanceSubsystem.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
 #include "OnlineSessionSettings.h"
@@ -183,7 +183,7 @@ void UMainGameInstanceSubsystem::OnCreateSessionComplete(FName SessionName, bool
     UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 생성 성공: %s"), *SessionName.ToString());
 
    //?listen이 핵심 해당 클라이언트가 서버가 되는 부분
-    GetWorld()->ServerTravel(TEXT("/Game/Developers/LSJae/Levels/TestLobbyLevel?listen"));
+    GetWorld()->ServerTravel(TEXT("/Game/BumperCart/Map/L_RoomLobby?listen"));
 }
 
 void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
@@ -392,3 +392,4 @@ int32 UMainGameInstanceSubsystem::GetFoundSessionCount() const
     if (!SearchSettings.IsValid()) return 0;
     return SearchSettings->SearchResults.Num();
 }
+
