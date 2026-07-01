@@ -37,7 +37,7 @@ IOnlineIdentityPtr UMainGameInstanceSubsystem::GetIdentityInterface() const
 }
 
 
-
+// 로그인
 void UMainGameInstanceSubsystem::Login(const FString& CredentialName)
 {
     IOnlineIdentityPtr Identity = GetIdentityInterface();
@@ -51,20 +51,35 @@ void UMainGameInstanceSubsystem::Login(const FString& CredentialName)
 
     FOnlineAccountCredentials Credentials;
     //개발자 테스트용
-
+    /*
     Credentials.Type = TEXT("Developer");
     Credentials.Id = TEXT("Localhost:7777");
     Credentials.Token = CredentialName;
 
 
     //패키징 테스트용
-    /*
+
     Credentials.Type = TEXT("AccountPortal");
     Credentials.Id = TEXT("");
     Credentials.Token = TEXT("");
     */
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] 로그인 시도 - Credential: %s"), *CredentialName);
+
+#if WITH_EDITOR
+    // 에디터(PIE) 환경 - DevAuthTool을 이용한 개발자 테스트용 로그인
+    Credentials.Type  = TEXT("Developer");
+    Credentials.Id    = TEXT("Localhost:7777");
+    Credentials.Token = CredentialName;
+
+    UE_LOG(LogTemp, Log, TEXT("[EOS] (Editor) Developer 로그인 시도 - Credential: %s"), *CredentialName);
+#else
+    // 배포 빌드 - AccountPortal을 통한 실제 로그인 (Id/Token은 EOS가 자동 처리)
+    Credentials.Type  = TEXT("AccountPortal");
+    Credentials.Id    = TEXT("");
+    Credentials.Token = TEXT("");
+
+    UE_LOG(LogTemp, Log, TEXT("[EOS] (Build) AccountPortal 로그인 시도"));
+#endif
 
     Identity->ClearOnLoginCompleteDelegates(0, this);
     Identity->OnLoginCompleteDelegates[0].AddUObject(this, &UMainGameInstanceSubsystem::OnLoginComplete);
@@ -102,8 +117,12 @@ void UMainGameInstanceSubsystem::OnLoginComplete(int32 LocalUserNum, bool bWasSu
 }
 
 //세션 호스팅(리슨서버)
-void UMainGameInstanceSubsystem::HostListenServer()
+void UMainGameInstanceSubsystem::HostListenServer(const FString& InRoomName, const FString& InRoomPassword)
 {
+    //호스팅할 방 정보
+    RoomName     = InRoomName;
+    RoomPassword = InRoomPassword;
+
     IOnlineSessionPtr Sessions = GetSessionInterface();
     if (!Sessions.IsValid()) return;
 
@@ -116,18 +135,32 @@ void UMainGameInstanceSubsystem::HostListenServer()
         return;
     }
 
+    CreateSessionInternal();
+}
+
+void UMainGameInstanceSubsystem::CreateSessionInternal()
+{
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid()) return;
 
     //세션 세팅
     FOnlineSessionSettings SessionSettings;
-    SessionSettings.bIsDedicated          = false;   // 리슨 서버
+    SessionSettings.bIsDedicated          = false;  // 리슨 서버
     SessionSettings.bIsLANMatch           = false;
-    SessionSettings.bShouldAdvertise      = true;    // 검색 가능
+    SessionSettings.bShouldAdvertise      = true;   // 검색 가능
     SessionSettings.bAllowJoinInProgress  = true;
-    SessionSettings.bUsesPresence         = false;    // 친구 초대/프레즌스
+    SessionSettings.bUsesPresence         = false;  // 친구 초대/프레즌스
     SessionSettings.bAllowInvites         = true;
-    SessionSettings.bUseLobbiesIfAvailable= true;    // EOS Lobby 사용 권장
-    SessionSettings.NumPublicConnections  = 4;
+    SessionSettings.bUseLobbiesIfAvailable= true;   // EOS Lobby 사용
+    SessionSettings.NumPublicConnections  = 4;      // 최대 인원 수
     SessionSettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineDataAdvertisementType::ViaOnlineService);
+
+    // 방 제목 - 검색 결과에서 UI에 표시하기 위해 온라인 서비스로 광고
+    SessionSettings.Set(SETTING_ROOMNAME, RoomName, EOnlineDataAdvertisementType::ViaOnlineService);
+    // 방 비밀번호
+    SessionSettings.Set(SETTING_ROOMPASSWORD, RoomPassword, EOnlineDataAdvertisementType::ViaOnlineService);
+    // 방장 이름(DevAuthTool 활용한 로컬 테스트 시 이름 변수가 자동으로 채워지지 않아서 커스텀 세팅 진행)
+    SessionSettings.Set(SETTING_OWNERNAME, CachedDisplayName, EOnlineDataAdvertisementType::ViaOnlineService);
 
     Sessions->OnCreateSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnCreateSessionComplete);
     Sessions->CreateSession(0, NAME_GameSession, SessionSettings);
@@ -164,7 +197,7 @@ void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, boo
     if (bWasSuccessful)
     {
         // 기존 세션 정리가 끝났으니 다시 호스팅 시도
-        HostListenServer();
+        CreateSessionInternal();
     }
     else
     {
@@ -215,7 +248,9 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
     OnSessionsFound.Broadcast(SearchSettings->SearchResults.Num());
 }
 
-void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index)
+
+
+void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& InputPassWord)
 {
     IOnlineSessionPtr Sessions = GetSessionInterface();
 
@@ -227,9 +262,24 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index)
         return;
     }
 
+    const FOnlineSessionSearchResult& Result = SearchSettings->SearchResults[Index];
+
+    // 방에 설정된 비밀번호와 입력값 비교
+    FString StoredPassword;
+    Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, StoredPassword);
+
+    if (!StoredPassword.IsEmpty() && StoredPassword != InputPassWord)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비밀번호가 일치하지 않습니다. (Index: %d)"), Index);
+        OnJoinPasswordIncorrect.Broadcast();
+        return;
+    }
+
+
+    Result.Session.SessionSettings.Get(SETTING_ROOMNAME, RoomName);
 
     Sessions->OnJoinSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnJoinSessionComplete);
-    Sessions->JoinSession(0, NAME_GameSession, SearchSettings->SearchResults[Index]);
+    Sessions->JoinSession(0, NAME_GameSession, Result);
 }
 
 void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
@@ -250,7 +300,7 @@ void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoi
                 APlayerController* PC = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController(GetWorld()) : nullptr;
                 if (PC)
                 {
-                    // 💡 만약 주소가 EOS: 로 시작하는데 언리얼 엔진이 드라이버 매핑을 못 다룬다면,
+                    // 만약 주소가 EOS: 로 시작하는데 언리얼 엔진이 드라이버 매핑을 못 다룬다면,
                     // 주소 앞에 명시적으로 프로토콜 포맷(bIsUsingP2PSockets에 대응하는 포맷)을 강제해 봅니다.
                     if (!ConnectString.StartsWith(TEXT("EOS:")))
                     {
@@ -260,7 +310,7 @@ void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoi
                     }
                     else
                     {
-                        // 💡 핵심: 언리얼 엔진의 NetDriverEOS가 주소를 명확히 인지하도록
+                        // 언리얼 엔진의 NetDriverEOS가 주소를 명확히 인지하도록
                         // 에디터/플러그인 버그 방지용 강제 파싱 포맷 적용
                         FString ForcedEOSURL = ConnectString;
 
@@ -293,4 +343,28 @@ void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoi
         UE_LOG(LogTemp, Warning, TEXT("[EOS] 알 수 없는 오류로 조인 실패."));
         break;
     }
+}
+
+FString UMainGameInstanceSubsystem::GetFoundSessionRoomName(int32 Index) const
+{
+    if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return FString();
+
+    FString FoundRoomName;
+    SearchSettings->SearchResults[Index].Session.SessionSettings.Get(SETTING_ROOMNAME, FoundRoomName);
+    return FoundRoomName;
+}
+
+FString UMainGameInstanceSubsystem::GetFoundSessionOwnerName(int32 Index) const
+{
+    if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return FString();
+
+    FString FoundOwnerName;
+    SearchSettings->SearchResults[Index].Session.SessionSettings.Get(SETTING_OWNERNAME, FoundOwnerName);
+    return FoundOwnerName;
+}
+
+int32 UMainGameInstanceSubsystem::GetFoundSessionCount() const
+{
+    if (!SearchSettings.IsValid()) return 0;
+    return SearchSettings->SearchResults.Num();
 }

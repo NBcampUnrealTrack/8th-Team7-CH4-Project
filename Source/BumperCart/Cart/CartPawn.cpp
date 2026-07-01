@@ -15,6 +15,9 @@
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+#include "UObject/ConstructorHelpers.h"
+#include "NiagaraComponent.h"
 
 ACartPawn::ACartPawn()
 {
@@ -25,7 +28,7 @@ ACartPawn::ACartPawn()
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	//이동 컴포넌트 기본 세팅 (수치는 B2에서 본격 튜닝)
+	//이동 컴포넌트 기본 세팅
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->bOrientRotationToMovement = false; //Yaw는 우리가 직접 제어
@@ -43,14 +46,14 @@ ACartPawn::ACartPawn()
 	//카메라: 고정 쿼터뷰. 카트가 회전해도 각도는 고정되고 위치만 따라간다.
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 800.f; //쿼터뷰 — 카트 메시 크기에 맞춰 당겨옴
-	CameraBoom->SetRelativeRotation(FRotator(-55.f, 0.f, 0.f)); //아래로 비스듬히 내려봄
+	CameraBoom->TargetArmLength = 800.f; //쿼터뷰
+	CameraBoom->SetRelativeRotation(FRotator(-55.f, 0.f, 0.f)); //아래로 비스듬히
 	CameraBoom->bUsePawnControlRotation = false;
 	CameraBoom->bInheritPitch = false; //카트 회전과 무관하게 각도 고정
 	CameraBoom->bInheritYaw = false;
 	CameraBoom->bInheritRoll = false;
-	CameraBoom->bDoCollisionTest = false; //탑다운이라 벽에 카메라가 당겨지지 않게
-	CameraBoom->bEnableCameraLag = true; //위치만 부드럽게 따라감
+	CameraBoom->bDoCollisionTest = false; //벽에 카메라가 당겨지지 않게
+	CameraBoom->bEnableCameraLag = true; //위치만 따라감
 	CameraBoom->CameraLagSpeed = 8.f;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -60,8 +63,24 @@ ACartPawn::ACartPawn()
 	//적재 컴포넌트(C 상품 시스템) 부착. 적재율 연동은 BeginPlay에서 이벤트 바인딩
 	LoadComponent = CreateDefaultSubobject<UCartLoadComponent>(TEXT("CartLoadComponent"));
 
+    //임시 효과음 기본값 (정식 사운드 작업 때 교체)
+    static ConstructorHelpers::FObjectFinder<USoundBase> BumpSoundFinder(TEXT("/Game/Developers/dbals/Audio/Bump.Bump"));
+    if (BumpSoundFinder.Succeeded()) { BumpSound = BumpSoundFinder.Object; }
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> BoostSoundFinder(TEXT("/Game/Developers/dbals/Audio/Boost2.Boost2"));
+    if (BoostSoundFinder.Succeeded()) { BoostSound = BoostSoundFinder.Object; }
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> BrakeSoundFinder(TEXT("/Game/Developers/dbals/Audio/Brake.Brake"));
+    if (BrakeSoundFinder.Succeeded()) { BrakeSound = BrakeSoundFinder.Object; }
+
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
     GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
+
+    //속도감 FX: 카트 바닥에 부착 (지면 높이로 내림). Niagara 에셋은 Stage2에서 지정
+    SpeedLineFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SpeedLineFX"));
+    SpeedLineFX->SetupAttachment(RootComponent);
+    SpeedLineFX->SetRelativeLocation(FVector(0.f, 0.f, -88.f)); //캡슐 바닥(지면) — 메시에 맞춰 조정
+    SpeedLineFX->SetAutoActivate(true);
 }
 
 void ACartPawn::BeginPlay()
@@ -128,21 +147,36 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 	else
 	{
-		//미끄럼 중엔 감속을 거의 없애 미끄러지게 한다(브레이크 무시), 평소엔 기본값
-		Move->BrakingDecelerationWalking = bIsSlipping ? SlipBrakingDeceleration : DefaultBrakingDeceleration;
+		float EffectiveThrottle = ThrottleInput;
 
-		if (!FMath::IsNearlyZero(ThrottleInput))
-		{
-			//카트가 바라보는 방향으로 전/후진 (미끄럼 중에도 빠져나오려 가속은 가능)
-			AddMovementInput(GetActorForwardVector(), ThrottleInput);
-		}
+	    //부스터 중 후진 무시
+	    if (bIsBoosting)
+	    {
+	        EffectiveThrottle = 1.f;
+	    }
+
+	    //전진 중 후진 => 약한 감속
+ 	    const bool bReverseWhileForward = (EffectiveThrottle < 0.f && ForwardSpeed > 10.f);
+
+	    //미끄럼 > 전진중후진(약한 감속, 무게 반영) > 평소 기본값
+	    if (bIsSlipping)
+	        Move->BrakingDecelerationWalking = SlipBrakingDeceleration;
+	    else if (bReverseWhileForward)
+	        Move->BrakingDecelerationWalking = ReverseSlideDeceleration * LoadBrakeMul;
+	    else
+	        Move->BrakingDecelerationWalking = DefaultBrakingDeceleration;
+
+	    if (!bReverseWhileForward && !FMath::IsNearlyZero(EffectiveThrottle))
+	    {
+	        AddMovementInput(GetActorForwardVector(), EffectiveThrottle);
+	    }
 	}
 
 	//--- 조향 (A/D = Yaw 회전). 입력을 부드럽게 따라가 회전 지연감을 준다 ---
 	CurrentSteer = FMath::FInterpTo(CurrentSteer, SteerInput, DeltaSeconds, SteerInterpSpeed);
 	if (!FMath::IsNearlyZero(CurrentSteer))
 	{
-		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용 (카트 특유의 둔한 조향)
+		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용
 		const float Speed = Move->Velocity.Size2D();
 		const float SpeedAlpha = FMath::Clamp(Speed / FMath::Max(DefaultMaxWalkSpeed, 1.f), 0.f, 1.f);
 		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
@@ -160,7 +194,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		SlipSpinRemainingDeg -= Step;
 	}
 
-	//--- B5: 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
+	//--- B5 : 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
 	//입력 기반이라 서버가 모름 => 내 카트(소유 클라)에서 판정, RequestSpill이 서버로 전달
 	if (bIsBoosting && IsLocallyControlled())
 	{
@@ -178,6 +212,45 @@ void ACartPawn::Tick(float DeltaSeconds)
 			BoostTurnAccumDeg = 0.f;
 		}
 	}
+
+    //--- 카메라 속도감 연출 ---
+    if (IsLocallyControlled() && CameraBoom && FollowCamera)
+    {
+        //속도 기반 알파 (0=저속, 1=고속)
+        const float SpeedAlpha = FMath::Clamp(Move->Velocity.Size2D() / FMath::Max(SpeedZoomFullSpeed, 1.f), 0.f, 1.f);
+
+        //속도로 FOV·암길이 보간
+        float TargetArm = FMath::Lerp(CameraArmMin, CameraArmMax, SpeedAlpha);
+        float TargetFov = FMath::Lerp(CameraFovMin, CameraFovMax, SpeedAlpha);
+        if (bIsBoosting)
+        {
+            TargetArm += BoostExtraArm;
+            TargetFov += BoostExtraFov;
+        }
+
+        //튐 방지로 부드럽게 보간
+        CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArm, DeltaSeconds, CameraZoomInterpSpeed);
+        FollowCamera->FieldOfView   = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFov, DeltaSeconds, CameraZoomInterpSpeed);
+
+    }
+
+    //--- 속도감 FX 바닥 스피드라인 (월드 FX) ---
+    if (SpeedLineFX)
+    {
+        const float SpeedAlpha = FMath::Clamp(ForwardSpeed / FMath::Max(SpeedLineFullSpeed, 1.f), 0.f, 1.f);
+        SpeedLineFX->SetVariableFloat(FName("SpeedAlpha"), SpeedAlpha);
+        SpeedLineFX->SetVariableFloat(FName("Boost"), bIsBoosting ? 1.f : 0.f);
+    }
+
+    if (IsLocallyControlled()   && !HasAuthority())
+    {
+        const float Yaw =GetActorRotation().Yaw;
+        if (!FMath::IsNearlyEqual(Yaw, LastSentYaw, 0.1f))
+        {
+            LastSentYaw = Yaw;
+            ServerSetCartYaw(Yaw);
+        }
+    }
 
 	//충돌 세기 계산용: 이번 프레임 속도를 저장 (다음 프레임 NotifyHit에서 '충돌 직전' 속도로 사용)
 	PreviousVelocity = GetVelocity();
@@ -315,10 +388,16 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	DOREPLIFETIME_CONDITION(ACartPawn, bIsBoosting, COND_SkipOwner);
 }
 
-//[B5-②] 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
+//B5 : 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
 bool ACartPawn::ServerSetBoosting_Validate(bool bNewBoosting)
 {
 	return true;
+}
+
+//회전 갱신
+void ACartPawn::ServerSetCartYaw_Implementation(float Yaw)
+{
+    SetActorRotation(FRotator(0.f, Yaw, 0.f));
 }
 
 void ACartPawn::ServerSetBoosting_Implementation(bool bNewBoosting)
@@ -382,7 +461,8 @@ void ACartPawn::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadI
 	}
 }
 
-//B4: 카트끼리 부딪히면 충격 세기만큼 상품을 쏟는다 (비물리라 속도로 의사 충격량 계산)
+//카트끼리 부딪히면 충격 세기만큼 상품을 쏟는다
+//카트가 IBumpable 대상(다른 카트·차단벽·장애물)에 부딪히면 충격 세기만큼 상품을 쏟는다
 void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
 {
 	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
@@ -393,34 +473,38 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		return;
 	}
 
-	//카트끼리만: 상대가 다른 카트일 때만 (벽/장애물은 무시)
-	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
-	if (!OtherCart || OtherCart == this)
+	if (!Other || Other == this)
 	{
 		return;
 	}
 
-	//비물리 카트라 NotifyHit 시점엔 GetVelocity()가 이미 0으로 깎이는 프레임이 있어, '충돌 직전' 프레임 속도(캐시)를 쓴다
-	const FVector RelativeVelocity = PreviousVelocity - OtherCart->PreviousVelocity;
+	//IBumpable(퍼블릭 상속/BP 인터페이스 추가)을 구현한 대상에만 충돌 연출+드롭. 그 외(일반 벽 등)는 그냥 막힘
+	if (!Other->GetClass()->ImplementsInterface(UBumpable::StaticClass()))
+	{
+		return;
+	}
 
-	//두 카트 중심을 잇는 선 방향(수평면) — 접근 중인지(충돌) vs 멀어지는지(튕겨남/접촉 유지) 판정에만 사용
-	const FVector ToOther = (OtherCart->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	//상대가 카트면 그 카트의 '충돌 직전' 속도를, 아니면(차단벽·장애물 등 정적) 0으로
+	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
+	const FVector OtherVel = OtherCart ? OtherCart->PreviousVelocity : FVector::ZeroVector;
+	const FVector RelativeVelocity = PreviousVelocity - OtherVel;
+
+	//두 액터 중심을 잇는 선 방향(수평면) — 접근 중(충돌)인지 판정에만 사용
+	const FVector ToOther = (Other->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 	const float Approach = FVector::DotProduct(RelativeVelocity, ToOther);
 	if (Approach <= 0.f)
 	{
-		return; //서로 멀어지는 중이면 충돌로 치지 않음 (접촉 유지 프레임의 closing=0 폭탄 제거)
+		return; //서로 멀어지는 중이면 충돌로 치지 않음
 	}
 
 	//충돌 세기 = 상대속도 크기(2D). 부딪힌 각도와 무관하게 일관됨
 	const float ClosingSpeed = RelativeVelocity.Size2D();
-
 	if (ClosingSpeed < MinBumpSpeed)
 	{
 		return; //약하게 스치는 접촉은 무시
 	}
 
-	//충돌 연출: 이 카트를 조종하는 클라 화면만 흔든다 (서버 → 소유 클라 Client RPC, 슬립과 동일한 클라측 연출)
-	//충돌이 셀수록 쉐이크도 더 세게: 접근속도 [MinBumpSpeed..BumpShakeFullSpeed] => 배율 [BumpShakeScale..BumpShakeMaxScale]
+	//충돌 연출: 이 카트를 조종하는 클라 화면만 흔든다 (서버 → 소유 클라 Client RPC)
 	if (BumpCameraShakeClass)
 	{
 		if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -433,19 +517,20 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		}
 	}
 
-	//충돌음: 소유 클라에서 재생 (쉐이크와 동일 — 서버에서 Client RPC)
+	//충돌음: 소유 클라에서 재생
 	ClientPlayBumpSound();
 
-	//[B5-②] 충돌 역할 판정 (서버 기준 부스터 상태로)
+	//드롭 역할 판정 — 카트끼리만 부스터 역할, 벽/장애물은 Normal
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 	if (bIsBoosting)
 	{
-		DropRole = EDropCollisionRole::BoosterInstigator;   //내가 부스터로 박음 => 덜 흘림
+		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터로 박음 => 덜 흘림
 	}
-	else if (OtherCart->bIsBoosting)
+	else if (OtherCart && OtherCart->bIsBoosting)
 	{
-		DropRole = EDropCollisionRole::BoostedTarget;        //부스터한테 박힘 => 더 흘림
+		DropRole = EDropCollisionRole::BoostedTarget; //부스터한테 박힘 => 더 흘림
 	}
+
 	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
 }
 
@@ -474,9 +559,32 @@ void ACartPawn::RequestSpill(float Impulse, EDropCollisionRole DropRole)
 	}
 	LastBumpDropTime = Now;
 
-	//[임시] B5-② 역할 확인용 - 검증 후 제거
+	//B5확인용 - 검증 후 제거
 	UE_LOG(LogBumperCart, Log, TEXT("Spill role=%d impulse=%.0f"), (int32)DropRole, Impulse);
 
 	//C가 개수 판정 + 실제 드롭 (서버=즉시, 클라=서버 RPC)
 	LoadComponent->RequestDropProduct(Impulse, DropRole);
+}
+
+//외부에서 카트를 강제로 밀어내기
+void ACartPawn::ApplyExternalKnockback(const FVector& Direction, float Strength)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (Strength <= 0.0f)
+    {
+        return;
+    }
+
+    const FVector KnockbackDirection = Direction.GetSafeNormal2D();
+    if (KnockbackDirection.IsNearlyZero())
+    {
+        return;
+    }
+
+    const FVector LaunchVelocity = KnockbackDirection * Strength;
+    LaunchCharacter(LaunchVelocity, true, false);
 }

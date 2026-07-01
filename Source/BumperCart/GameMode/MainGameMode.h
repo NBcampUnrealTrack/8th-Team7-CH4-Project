@@ -31,6 +31,7 @@ protected:
 
     virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
+    //라운드 시작
     void StartRound();
 
     // 0.25초마다 호출되어 다음 Phase에 도달했는지 체크
@@ -53,11 +54,19 @@ private:
 
     FTimerHandle Timer_RoundTick;
 
-    static constexpr float TickInterval = 0.25f;
+    const float TickInterval = 0.25f;
 
     UPROPERTY()
     ACheckoutManager* CheckoutManagerRef;
 
+    // 모든 플레이어 로비로 복귀
+    void ReturnAllPlayersToLobby();
+
+    // 결과창 노출 시간
+    UPROPERTY(EditDefaultsOnly, Category = "Round Schedule")
+    float ResultScreenDuration = 5.f;
+
+    FTimerHandle Timer_ReturnToLobby;
 
 #pragma region EventManager
 private:

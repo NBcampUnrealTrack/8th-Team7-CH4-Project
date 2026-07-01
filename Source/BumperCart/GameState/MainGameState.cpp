@@ -11,6 +11,7 @@ void AMainGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
     DOREPLIFETIME(AMainGameState, CurrentPhase);
     DOREPLIFETIME(AMainGameState, RoundStartServerTime);
+    DOREPLIFETIME(AMainGameState, FinalWinnerNames)
 }
 
 void AMainGameState::SetRoundPhase(ERoundPhase NewPhase)
@@ -53,4 +54,21 @@ float AMainGameState::GetRemainingTime() const
 void AMainGameState::OnRep_CurrentPhase()
 {
     OnRoundPhaseChanged.Broadcast();
+}
+
+//서버에서만 호출 - 최종 1등 명단 저장
+void AMainGameState::SetFinalWinners(const TArray<FString>& InWinnerNames)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    FinalWinnerNames = InWinnerNames;
+}
+
+//최종 1등 명단 조회
+TArray<FString> AMainGameState::GetFinalWinners() const
+{
+    return FinalWinnerNames;
 }

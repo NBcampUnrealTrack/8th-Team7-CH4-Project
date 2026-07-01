@@ -24,7 +24,7 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 
     if (ALobbyGameState* GS = GetGameState<ALobbyGameState>())
     {
-        GS->RefreshPlayerNames();
+        GS->RefreshPlayerInfos();
     }
 }
 
@@ -35,7 +35,7 @@ void ALobbyGameMode::Logout(AController* Exiting)
 
     if (ALobbyGameState* GS = GetGameState<ALobbyGameState>())
     {
-        GS->RefreshPlayerNames();
+        GS->RefreshPlayerInfos();
     }
 }
 
@@ -45,6 +45,7 @@ void ALobbyGameMode::BeginPlay()
 
 }
 
+//게임 시작(게임 맵으로 이동)
 void ALobbyGameMode::StartGame()
 {
     if (!HasAuthority()) return;
@@ -54,6 +55,13 @@ void ALobbyGameMode::StartGame()
     {
         UE_LOG(LogTemp, Warning, TEXT("[Lobby] 인원이 부족하여 게임을 시작할 수 없습니다. 현재 인원: %d"),
             GS ? GS->PlayerArray.Num() : 0);
+        return;
+    }
+
+    //모든 플레이어 준비완료 확인
+    if (!GS->bIsAllPlayersReady())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Lobby] 아직 모든 플레이어가 준비 완료 상태가 아니므로 게임을 시작할 수 없습니다."));
         return;
     }
 
