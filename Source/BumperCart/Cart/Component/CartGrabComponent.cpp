@@ -55,6 +55,9 @@ UCartGrabComponent::UCartGrabComponent()
     ProductPopBaseScale = FVector::OneVector;
     ProductPopIncreaseDuration = 0.35f;
 
+    // 실패 연출 변수
+    GrabFailEffectOffset = 20.f;
+
     // 조준선 갱신 관련
     CachedAimDirection = FVector::ZeroVector;
     CachedAimTargetLocation = FVector::ZeroVector;
@@ -452,6 +455,11 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
     if (ServerGrabCurrentDistance >= ServerGrabMaxDistance - KINDA_SMALL_NUMBER)
     {
         bServerGrab = false;
+
+        // 실패시 나이아가라 이펙트 Multicast
+        FVector FailLocation = ServerGrabStartLocation + ServerGrabDirection * ServerGrabMaxDistance;
+        FailLocation.Z = ServerGrabStartLocation.Z + GrabFailEffectOffset;
+        Multicast_PlayGrabFailEffect(FailLocation);
 
         // 서버에서 회수 처리
         float ReturnDuration = ServerGrabMaxDistance / FMath::Max(GrabSpeed, 1.f);
@@ -891,4 +899,22 @@ void UCartGrabComponent::UpdateAimDecal(const FVector& Target)
     if (!IsValid(AimDecal)) return;
 
     AimDecal->SetWorldLocation(Target);
+}
+
+void UCartGrabComponent::Multicast_PlayGrabFailEffect_Implementation(FVector_NetQuantize EffectLocation)
+{
+    if (GetNetMode() == NM_DedicatedServer) return;
+    if (!GrabFailDustEffect) return;
+
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return;
+
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        World,
+        GrabFailDustEffect,
+        EffectLocation,
+        FRotator::ZeroRotator,
+        FVector::OneVector,
+        true
+    );
 }

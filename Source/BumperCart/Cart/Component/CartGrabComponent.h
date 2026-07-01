@@ -143,6 +143,9 @@ private:
     // 마우스 위치에 데칼 업데이트하는 함수
     void UpdateAimDecal(const FVector& Target);
 
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayGrabFailEffect(FVector_NetQuantize EffectLocation);
+
 private:
     /* ---------------- 로봇손 연출 관련 ---------------- */
 
@@ -207,6 +210,14 @@ private:
     // 획득시 나이아가라 연출
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
     TObjectPtr<UNiagaraSystem> ProductGrabPickupEffect;
+
+    // 획득 실패 시 나이아가라 연출
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UNiagaraSystem> GrabFailDustEffect;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    float GrabFailEffectOffset;
+
 
     /* ---------------- 조준선 갱신 관련 변수들  ----------------   */
 
