@@ -89,6 +89,16 @@ private:
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayCartLoadEffect(int32 DummyIndex);
 
+    // 더미메시 인덱스 변경시 호출되는 OnRep 함수
+    UFUNCTION()
+    void OnRep_LoadDummyMeshIndices();
+
+    // 더미 메시 인덱스를 갱신하는 함수
+    void UpdateDummyMeshIndices(int32 PrevCount, int32 CurrentCount);
+
+    // 보여줄 더미 메시 인덱스 랜덤으로 얻는 함수
+    int32 GetRandomDummyMeshIndex() const;
+
 private:
     /* ---------------- 적재 연출 관련 ---------------- */
 
@@ -100,9 +110,13 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")
     TArray<FName> LoadDummySocketNames;
 
-    // 더미로 사용할 실제 메시
+    // 더미로 사용할 실제 스태틱 메시들
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")
-    TObjectPtr<UStaticMesh> LoadDummyMesh;
+    TArray<TObjectPtr<UStaticMesh>> LoadDummyMeshVariants;
+
+    // 각 더미 메시 소켓이 몇번 인덱스의 더미 메시를 쓰는지
+    UPROPERTY(ReplicatedUsing = OnRep_LoadDummyMeshIndices)
+    TArray<int32> LoadDummyMeshIndices;
 
     // 적재 시 나이아가라 연출
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")

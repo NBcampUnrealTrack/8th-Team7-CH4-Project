@@ -635,6 +635,8 @@ void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Tar
     EnsureVisualComponents();
     if (!ArmSpline || !Hand) return;
 
+    SetHandOpen(true);
+
     // 내 Pawn 이라면 조준선 끄기
     if (IsLocallyControlled())
     {
@@ -671,6 +673,8 @@ void UCartGrabComponent::FinishGrabVisual()
     VisualState = EGrabVisualState::None;
     VisualElapsedTime = 0.f;
 
+    SetHandOpen(true);
+
     if (ArmSpline)
     {
         ArmSpline->SetVisibility(false);
@@ -693,6 +697,26 @@ void UCartGrabComponent::FinishGrabVisual()
     }
 }
 
+void UCartGrabComponent::SetHandOpen(bool bIsOpen)
+{
+    if (!IsValid(Hand)) return;
+
+    if (bIsOpen)
+    {
+        if (HandMeshAsset)
+        {
+            Hand->SetStaticMesh(HandMeshAsset);
+        }
+    }
+    else
+    {
+        if (CloseHandMeshAsset)
+        {
+            Hand->SetStaticMesh(CloseHandMeshAsset);
+        }
+    }
+}
+
 void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
 {
     EnsureVisualComponents();
@@ -702,8 +726,13 @@ void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
     UStaticMesh* ProductMesh = Product->GetProductMesh();
     if (!IsValid(ProductMesh)) return;
 
+    SetHandOpen(false);
+
     VisualProductMesh->SetStaticMesh(ProductMesh);
     VisualProductMesh->SetVisibility(true);
+
+    // 닫힌손 소켓에 부착해주기
+    VisualProductMesh->AttachToComponent(Hand, FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
 
     // 원본 상품은 가리기
     Product->SetActorHiddenInGame(true);

@@ -21,6 +21,8 @@ class BUMPERCART_API AProductBase : public AActor
 public:
 	AProductBase();
 
+    virtual void Destroyed() override;
+
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     // 스폰할 때 위치 설정 및 상태를 초기화하는 함수
