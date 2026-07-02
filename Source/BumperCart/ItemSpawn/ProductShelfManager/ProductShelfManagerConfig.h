@@ -4,6 +4,8 @@
 #include "Engine/DataAsset.h"
 #include "ProductShelfManagerConfig.generated.h"
 
+class UNiagaraSystem;
+
 /**
  * 
  */
@@ -24,4 +26,8 @@ public:
     // 리스폰 딜레이
     UPROPERTY(EditAnywhere, Category = "Spawn Rules")
     float RespawnDelay = 5.0f;
+
+    // 스폰시 사용할 이펙트
+    UPROPERTY(EditAnywhere, Category = "FX")
+    TObjectPtr<UNiagaraSystem> SpawnFX;
 };

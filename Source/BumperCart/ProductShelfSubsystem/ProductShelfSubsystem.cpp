@@ -46,16 +46,17 @@ void UProductShelfSubsystem::InitializeConfig(UProductShelfManagerConfig* InConf
         MaxSpawnCount = SpawnConfig->MaxSpawnCount;
         MaxSpawnLimit = SpawnConfig->MaxSpawnLimit;
         RespawnDelay = SpawnConfig->RespawnDelay;
+        SpawnFX = SpawnConfig->SpawnFX;
 
         FString NetModeStr = (GetWorld() && GetWorld()->GetNetMode() != NM_Client) ? TEXT("서버") : TEXT("클라이언트");
         UE_LOG(LogTemp, Log, TEXT("[%s][선반매니저] 데이터 에셋 적용"), *NetModeStr);
 
         // 서버에서만
-        //if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
-        //{
-        //    // 게임 모드에서 호출시 삭제 예정 - 테스트용
-        //    GetWorld()->GetTimerManager().SetTimer(GameStartTimerHandle, this, &UProductShelfSubsystem::StartProductSpawning, RespawnDelay, false);
-        //}
+        if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
+        {
+            // 게임 모드에서 호출시 삭제 예정 - 테스트용
+            GetWorld()->GetTimerManager().SetTimer(GameStartTimerHandle, this, &UProductShelfSubsystem::StartProductSpawning, RespawnDelay, false);
+        }
     }
 }
 
@@ -94,11 +95,6 @@ void UProductShelfSubsystem::ProductSpawnCall()
                 if (IsValid(SpawnedProduct))
                 {
                     CurrentProductCount++;
-
-                    // 제품이 제거 되었을때 매니저의 현재 스폰된 수 관리를 위해
-                    // ProductBase에 SetSubsystem(AProductShelfSubsystem* InSubsystem) 추가 요청
-                    // 변수로 TObjectPtr<AProductShelfSubsystem> 추가 요청
-                    //SpawnedProduct->SetSubsystem(this);
                 }
             }
         }
