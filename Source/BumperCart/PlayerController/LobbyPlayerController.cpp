@@ -25,6 +25,7 @@ void ALobbyPlayerController::BeginPlay()
         if (LobbyWidgetInstance)
         {
             LobbyWidgetInstance->AddToViewport();
+            bShowMouseCursor = true;
         }
     }
 
