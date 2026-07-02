@@ -20,7 +20,7 @@ public:
     int32 MaxSpawnCount = 150;
 
     // 한 번에 최대 스폰 가능한 수
-    UPROPERTY(EditAnywhere, Category = "S[awn Rules")
+    UPROPERTY(EditAnywhere, Category = "Spawn Rules")
     int32 MaxSpawnLimit = 3;
 
     // 리스폰 딜레이
