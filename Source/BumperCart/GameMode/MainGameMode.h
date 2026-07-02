@@ -56,9 +56,6 @@ private:
 
     const float TickInterval = 0.25f;
 
-    UPROPERTY()
-    ACheckoutManager* CheckoutManagerRef;
-
     // 모든 플레이어 로비로 복귀
     void ReturnAllPlayersToLobby();
 
@@ -68,7 +65,7 @@ private:
 
     FTimerHandle Timer_ReturnToLobby;
 
-#pragma region EventManager
+#pragma region Managers
 private:
     /*
     UPROPERTY(EditAnywhere, Category = "GameMode | Managers")
@@ -80,6 +77,8 @@ private:
     UPROPERTY(EditAnywhere, Category = "GameMode | Managers")
     TObjectPtr<AProductShelfManager> ProductShelfManager = nullptr;
 */
+    UPROPERTY()
+    ACheckoutManager* CheckoutManagerRef;
 
     UPROPERTY(EditAnywhere, Category = "Config")
     TObjectPtr<UProductShelfManagerConfig> ProductShelfManagerConfig;
