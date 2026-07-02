@@ -66,6 +66,7 @@ void UCartLoadComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ThisClass, LoadInfo);
+    DOREPLIFETIME(ThisClass, LoadDummyMeshIndices);
 }
 
 bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
@@ -259,6 +260,8 @@ void UCartLoadComponent::UpdateLoadInfo()
 {
     if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return;
 
+    int32 PrevCount = GetVisibleDummyCount();
+
     int32 TotalWeight = 0;
     int32 Count = 0;
 
@@ -273,6 +276,10 @@ void UCartLoadComponent::UpdateLoadInfo()
 
     LoadInfo.CurrentLoadedCount = Count;
     LoadInfo.CurrentWeight = TotalWeight;
+
+    int32 CurrentCount = GetVisibleDummyCount();
+
+    UpdateDummyMeshIndices(PrevCount, CurrentCount);
 
     // 리슨 서버면 본인도 UI 갱신
     if (GetNetMode() != NM_DedicatedServer)
@@ -311,7 +318,6 @@ void UCartLoadComponent::CreateDummyMeshes()
     for (const FName& SocketName : LoadDummySocketNames)
     {
         UStaticMeshComponent* Dummy = NewObject<UStaticMeshComponent>(OwnerActor, SocketName);
-        Dummy->SetStaticMesh(LoadDummyMesh);
         Dummy->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Dummy->SetVisibility(false);
         Dummy->SetReceivesDecals(false);
@@ -323,7 +329,8 @@ void UCartLoadComponent::CreateDummyMeshes()
         LoadDummyMeshes.Add(Dummy);
     }
 
-    UpdateLoadVisual();
+    // 인덱스배열 초기화
+    LoadDummyMeshIndices.Init(INDEX_NONE, LoadDummyMeshes.Num());
 }
 
 void UCartLoadComponent::UpdateLoadVisual()
@@ -334,10 +341,29 @@ void UCartLoadComponent::UpdateLoadVisual()
     for (int32 i = 0; i < LoadDummyMeshes.Num(); ++i)
     {
         UStaticMeshComponent* Dummy = LoadDummyMeshes[i];
-        if (IsValid(Dummy))
+        if (!IsValid(Dummy)) continue;
+
+        bool bIsVisible = i < VisibleCount;
+
+        // 보여야 하면 정해진 랜덤 인덱스에 해당하는 메시 보여주기
+        if (bIsVisible)
         {
-            Dummy->SetVisibility(i < VisibleCount);
+            UStaticMesh* SelectedMesh = nullptr;
+
+            if (LoadDummyMeshIndices.IsValidIndex(i))
+            {
+                int32 Idx = LoadDummyMeshIndices[i];
+
+                if (LoadDummyMeshVariants.IsValidIndex(Idx))
+                {
+                    SelectedMesh = LoadDummyMeshVariants[Idx];
+                }
+            }
+
+            Dummy->SetStaticMesh(SelectedMesh);
         }
+
+        Dummy->SetVisibility(bIsVisible);
     }
 }
 
@@ -377,6 +403,50 @@ int32 UCartLoadComponent::GetVisibleDummyCount() const
     }
 
     return 6;
+}
+
+void UCartLoadComponent::OnRep_LoadDummyMeshIndices()
+{
+    UpdateLoadVisual();
+}
+
+void UCartLoadComponent::UpdateDummyMeshIndices(int32 PrevCount, int32 CurrentCount)
+{
+    AActor* OwnerActor = GetOwner();
+    if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
+
+    if (LoadDummyMeshIndices.Num() != LoadDummySocketNames.Num())
+    {
+        LoadDummyMeshIndices.Init(INDEX_NONE, LoadDummySocketNames.Num());
+    }
+
+    // 늘어났다면 랜덤 메시 지정
+    if (CurrentCount > PrevCount)
+    {
+        for (int32 i = PrevCount; i < CurrentCount; ++i)
+        {
+            if (!LoadDummyMeshIndices.IsValidIndex(i)) continue;
+
+            LoadDummyMeshIndices[i] = GetRandomDummyMeshIndex();
+        }
+    }
+    // 물건이 떨어져서 더미 숨겨지면 소켓 인덱스 초기화
+    else if (CurrentCount < PrevCount)
+    {
+        for (int32 i = CurrentCount; i < PrevCount; ++i)
+        {
+            if (!LoadDummyMeshIndices.IsValidIndex(i)) continue;
+
+            LoadDummyMeshIndices[i] = INDEX_NONE;
+        }
+    }
+}
+
+int32 UCartLoadComponent::GetRandomDummyMeshIndex() const
+{
+    if (LoadDummyMeshVariants.Num() <= 0) return INDEX_NONE;
+
+    return FMath::RandRange(0, LoadDummyMeshVariants.Num() - 1);
 }
 
 void UCartLoadComponent::Multicast_PlayCartLoadEffect_Implementation(int32 DummyIndex)
