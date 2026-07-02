@@ -24,6 +24,7 @@ AProductBase::AProductBase()
     Mesh->SetCollisionProfileName(TEXT("ProductPhysics"));
     Mesh->SetSimulatePhysics(false);
     Mesh->SetMobility(EComponentMobility::Movable);
+    Mesh->SetReceivesDecals(false);
     SetRootComponent(Mesh);
 
     GrabCollision = CreateDefaultSubobject<USphereComponent>(TEXT("GrabCollision"));
