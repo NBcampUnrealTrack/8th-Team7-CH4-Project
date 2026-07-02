@@ -14,6 +14,7 @@
 #include "BumperCart.h"
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
+#include "Component/CartScreenFXComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
@@ -101,6 +102,9 @@ ACartPawn::ACartPawn()
         SpeedLineFXLeft->SetAsset(SpeedLineSysFinder.Object);
         SpeedLineFXRight->SetAsset(SpeedLineSysFinder.Object);
     }
+
+    //화면 가장자리 스피드라인(부스트 중 로컬 화면) 컴포넌트. PP 머티리얼은 컴포넌트가 C++ 기본값으로 보유
+    ScreenFXComponent = CreateDefaultSubobject<UCartScreenFXComponent>(TEXT("CartScreenFXComponent"));
 }
 
 void ACartPawn::BeginPlay()
