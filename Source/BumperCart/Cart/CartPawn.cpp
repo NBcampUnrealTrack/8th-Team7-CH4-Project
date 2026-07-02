@@ -18,8 +18,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
-#include "NiagaraComponent.h"
-#include "NiagaraSystem.h"
 
 ACartPawn::ACartPawn()
 {
@@ -78,32 +76,7 @@ ACartPawn::ACartPawn()
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
     GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
 
-    //속도감 FX: 양쪽 뒷바퀴에 각각 부착 (Y=바퀴 폭, X=뒤, Z=바닥 — BP에서 미세조정). Niagara 에셋은 BP에서 지정
-    //기존 1컴포넌트(가운데)
-    //SpeedLineFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SpeedLineFX"));
-    //SpeedLineFX->SetupAttachment(RootComponent);
-    //SpeedLineFX->SetRelativeLocation(FVector(0.f, 0.f, -88.f));
-    //SpeedLineFX->SetAutoActivate(true);
-
-    SpeedLineFXLeft = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SpeedLineFXLeft"));
-    SpeedLineFXLeft->SetupAttachment(RootComponent);
-    SpeedLineFXLeft->SetRelativeLocation(FVector(-10.f, -20.f, -88.f));
-    SpeedLineFXLeft->SetAutoActivate(true);
-
-    SpeedLineFXRight = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SpeedLineFXRight"));
-    SpeedLineFXRight->SetupAttachment(RootComponent);
-    SpeedLineFXRight->SetRelativeLocation(FVector(-10.f, 20.f, -88.f));
-    SpeedLineFXRight->SetAutoActivate(true);
-
-    //Niagara 에셋 기본 지정 — BP 없이도 동작(사운드처럼 C++ 기본값). BP에서 다른 걸로 덮어도 됨
-    static ConstructorHelpers::FObjectFinder<UNiagaraSystem> SpeedLineSysFinder(TEXT("/Game/Developers/dbals/FX/NS_CartSpeedLines.NS_CartSpeedLines"));
-    if (SpeedLineSysFinder.Succeeded())
-    {
-        SpeedLineFXLeft->SetAsset(SpeedLineSysFinder.Object);
-        SpeedLineFXRight->SetAsset(SpeedLineSysFinder.Object);
-    }
-
-    //화면 가장자리 스피드라인(부스트 중 로컬 화면) 컴포넌트. PP 머티리얼은 컴포넌트가 C++ 기본값으로 보유
+    //연출(FX) 전담 컴포넌트 — 화면 스피드라인·바닥 리본·브레이크 스파크. 에셋·소켓은 BP의 이 컴포넌트에서 지정
     ScreenFXComponent = CreateDefaultSubobject<UCartScreenFXComponent>(TEXT("CartScreenFXComponent"));
 }
 
@@ -258,25 +231,6 @@ void ACartPawn::Tick(float DeltaSeconds)
 
     }
 
-    //--- 속도감 FX: 양쪽 바퀴 스피드라인 (월드 FX) ---
-    //계단식 게이트(짧은 10 램프): MinSpeed 넘으면 바로 꽉 참, 미만이면 0. 밀도는 Niagara Spawn Spacing 담당 => 어중간 듬성 제거
-    //무거우면 최고속도가 MinSpeed 아래라 자동 OFF, 부스트 땐 빨라져서 ON. 후진/느림도 0
-    const float SpeedLineAlpha = FMath::GetMappedRangeValueClamped(
-        FVector2D(SpeedLineMinSpeed, SpeedLineMinSpeed + 10.f), FVector2D(0.f, 1.f), ForwardSpeed);
-    //적재무게 => Niagara에서 굵기/길이 커브에 사용 (가벼움 0 ~ 무거움 1)
-    const float SpeedLineLoad = FMath::Clamp(LoadRatio, 0.f, 1.f);
-    //[보존] 기존 1컴포넌트
-    //if (SpeedLineFX) { SpeedLineFX->SetVariableFloat(FName("SpeedAlpha"), SpeedLineAlpha); ... }
-    auto DriveSpeedLine = [&](UNiagaraComponent* Fx)
-    {
-        if (!Fx) { return; }
-        Fx->SetVariableFloat(FName("SpeedAlpha"), SpeedLineAlpha);
-        Fx->SetVariableFloat(FName("LoadRatio"), SpeedLineLoad);
-        Fx->SetVariableFloat(FName("Boost"), bIsBoosting ? 1.f : 0.f);
-    };
-    DriveSpeedLine(SpeedLineFXLeft);
-    DriveSpeedLine(SpeedLineFXRight);
-
     if (IsLocallyControlled()   && !HasAuthority())
     {
         const float Yaw =GetActorRotation().Yaw;
@@ -362,6 +316,7 @@ void ACartPawn::OnSteerReleased(const FInputActionValue& Value)
 void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
 {
 	bIsBraking = true;
+	ServerSetBraking(true); //타 클라 스파크 연출용 (부스터와 동일 패턴)
 
 	//브레이크 효과음 (소유 클라 로컬)
 	if (BrakeSound)
@@ -373,6 +328,7 @@ void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
 void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
 {
 	bIsBraking = false;
+	ServerSetBraking(false);
 }
 
 void ACartPawn::OnBoost(const FInputActionValue& Value)
@@ -421,6 +377,7 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 
 	//소유 클라는 로컬값 유지, 서버/타 클라만 복제 (충돌 역할 판정·연출용)
 	DOREPLIFETIME_CONDITION(ACartPawn, bIsBoosting, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(ACartPawn, bIsBraking, COND_SkipOwner);
 }
 
 //B5 : 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
@@ -438,6 +395,12 @@ void ACartPawn::ServerSetCartYaw_Implementation(float Yaw)
 void ACartPawn::ServerSetBoosting_Implementation(bool bNewBoosting)
 {
 	bIsBoosting = bNewBoosting;
+}
+
+//브레이크 상태를 서버에 통지 (타 클라 스파크 연출용)
+void ACartPawn::ServerSetBraking_Implementation(bool bNewBraking)
+{
+	bIsBraking = bNewBraking;
 }
 
 //[ISlideAffectable] 외부 기믹(물웅덩이 등)이 서버에서 호출 => 모든 인스턴스에 전파
