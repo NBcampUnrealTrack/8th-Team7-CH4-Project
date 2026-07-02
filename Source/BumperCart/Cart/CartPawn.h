@@ -15,7 +15,6 @@ class UCameraShakeBase;
 class USoundBase;
 struct FInputActionValue;
 class UCartGrabComponent;
-class UNiagaraComponent;
 class UCartScreenFXComponent;
 
 UCLASS(abstract)
@@ -31,6 +30,10 @@ public:
 	//부스터 진행 중인지
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBoosting() const { return bIsBoosting; }
+
+	//브레이크 중인지 (FX 등 연출용. 타 클라에도 복제됨)
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	bool IsBraking() const { return bIsBraking; }
 
 	//현재 적재율(0~1). SetLoadRatio로 갱신
 	UFUNCTION(BlueprintCallable, Category = "Cart")
@@ -58,6 +61,10 @@ protected:
 	//B5 : 부스터 상태를 서버에 통지 (서버가 충돌 역할 판정에 사용)
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerSetBoosting(bool bNewBoosting);
+
+	//브레이크 상태를 서버에 통지 (타 클라 스파크 연출용 — 부스터와 동일 패턴)
+	UFUNCTION(Server, Reliable)
+	void ServerSetBraking(bool bNewBraking);
 
 	//미끄럼 효과를 모든 인스턴스에 전파해 각자 로컬 적용 (소유 클라의 예측 이동에도 반영)
 	UFUNCTION(NetMulticast, Reliable)
@@ -118,9 +125,9 @@ protected:
 	float SteerInterpSpeed = 5.f;
 
 	//---------- 브레이크 ----------
-	//브레이크 시 감속도
+	//브레이크 시 감속도 (낮을수록 제동거리가 길다 — 즉시 멈춤 방지, 스파크 연출 시간 확보)
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
-	float BrakeDeceleration = 2000.f;
+	float BrakeDeceleration = 1000.f;
 
     //전진 중 후진키를 눌렀을 때의 감속도 (낮을수록 천천히)
     UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
@@ -165,23 +172,8 @@ protected:
     float CameraZoomInterpSpeed = 7.f;
 
 
-    //---------- 속도감 FX (바닥 스피드라인) ----------
-    //기존 1컴포넌트
-    //UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
-    //UNiagaraComponent* SpeedLineFX;
-
-    //양쪽 뒷바퀴 속도선 (바퀴 위치는 BP의 RelativeLocation에서 조정)
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
-    UNiagaraComponent* SpeedLineFXLeft;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
-    UNiagaraComponent* SpeedLineFXRight;
-
-    //이 속도 넘으면 속도선 ON 미만이면 OFF
-    UPROPERTY(EditAnywhere, Category = "Cart|FX", meta = (ClampMin = "0"))
-    float SpeedLineMinSpeed = 500.f;
-
-    //화면 가장자리 스피드라인 (부스트 중, 로컬 화면 전용) — 컴포넌트가 PP 연출을 소유
+    //---------- 연출 (FX) ----------
+    //카트 연출 전담 컴포넌트 — 화면 스피드라인(부스트)·바닥 리본·브레이크 스파크 (에셋·소켓은 BP에서 지정)
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|FX")
     UCartScreenFXComponent* ScreenFXComponent;
 
@@ -304,6 +296,9 @@ private:
 	float ThrottleInput = 0.f;
 	float SteerInput = 0.f;
 	float CurrentSteer = 0.f; //부드럽게 보간된 조향값
+
+	//브레이크 상태 (타 클라 스파크 연출용 복제 — 부스터와 동일 패턴)
+	UPROPERTY(Replicated)
 	bool bIsBraking = false;
 
 	//부스터 상태 (bIsBoosting: 충돌 역할 판정 위해 서버 통지 + 타 클라 복제)
