@@ -7,7 +7,6 @@
 
 class USceneComponent;
 class UStaticMeshComponent;
-class UBoxComponent;
 
 UCLASS(Blueprintable)
 class BUMPERCART_API ACheckoutBarrier : public AActor, public IBumpable
@@ -16,6 +15,17 @@ class BUMPERCART_API ACheckoutBarrier : public AActor, public IBumpable
 	
 public:	
 	ACheckoutBarrier();
+
+protected:
+    virtual void BeginPlay() override;
+
+private:
+    UPROPERTY(VisibleAnywhere, Category = "Checkout|Barrier")
+    TObjectPtr<USceneComponent> SceneRoot;
+
+    // 메시
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UStaticMeshComponent> BarrierMesh;
 
 public:
     // 차단벽 활성화/비활성화
@@ -26,17 +36,6 @@ public:
     bool IsBarrierEnabled() const;
 
 private:
-    UPROPERTY(VisibleAnywhere, Category = "Checkout|Barrier")
-    TObjectPtr<USceneComponent> SceneRoot;
-
-    // 메시
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
-    TObjectPtr<UStaticMeshComponent> BarrierMesh;
-
-    // 실제 충돌 판정
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
-    TObjectPtr<UBoxComponent> BarrierCollision;
-
-    UPROPERTY(VisibleAnywhere, Category = "Checkout|Barrier")
-    bool bIsBarrierEnabled = true;
+    UPROPERTY(EditAnywhere, Category = "Checkout|Barrier")
+    bool bIsBarrierEnabled = false;
 };

@@ -2,7 +2,6 @@
 
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/BoxComponent.h"
 
 ACheckoutBarrier::ACheckoutBarrier()
 {
@@ -16,39 +15,44 @@ ACheckoutBarrier::ACheckoutBarrier()
     BarrierMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BarrierMesh"));
     BarrierMesh->SetupAttachment(SceneRoot);
 
-    // 메시는 충돌 X
+    // 에디터에서는 표시, 게임 시작 시 표시 X
+    BarrierMesh->SetVisibility(true, true);
+    BarrierMesh->SetHiddenInGame(true);
+
+    // 메시 충돌 설정
+    BarrierMesh->SetCollisionObjectType(ECC_WorldStatic);
+    BarrierMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+    BarrierMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
     BarrierMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BarrierMesh->SetGenerateOverlapEvents(false);
-
-    BarrierCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("BarrierCollision"));
-    BarrierCollision->SetupAttachment(SceneRoot);
-
-    // 충돌 설정
-    BarrierCollision->SetGenerateOverlapEvents(false);
-    BarrierCollision->SetCollisionObjectType(ECC_WorldStatic);
-    BarrierCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
-    BarrierCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
-    BarrierCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    BarrierMesh->CanCharacterStepUpOn = ECB_No; // 발판 방지
 }
 
+void ACheckoutBarrier::BeginPlay()
+{
+    Super::BeginPlay();
+
+    SetBarrierEnabled(false);
+}
 
 void ACheckoutBarrier::SetBarrierEnabled(bool bIsEnabled)
 {
     bIsBarrierEnabled = bIsEnabled;
 
-    if (IsValid(BarrierMesh))
+    if (!IsValid(BarrierMesh))
     {
-        BarrierMesh->SetVisibility(bIsEnabled, true);
+        return;
     }
 
-    if (IsValid(BarrierCollision))
-    {
-        BarrierCollision->SetCollisionEnabled(
-            bIsEnabled
-            ? ECollisionEnabled::QueryAndPhysics
-            : ECollisionEnabled::NoCollision
-        );
-    }
+    // 게임 화면 표시
+    BarrierMesh->SetHiddenInGame(!bIsEnabled);
+
+    // 충돌 설정
+    BarrierMesh->SetCollisionEnabled(
+        bIsEnabled
+        ? ECollisionEnabled::QueryOnly
+        : ECollisionEnabled::NoCollision
+    );
 }
 
 bool ACheckoutBarrier::IsBarrierEnabled() const

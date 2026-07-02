@@ -13,6 +13,13 @@ enum class ECheckoutZoneState : uint8
     Closed          // 계산대 닫힘
 };
 
+UENUM(BlueprintType)
+enum class ECheckoutBarrierType : uint8
+{
+    Side,
+    Entrance
+};
+
 USTRUCT(BlueprintType)
 struct FCheckoutScoreResult
 {
