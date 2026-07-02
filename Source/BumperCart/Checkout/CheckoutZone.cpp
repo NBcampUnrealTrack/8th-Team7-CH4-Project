@@ -543,22 +543,6 @@ bool ACheckoutZone::IsEjectPathClear(const ACartPawn* PlayerCharacter, const FVe
     return !bHasBlockingHit;
 }
 
-void ACheckoutZone::CloseCheckoutBarrier()
-{
-    if (!HasAuthority())
-    {
-        return;
-    }
-
-    // 지연 시간 동안 정산이 취소됐다면 닫지 않음
-    if (!bIsCheckoutInProgress || !IsValid(CurrentCheckoutPlayer))
-    {
-        return;
-    }
-
-    SetCheckoutBarrierEnabled(true);
-}
-
 // ------------------------------------------------------------
 // 구역 내 플레이어
 // ------------------------------------------------------------
@@ -807,26 +791,11 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
         EjectNonCheckoutPlayers();
     }
 
-    // 정산 시작 시 입구 차단벽 활성화
-    //SetCheckoutBarrierEnabled(true);
+    // 정산 시작 시 차단벽 생성 연출
+    // Reveal 연출 끝난 뒤 충돌 활성화
     if (bUseCheckoutBarrier)
     {
-        GetWorldTimerManager().ClearTimer(CheckoutBarrierCloseTimerHandle);
-
-        if (CheckoutBarrierCloseDelay <= 0.0f)
-        {
-            CloseCheckoutBarrier();
-        }
-        else
-        {
-            GetWorldTimerManager().SetTimer(
-                CheckoutBarrierCloseTimerHandle,
-                this,
-                &ThisClass::CloseCheckoutBarrier,
-                CheckoutBarrierCloseDelay,
-                false
-            );
-        }
+        SetCheckoutBarrierEnabled(true);
     }
 
     // 적재된 상품 수에 따라 추가 정산 시간
@@ -1036,8 +1005,6 @@ void ACheckoutZone::CancelCheckout()
 void ACheckoutZone::ResetCheckout()
 {
     GetWorldTimerManager().ClearTimer(CheckoutTimerHandle);
-
-    GetWorldTimerManager().ClearTimer(CheckoutBarrierCloseTimerHandle);
 
     // 정산 완료 시 벽 해제
     SetCheckoutBarrierEnabled(false);
