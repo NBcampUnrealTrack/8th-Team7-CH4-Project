@@ -124,6 +124,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0.1"))
 	float SteerInterpSpeed = 5.f;
 
+	//원격(타 클라·서버)에서 이 카트를 복제된 yaw로 따라잡는 보간 속도. 낮으면 회전이 느리게 돌고, 너무 높으면 각지게 튄다
+	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "1"))
+	float RemoteYawInterpSpeed = 15.f;
+
 	//---------- 브레이크 ----------
 	//브레이크 시 감속도 (낮을수록 제동거리가 길다 — 즉시 멈춤 방지, 스파크 연출 시간 확보)
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
@@ -319,8 +323,16 @@ private:
 	//충돌 직전 프레임의 속도 (NotifyHit 시점엔 비물리라 속도가 0으로 깎여 신뢰 불가 => Tick에서 매 프레임 캐시)
 	FVector PreviousVelocity = FVector::ZeroVector;
 
+    //카트 회전(yaw) 네트워크 동기화 — 소유자가 갱신, 비소유(타 클라·서버)는 이 값으로 보간해 따라간다
+    //RepMovement 회전이 클라 조종 카트에서 느리게/스텝으로 전파되는 문제를 우회. COND_SkipOwner(소유자는 로컬 유지)
+    UPROPERTY(Replicated)
+    float ReplicatedYaw = 0.f;
+
     //서버에 마지막으로 보낸 Yaw
     float LastSentYaw = 0.f;
+
+    //소유 클라가 전담하는 절대 회전값(도). 매 프레임 SetActorRotation으로 재확정해 서버 보정 롤백에 면역
+    float ControlledYaw = 0.f;
 
 	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
 	float BoostTurnAccumDeg = 0.f;
