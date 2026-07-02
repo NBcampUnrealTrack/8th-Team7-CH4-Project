@@ -96,6 +96,11 @@ void ACartPawn::BeginPlay()
 	{
 		LoadComponent->OnLoadInfoChanged.AddDynamic(this, &ACartPawn::HandleLoadInfoChanged);
 	}
+
+	//회전 동기화 초기값 — 스폰 방향으로 세팅 (첫 복제 전 비소유 인스턴스가 yaw=0으로 튀는 것 방지)
+	ReplicatedYaw = GetActorRotation().Yaw;
+	LastSentYaw = ReplicatedYaw;
+	ControlledYaw = ReplicatedYaw;
 }
 
 void ACartPawn::Tick(float DeltaSeconds)
@@ -169,8 +174,13 @@ void ACartPawn::Tick(float DeltaSeconds)
 	    }
 	}
 
-	//--- 조향 (A/D = Yaw 회전). 입력을 부드럽게 따라가 회전 지연감을 준다 ---
+	//--- 조향(A/D)·미끄럼 스핀을 하나의 yaw 델타로 합산 (회전은 아래에서 한 번에 적용) ---
+	//[임시 진단] 프레임 시작 시점 실제 yaw (지난 프레임 끝 이후 네트워크 되돌림 감지용)
+	const float DiagYawAtFrameStart = GetActorRotation().Yaw;
+
 	CurrentSteer = FMath::FInterpTo(CurrentSteer, SteerInput, DeltaSeconds, SteerInterpSpeed);
+	float YawDeltaTotal = 0.f;
+	float DiagSpeedFactor = 1.f;
 	if (!FMath::IsNearlyZero(CurrentSteer))
 	{
 		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용
@@ -178,17 +188,59 @@ void ACartPawn::Tick(float DeltaSeconds)
 		const float SpeedAlpha = FMath::Clamp(Speed / FMath::Max(DefaultMaxWalkSpeed, 1.f), 0.f, 1.f);
 		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
 
-		const float YawDelta = CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
-		AddActorWorldRotation(FRotator(0.f, YawDelta, 0.f));
+		YawDeltaTotal += CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
+		DiagSpeedFactor = SpeedFactor;
 	}
 
-	//--- 미끄럼 강제 스핀: 남은 스핀각을 SlipSpinSpeedDeg 속도로 풀어낸다 ---
+	//미끄럼 강제 스핀: 남은 스핀각을 SlipSpinSpeedDeg 속도로 풀어낸다 (조향과 합산)
 	if (bIsSlipping && !FMath::IsNearlyZero(SlipSpinRemainingDeg))
 	{
 		const float MaxStep = SlipSpinSpeedDeg * DeltaSeconds;
 		const float Step = FMath::Clamp(SlipSpinRemainingDeg, -MaxStep, MaxStep);
-		AddActorWorldRotation(FRotator(0.f, Step, 0.f));
+		YawDeltaTotal += Step;
 		SlipSpinRemainingDeg -= Step;
+	}
+
+	//--- 회전 적용 + 네트워크 동기화 (회전은 '소유 클라 전담') ---
+	if (IsLocallyControlled())
+	{
+		//소유자: 절대 yaw를 매 프레임 재확정 → 서버 보정 롤백에 면역 (상대 회전은 롤백 시 각도를 까먹어 클라만 느려짐)
+		ControlledYaw = FRotator::NormalizeAxis(ControlledYaw + YawDeltaTotal);
+		SetActorRotation(FRotator(0.f, ControlledYaw, 0.f));
+
+		if (HasAuthority())
+		{
+			ReplicatedYaw = ControlledYaw; //리슨 서버 호스트: 바로 복제값 갱신
+		}
+		else if (!FMath::IsNearlyEqual(ControlledYaw, LastSentYaw, 0.1f))
+		{
+			LastSentYaw = ControlledYaw;
+			ServerSetCartYaw(ControlledYaw); //클라: 서버에 통지 → 서버가 ReplicatedYaw 갱신 → 타 클라 복제
+		}
+	}
+	else
+	{
+		//비소유(타 클라·서버): 복제 yaw로 부드럽게 보간해 따라간다 (회전은 충돌 판정에 안 쓰여 보간 지연 무해)
+		const FRotator Target(0.f, ReplicatedYaw, 0.f);
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), Target, DeltaSeconds, RemoteYawInterpSpeed));
+	}
+
+	//[임시 진단] 로컬 조종 카트에서 0.25초마다 회전 값 로깅 — 검증 후 제거
+	//  적용Δ는 호스트/클라 같은데 실제간Δ가 클라만 음수/작으면 = 네트워크 되돌림(이번 fix가 절대 yaw로 덮어씀)
+	if (IsLocallyControlled())
+	{
+		const float DiagActualDelta = FMath::FindDeltaAngleDegrees(DiagLastYaw, DiagYawAtFrameStart);
+		DiagLogTimer += DeltaSeconds;
+		if (!FMath::IsNearlyZero(YawDeltaTotal) && DiagLogTimer >= 0.25f)
+		{
+			DiagLogTimer = 0.f;
+			UE_LOG(LogBumperCart, Warning,
+				TEXT("[CartYaw] Auth=%d Load=%.2f LoadMul=%.2f Speed=%.0f SpdF=%.2f Steer=%.2f 적용Δ=%.2f 실제간Δ=%.2f(지난적용%.2f)"),
+				HasAuthority() ? 1 : 0, LoadRatio, LoadTurnMul, Move->Velocity.Size2D(),
+				DiagSpeedFactor, CurrentSteer, YawDeltaTotal, DiagActualDelta, DiagAppliedYaw);
+		}
+		DiagLastYaw = GetActorRotation().Yaw;
+		DiagAppliedYaw = YawDeltaTotal;
 	}
 
 	//--- B5 : 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
@@ -229,16 +281,6 @@ void ACartPawn::Tick(float DeltaSeconds)
         CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArm, DeltaSeconds, CameraZoomInterpSpeed);
         FollowCamera->FieldOfView   = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFov, DeltaSeconds, CameraZoomInterpSpeed);
 
-    }
-
-    if (IsLocallyControlled()   && !HasAuthority())
-    {
-        const float Yaw =GetActorRotation().Yaw;
-        if (!FMath::IsNearlyEqual(Yaw, LastSentYaw, 0.1f))
-        {
-            LastSentYaw = Yaw;
-            ServerSetCartYaw(Yaw);
-        }
     }
 
 	//충돌 세기 계산용: 이번 프레임 속도를 저장 (다음 프레임 NotifyHit에서 '충돌 직전' 속도로 사용)
@@ -378,6 +420,8 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	//소유 클라는 로컬값 유지, 서버/타 클라만 복제 (충돌 역할 판정·연출용)
 	DOREPLIFETIME_CONDITION(ACartPawn, bIsBoosting, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(ACartPawn, bIsBraking, COND_SkipOwner);
+	//회전 yaw: 소유자는 로컬 회전을 쓰므로 제외, 비소유(타 클라)만 복제받아 보간
+	DOREPLIFETIME_CONDITION(ACartPawn, ReplicatedYaw, COND_SkipOwner);
 }
 
 //B5 : 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
@@ -386,10 +430,10 @@ bool ACartPawn::ServerSetBoosting_Validate(bool bNewBoosting)
 	return true;
 }
 
-//회전 갱신
+//회전 갱신 — 클라가 보낸 yaw를 복제 프로퍼티에만 반영 (서버 권한 회전은 Tick의 else 분기가 ReplicatedYaw로 세팅)
 void ACartPawn::ServerSetCartYaw_Implementation(float Yaw)
 {
-    SetActorRotation(FRotator(0.f, Yaw, 0.f));
+    ReplicatedYaw = Yaw;
 }
 
 void ACartPawn::ServerSetBoosting_Implementation(bool bNewBoosting)
