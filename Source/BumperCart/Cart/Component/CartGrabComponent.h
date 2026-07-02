@@ -14,6 +14,7 @@ class UStaticMeshComponent;
 class UNiagaraComponent;
 class UNiagaraSystem;
 class UDecalComponent;
+class USoundBase;
 
 UENUM(BlueprintType)
 enum class EGrabVisualState : uint8
@@ -143,8 +144,12 @@ private:
     // 마우스 위치에 데칼 업데이트하는 함수
     void UpdateAimDecal(const FVector& Target);
 
+    // 그랩 실패 이펙트 멀티캐스트 함수
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayGrabFailEffect(FVector_NetQuantize EffectLocation);
+
+    // 로컬 플레이어인지 확인하는 함수
+    bool IsLocallyControlled() const;
 
 private:
     /* ---------------- 로봇손 연출 관련 ---------------- */
@@ -218,6 +223,8 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
     float GrabFailEffectOffset;
 
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
+    TObjectPtr<USoundBase> GrabSuccessSound;
 
     /* ---------------- 조준선 갱신 관련 변수들  ----------------   */
 

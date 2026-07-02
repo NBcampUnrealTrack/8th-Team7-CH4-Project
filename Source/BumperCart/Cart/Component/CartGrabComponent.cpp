@@ -15,6 +15,8 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Components/DecalComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "UObject/ConstructorHelpers.h"
 
 
 namespace NiagaraParamName
@@ -82,6 +84,14 @@ UCartGrabComponent::UCartGrabComponent()
     GrabRadius = 10.f;
     bCanGrab = true;
     SocketName = TEXT("ProductSocket");
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> GrabSuccessFinder(
+        TEXT("/Game/Developers/dongh/Audio/CoinCollectSound.CoinCollectSound")
+    );
+    if (GrabSuccessFinder.Succeeded())
+    {
+        GrabSuccessSound = GrabSuccessFinder.Object;
+    }
 }
 
 void UCartGrabComponent::SetupInput()
@@ -691,6 +701,14 @@ void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
             true
         );
     }
+
+    if (IsLocallyControlled())
+    {
+        if (GrabSuccessSound)
+        {
+            UGameplayStatics::PlaySound2D(this, GrabSuccessSound);
+        }
+    }
 }
 
 void UCartGrabComponent::HideVisualProductMesh()
@@ -917,4 +935,10 @@ void UCartGrabComponent::Multicast_PlayGrabFailEffect_Implementation(FVector_Net
         FVector::OneVector,
         true
     );
+}
+
+bool UCartGrabComponent::IsLocallyControlled() const
+{
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    return IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled();
 }

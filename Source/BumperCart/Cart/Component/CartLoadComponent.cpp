@@ -7,6 +7,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "UObject/ConstructorHelpers.h"
 
 
 UCartLoadComponent::UCartLoadComponent()
@@ -35,7 +37,18 @@ UCartLoadComponent::UCartLoadComponent()
         LoadDummySocketNames.Add(SocketName);
     }
 
-    Initialize();
+    LoadInfo.CurrentLoadedCount = 0;
+    LoadInfo.CurrentWeight = 0;
+
+    LoadedProducts.Reset();
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> LoadSoundFinder(
+        TEXT("/Game/Developers/dongh/Audio/MoneyPickupSound.MoneyPickupSound")
+    );
+    if (LoadSoundFinder.Succeeded())
+    {
+        LoadSound = LoadSoundFinder.Object;
+    }
 }
 
 void UCartLoadComponent::BeginPlay()
@@ -53,14 +66,6 @@ void UCartLoadComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ThisClass, LoadInfo);
-}
-
-void UCartLoadComponent::Initialize()
-{
-    LoadInfo.CurrentLoadedCount = 0;
-    LoadInfo.CurrentWeight = 0;
-
-    LoadedProducts.Reset();
 }
 
 bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
@@ -377,10 +382,10 @@ void UCartLoadComponent::Multicast_PlayCartLoadEffect_Implementation(int32 Dummy
 {
     if (GetNetMode() == NM_DedicatedServer) return;
 
-    AActor* OwnerActor = GetOwner();
-    if (!IsValid(OwnerActor)) return;
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (!IsValid(OwnerPawn)) return;
 
-    FVector EffectLocation = OwnerActor->GetActorLocation();
+    FVector EffectLocation = OwnerPawn->GetActorLocation();
 
     if (LoadDummyMeshes.IsValidIndex(DummyIndex) && IsValid(LoadDummyMeshes[DummyIndex]))
     {
@@ -400,6 +405,14 @@ void UCartLoadComponent::Multicast_PlayCartLoadEffect_Implementation(int32 Dummy
             FVector::OneVector,
             true
         );
+    }
+
+    if (OwnerPawn->IsLocallyControlled())
+    {
+        if (LoadSound)
+        {
+            UGameplayStatics::PlaySound2D(this, LoadSound);
+        }
     }
 }
 
