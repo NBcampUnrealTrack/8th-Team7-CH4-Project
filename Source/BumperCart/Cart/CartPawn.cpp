@@ -175,12 +175,8 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 
 	//--- 조향(A/D)·미끄럼 스핀을 하나의 yaw 델타로 합산 (회전은 아래에서 한 번에 적용) ---
-	//[임시 진단] 프레임 시작 시점 실제 yaw (지난 프레임 끝 이후 네트워크 되돌림 감지용)
-	const float DiagYawAtFrameStart = GetActorRotation().Yaw;
-
 	CurrentSteer = FMath::FInterpTo(CurrentSteer, SteerInput, DeltaSeconds, SteerInterpSpeed);
 	float YawDeltaTotal = 0.f;
-	float DiagSpeedFactor = 1.f;
 	if (!FMath::IsNearlyZero(CurrentSteer))
 	{
 		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용
@@ -189,7 +185,6 @@ void ACartPawn::Tick(float DeltaSeconds)
 		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
 
 		YawDeltaTotal += CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
-		DiagSpeedFactor = SpeedFactor;
 	}
 
 	//미끄럼 강제 스핀: 남은 스핀각을 SlipSpinSpeedDeg 속도로 풀어낸다 (조향과 합산)
@@ -223,24 +218,6 @@ void ACartPawn::Tick(float DeltaSeconds)
 		//비소유(타 클라·서버): 복제 yaw로 부드럽게 보간해 따라간다 (회전은 충돌 판정에 안 쓰여 보간 지연 무해)
 		const FRotator Target(0.f, ReplicatedYaw, 0.f);
 		SetActorRotation(FMath::RInterpTo(GetActorRotation(), Target, DeltaSeconds, RemoteYawInterpSpeed));
-	}
-
-	//[임시 진단] 로컬 조종 카트에서 0.25초마다 회전 값 로깅 — 검증 후 제거
-	//  적용Δ는 호스트/클라 같은데 실제간Δ가 클라만 음수/작으면 = 네트워크 되돌림(이번 fix가 절대 yaw로 덮어씀)
-	if (IsLocallyControlled())
-	{
-		const float DiagActualDelta = FMath::FindDeltaAngleDegrees(DiagLastYaw, DiagYawAtFrameStart);
-		DiagLogTimer += DeltaSeconds;
-		if (!FMath::IsNearlyZero(YawDeltaTotal) && DiagLogTimer >= 0.25f)
-		{
-			DiagLogTimer = 0.f;
-			UE_LOG(LogBumperCart, Warning,
-				TEXT("[CartYaw] Auth=%d Load=%.2f LoadMul=%.2f Speed=%.0f SpdF=%.2f Steer=%.2f 적용Δ=%.2f 실제간Δ=%.2f(지난적용%.2f)"),
-				HasAuthority() ? 1 : 0, LoadRatio, LoadTurnMul, Move->Velocity.Size2D(),
-				DiagSpeedFactor, CurrentSteer, YawDeltaTotal, DiagActualDelta, DiagAppliedYaw);
-		}
-		DiagLastYaw = GetActorRotation().Yaw;
-		DiagAppliedYaw = YawDeltaTotal;
 	}
 
 	//--- B5 : 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---

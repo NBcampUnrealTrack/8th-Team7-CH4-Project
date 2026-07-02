@@ -334,11 +334,6 @@ private:
     //소유 클라가 전담하는 절대 회전값(도). 매 프레임 SetActorRotation으로 재확정해 서버 보정 롤백에 면역
     float ControlledYaw = 0.f;
 
-    //[임시 진단] 회전 느림 원인 추적용 — 검증 후 제거
-    float DiagLogTimer = 0.f;
-    float DiagLastYaw = 0.f;
-    float DiagAppliedYaw = 0.f;
-
 	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
 	float BoostTurnAccumDeg = 0.f;
 
