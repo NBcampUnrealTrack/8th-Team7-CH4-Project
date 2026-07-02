@@ -15,6 +15,8 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Components/DecalComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "UObject/ConstructorHelpers.h"
 
 
 namespace NiagaraParamName
@@ -82,6 +84,30 @@ UCartGrabComponent::UCartGrabComponent()
     GrabRadius = 10.f;
     bCanGrab = true;
     SocketName = TEXT("ProductSocket");
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> GrabSuccessSoundFinder(
+        TEXT("/Game/Developers/dongh/Audio/GrabSuccess.GrabSuccess")
+    );
+    if (GrabSuccessSoundFinder.Succeeded())
+    {
+        GrabSuccessSound = GrabSuccessSoundFinder.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> GrabFailSoundFinder(
+        TEXT("/Game/Developers/dongh/Audio/GrabFail.GrabFail")
+    );
+    if (GrabFailSoundFinder.Succeeded())
+    {
+        GrabFailSound = GrabFailSoundFinder.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> GrabLaunchSoundFinder(
+        TEXT("/Game/Developers/dongh/Audio/SimpleWhoosh.SimpleWhoosh")
+    );
+    if (GrabLaunchSoundFinder.Succeeded())
+    {
+        GrabLaunchSound = GrabLaunchSoundFinder.Object;
+    }
 }
 
 void UCartGrabComponent::SetupInput()
@@ -157,6 +183,7 @@ void UCartGrabComponent::EnsureVisualComponents()
         ArmSpline->SetMobility(EComponentMobility::Movable);
         ArmSpline->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         ArmSpline->SetVisibility(false);
+        ArmSpline->SetReceivesDecals(false);
 
         if (ArmMeshAsset)
         {
@@ -177,6 +204,7 @@ void UCartGrabComponent::EnsureVisualComponents()
         Hand->SetMobility(EComponentMobility::Movable);
         Hand->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Hand->SetVisibility(false);
+        Hand->SetReceivesDecals(false);
 
         if (HandMeshAsset)
         {
@@ -196,6 +224,7 @@ void UCartGrabComponent::EnsureVisualComponents()
         VisualProductMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         VisualProductMesh->SetVisibility(false);
         VisualProductMesh->SetUsingAbsoluteRotation(true);
+        VisualProductMesh->SetReceivesDecals(false);
 
         VisualProductMesh->SetupAttachment(Hand, SocketName);
 
@@ -607,10 +636,14 @@ void UCartGrabComponent::PlayGrabVisual(const FVector& Start, const FVector& Tar
     if (!ArmSpline || !Hand) return;
 
     // 내 Pawn 이라면 조준선 끄기
-    APawn* OwnerPawn = Cast<APawn>(GetOwner());
-    if (IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled())
+    if (IsLocallyControlled())
     {
         SetAimVisual(false);
+
+        if (GrabLaunchSound)
+        {
+            UGameplayStatics::PlaySound2D(this, GrabLaunchSound);
+        }
     }
 
     VisualStartLocation = Start;
@@ -690,6 +723,14 @@ void UCartGrabComponent::ShowVisualProductMesh(AProductBase* Product)
             FVector::OneVector,
             true
         );
+    }
+
+    if (IsLocallyControlled())
+    {
+        if (GrabSuccessSound)
+        {
+            UGameplayStatics::PlaySound2D(this, GrabSuccessSound);
+        }
     }
 }
 
@@ -917,4 +958,18 @@ void UCartGrabComponent::Multicast_PlayGrabFailEffect_Implementation(FVector_Net
         FVector::OneVector,
         true
     );
+
+    if (IsLocallyControlled())
+    {
+        if (GrabFailSound)
+        {
+            UGameplayStatics::PlaySound2D(this, GrabFailSound);
+        }
+    }
+}
+
+bool UCartGrabComponent::IsLocallyControlled() const
+{
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    return IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled();
 }

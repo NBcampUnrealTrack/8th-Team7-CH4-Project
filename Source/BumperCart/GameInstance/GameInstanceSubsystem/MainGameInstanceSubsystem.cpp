@@ -393,3 +393,18 @@ int32 UMainGameInstanceSubsystem::GetFoundSessionCount() const
     return SearchSettings->SearchResults.Num();
 }
 
+void UMainGameInstanceSubsystem::UpdateRoomDifficulty(bool bHardMode)
+{
+    //호스트만 난이도 변경가능하게 방지
+    const ENetMode CurrentNetMode = GetWorld() ? GetWorld()->GetNetMode() : NM_MAX;
+    if (CurrentNetMode != NM_ListenServer && CurrentNetMode != NM_Standalone)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 방장(호스트)만 난이도를 변경할 수 있습니다."));
+        return;
+    }
+
+    if (bIsHardMode == bHardMode) return;
+
+    bIsHardMode = bHardMode;
+    UE_LOG(LogTemp, Warning, TEXT("[Room] 난이도 변경: %s"), bIsHardMode ? TEXT("HardMode") : TEXT("NormalMode"));
+}

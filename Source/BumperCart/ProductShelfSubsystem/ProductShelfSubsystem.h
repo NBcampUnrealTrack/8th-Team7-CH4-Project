@@ -8,6 +8,7 @@
 
 class AProductShelf;
 class UProductShelfManagerConfig;
+class UNiagaraSystem;
 
 /**
  * 
@@ -74,15 +75,16 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
     float RespawnDelay = 10.0f;
 
+    // 스폰시 사용할 이펙트
+    UPROPERTY(EditAnywhere, Category = "FX")
+    TObjectPtr<UNiagaraSystem> SpawnFX;
+
 public:
     // 제품 스폰 호출
     void ProductSpawnCall();
 
     // 스폰된 아이템이 파괴되었을 떄
     void OnProductDestroyed();
-    
-    FORCEINLINE int32 GetCurrentProductCount() const { return CurrentProductCount; }
-    FORCEINLINE void SetMaxSpawnCount(int32 SpawnCount) { MaxSpawnCount = SpawnCount; }
 
     // 게임 시작시 호출
     void StartProductSpawning();
@@ -91,6 +93,10 @@ public:
     FTimerHandle GameStartTimerHandle;
 
     void InitializeConfig(UProductShelfManagerConfig* InConfig);
+
+    FORCEINLINE int32 GetCurrentProductCount() const { return CurrentProductCount; }
+    FORCEINLINE void SetMaxSpawnCount(int32 SpawnCount) { MaxSpawnCount = SpawnCount; }
+    FORCEINLINE UNiagaraSystem* GetSpawnFX() const { return SpawnFX; }
 
 #pragma endregion
 

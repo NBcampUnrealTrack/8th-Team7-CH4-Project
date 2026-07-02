@@ -3,6 +3,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/TargetPoint.h"
 #include "WaterHoleGimmick/WaterHoleGimmick.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+#include "MapGimmickManager/NPCRushGimmick/NPCRushGimmick.h"
 
 AMapGimmickManager::AMapGimmickManager()
 {
@@ -17,12 +20,12 @@ void AMapGimmickManager::BeginPlay()
 
     if (!HasAuthority()) return;
 
-    // 맵에 있는 'GimmickPoint' 태그가 붙어있는 타겟포인트 가져오기
     TArray<AActor*> FoundActors;
     UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATargetPoint::StaticClass(), FoundActors);
 
     for (AActor* Actor : FoundActors)
     {
+        // 맵에 있는 'GimmickPoint' 태그가 붙어있는 타겟포인트 가져오기
         if (Actor && Actor->ActorHasTag(FName("GimmickPoint")))
         {
             ATargetPoint* SpawnPoint = Cast<ATargetPoint>(Actor);
@@ -31,95 +34,30 @@ void AMapGimmickManager::BeginPlay()
                 GimmickSpawnPointList.Add(SpawnPoint);
             }
         }
+        // 맵에 있는 'NPCRushPoint' 태그가 붙어있는 타겟포인트 가져오기
+        else if (Actor && Actor->ActorHasTag(FName("NPCRushPoint")))
+        {
+            ATargetPoint* SpawnPoint = Cast<ATargetPoint>(Actor);
+            if (SpawnPoint)
+            {
+                NPCRushStartPointList.Add(SpawnPoint);
+            }
+        }
     }
 
     UE_LOG(LogTemp, Log, TEXT("[MapGimmickManager] 총 타겟 포인트 갯수 : %d "), GimmickSpawnPointList.Num());
 
 
-    // 게임 모드에서 호출시 삭제 예정
-    StartGimmickSpawning();
+    // 테스트용 - 게임 모드에서 호출시 삭제 예정
+    //StartGimmickSpawning();
+    //StartNPCRush();
 }
 
 void AMapGimmickManager::StartGimmickSpawning()
 {
     RespawnObstacles();
 
-    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnObstacles, WaterHoleRespawnInterval, true);
-}
-
-void AMapGimmickManager::RespawnWaterHole()
-{
-    if (!HasAuthority()) return;
-
-    ClearAllWaterHole();
-
-    SpawnWaterHole();
-}
-
-void AMapGimmickManager::ClearAllWaterHole()
-{
-    if (!HasAuthority()) return;
-
-    for (AWaterHoleGimmick* WaterHole : SpawnedWaterHoles)
-    {
-        if (IsValid(WaterHole))
-        {
-            WaterHole->Destroy();
-        }
-    }
-
-    SpawnedWaterHoles.Empty();
-
-    UE_LOG(LogTemp, Warning, TEXT("[GimmickManager] 기존 물 웅덩이 정리완료"));
-}
-
-void AMapGimmickManager::SpawnWaterHole()
-{
-    if (!HasAuthority()) return;
-
-    if (!IsValid(WaterHoleClass))
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GimmickManager] 물 웅덩이 클래스가 없습니다"));
-        return;
-    }
-
-    if (GimmickSpawnPointList.Num() == 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[GimmickManager] 저장된 타겟 포인트가 없습니다"));
-        return;
-    }
-
-    for (int32 i = GimmickSpawnPointList.Num() - 1; i > 0; --i)
-    {
-        int32 RandomIndex = FMath::RandRange(0, i);
-        GimmickSpawnPointList.Swap(i, RandomIndex);
-    }
-
-    int32 FinalSpawnCount = FMath::Min(TotalWaterHoleSpawnCount, GimmickSpawnPointList.Num());
-
-    for (int32 i = 0; i < FinalSpawnCount; i++)
-    {
-        ATargetPoint* TargetPoint = GimmickSpawnPointList[i];
-        if (IsValid(TargetPoint))
-        {
-            FVector SpawnLocation = TargetPoint->GetActorLocation();
-            FRotator SpawnRotation = TargetPoint->GetActorRotation();
-
-            AWaterHoleGimmick* SpawnedWaterHole = GetWorld()->SpawnActor<AWaterHoleGimmick>(WaterHoleClass, SpawnLocation, SpawnRotation);
-            if (IsValid(SpawnedWaterHole))
-            {
-                SpawnedWaterHoles.Add(SpawnedWaterHole);
-            }
-        }
-    }
-
-    UE_LOG(LogTemp, Log, TEXT("[GimmickManager] 물 웅덩이 %d개 스폰"), FinalSpawnCount);
-
-}
-
-void AMapGimmickManager::EndSpawnWaterHole()
-{
-    ClearAllWaterHole();
+    GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnObstacles, ObstacleRespawnInterval, true);
 }
 
 void AMapGimmickManager::SpawnObstacles()
@@ -141,7 +79,7 @@ void AMapGimmickManager::SpawnObstacles()
 
     for (const FObstacleSpawnInfo& Info : ObstacleSpawnList)
     {
-        if (IsValid(Info.ObstacleClass)) continue;
+        if (!IsValid(Info.ObstacleClass)) continue;
 
         for (int32 i = 0; i < Info.SpawnCount; ++i)
         {
@@ -198,3 +136,38 @@ void AMapGimmickManager::EndSpawnObstacle()
     ClearAllObstacles();
 }
 
+void AMapGimmickManager::StartNPCRush()
+{
+    for (int32 i = NPCRushStartPointList.Num() - 1; i > 0; --i)
+    {
+        int32 RandomIndex = FMath::RandRange(0, i);
+        if (i != RandomIndex)
+        {
+            NPCRushStartPointList.Swap(i, RandomIndex);
+        }
+    }
+
+    int32 RandomPoint = FMath::RandRange(0, NPCRushStartPointList.Num() - 1);
+    ATargetPoint* TargetPoint = NPCRushStartPointList[RandomPoint];
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = this;
+    SpawnParams.Instigator = GetInstigator();
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    if (IsValid(TargetPoint))
+    {
+        if (UWorld* World = GetWorld())
+        {
+            FVector SpawnLocation = TargetPoint->GetActorLocation();
+            FRotator SpawnRotation = TargetPoint->GetActorRotation();
+
+            ANPCRushGimmick* SpawnedGimmick = GetWorld()->SpawnActor<ANPCRushGimmick>(NPCRushGimmick, SpawnLocation, SpawnRotation, SpawnParams);
+
+            if (IsValid(SpawnedGimmick))
+            {
+                UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 시작"))
+            }
+        }
+    }
+}

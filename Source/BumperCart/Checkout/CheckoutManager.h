@@ -23,6 +23,22 @@ protected:
 	virtual void BeginPlay() override;
 
 // ------------------------------------------------------------
+// 차단벽 설정
+// ------------------------------------------------------------
+public:
+    // 모든 계산대에 차단벽 사용 여부 적용
+    UFUNCTION(BlueprintCallable, Category = "CheckoutManager|Barrier")
+    void SetUseCheckoutBarrier(bool bUseBarrier);
+
+    UFUNCTION(BlueprintPure, Category = "CheckoutManager|Barrier")
+    bool IsUsingCheckoutBarrier() const;
+
+private:
+    // 게임 시작 전 기본 설정값
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CheckoutManager|Barrier",meta = (AllowPrivateAccess = "true"))
+    bool bUseCheckoutBarrier = true;
+
+// ------------------------------------------------------------
 // 계산대 목록 및 세팅
 // ------------------------------------------------------------
 

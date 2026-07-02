@@ -13,6 +13,7 @@ class AProductBase;
 class UStaticMeshComponent;
 class UStaticMesh;
 class UNiagaraSystem;
+class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnLoadInfoChanged,
@@ -28,9 +29,6 @@ class BUMPERCART_API UCartLoadComponent : public UActorComponent
 
 public:
     UCartLoadComponent();
-
-    // 기본 값으로 초기화하는 함수
-    void Initialize();
 
     // 상품 적재를 시도하는 함수
     bool TryAddProduct(AProductBase* Product);
@@ -109,6 +107,9 @@ private:
     // 적재 시 나이아가라 연출
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Load|Visual")
     TObjectPtr<UNiagaraSystem> LoadEffect;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
+    TObjectPtr<USoundBase> LoadSound;
 
 
     /* ---------------- 적재 관리 변수 ---------------- */
