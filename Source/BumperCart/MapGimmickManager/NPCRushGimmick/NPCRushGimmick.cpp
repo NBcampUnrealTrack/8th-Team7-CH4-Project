@@ -54,5 +54,10 @@ void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 
         Destroy();
     }
+
+    if (ACartPawn* HitPlayer = Cast<ACartPawn>(OtherActor))
+    {
+        UE_LOG(LogTemp, Log, TEXT("[NPCRush] 플레이어 오버랩 감지"));
+    }
 }
 
