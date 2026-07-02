@@ -17,7 +17,7 @@ UCartLoadComponent::UCartLoadComponent()
 
     SetIsReplicatedByDefault(true);
 
-    MaxWeight = 20;
+    MaxWeight = 40;
     WeightScaling = 0.5f;
 
     BoosterInstigatorDropMultiplier = 0.4f;
@@ -314,6 +314,7 @@ void UCartLoadComponent::CreateDummyMeshes()
         Dummy->SetStaticMesh(LoadDummyMesh);
         Dummy->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Dummy->SetVisibility(false);
+        Dummy->SetReceivesDecals(false);
         Dummy->SetupAttachment(CartMesh, SocketName);
 
         OwnerActor->AddInstanceComponent(Dummy);

@@ -188,6 +188,10 @@ private:
     // 현재 연출 상태
     EGrabVisualState VisualState;
 
+    // 로봇손 발사 사운드
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
+    TObjectPtr<USoundBase> GrabLaunchSound;
+
 
     /* ---------------- 상품 획득 연출 관련  ----------------   */
     // Pop Scale 연출
@@ -225,6 +229,9 @@ private:
 
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
     TObjectPtr<USoundBase> GrabSuccessSound;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
+    TObjectPtr<USoundBase> GrabFailSound;
 
     /* ---------------- 조준선 갱신 관련 변수들  ----------------   */
 
