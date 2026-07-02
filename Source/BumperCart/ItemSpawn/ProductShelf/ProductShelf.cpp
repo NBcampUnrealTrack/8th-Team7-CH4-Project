@@ -6,6 +6,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
+#include "NiagaraSystem.h"
+#include "NiagaraFunctionLibrary.h"
 
 AProductShelf::AProductShelf()
 {
@@ -100,7 +102,23 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
             // 힘을 가해 튕겨내기
             PhysComp->AddImpulse(RandomDir * LaunchForce, NAME_None, true);
 
-            SpawnedProduct->SetLifeSpan(30.0f);
+            //SpawnedProduct->SetLifeSpan(30.0f);
+
+            if (UWorld* World = GetWorld())
+            {
+                if (IsValid(SpawnFX))
+                {
+                    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+                        World,
+                        SpawnFX,
+                        SpawnLocation,
+                        SpawnRotation,
+                        FVector(1.0f),
+                        true,
+                        true
+                        );
+                }
+            }
         }
 
         UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());

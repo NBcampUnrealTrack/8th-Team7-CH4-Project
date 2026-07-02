@@ -45,11 +45,13 @@ private:
     UPROPERTY()
     TArray<TObjectPtr<class ATargetPoint>> GimmickSpawnPointList;
 
+    // NPCRush 시작 위치
     UPROPERTY()
     TArray<TObjectPtr<class ATargetPoint>> NPCRushStartPointList;
 
 #pragma endregion
 
+// 모든 장애물 관리 및 스폰
 #pragma region Gimmick
 private:
     UPROPERTY()
@@ -86,6 +88,7 @@ public:
 
 #pragma endregion
 
+// 맵을 횡단하는 장애물 기믹
 #pragma region NPC Rush
 private:
     UPROPERTY(EditAnywhere, Category = "Gimmick | NPC Rush")
