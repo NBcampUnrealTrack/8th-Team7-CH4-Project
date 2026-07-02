@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 #include "EventManager/BC_EventSubsystem.h"
+#include "MapGimmickManager/MapGimmickManager.h"
 #include "PlayerState/MainPlayerState.h"
 
 class AMainPlayerState;
@@ -63,6 +64,12 @@ void AMainGameMode::BeginPlay()
     else
     {
         UE_LOG(LogMainGameMode, Error, TEXT("월드에서 CheckoutManager를 찾을 수 없습니다!"));
+    }
+
+    AActor* FoundActor2 = UGameplayStatics::GetActorOfClass(GetWorld(), AMapGimmickManager::StaticClass());
+    if (FoundActor2)
+    {
+        MapGimmickManager = Cast<AMapGimmickManager>(FoundActor2);
     }
 
 
@@ -182,6 +189,11 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         {
             // 스폰 시작 함수 호출
             ShelfSubsystem->StartProductSpawning();
+        }
+
+        if (MapGimmickManager)
+        {
+            MapGimmickManager->StartGimmickSpawning();
         }
 
         break;

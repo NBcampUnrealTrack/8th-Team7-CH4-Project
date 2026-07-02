@@ -11,6 +11,7 @@ class ACheckoutManager; // 계산대 매니저
 class UProductShelfManagerConfig;
 class USaleEventConfig;
 class ULimitedEventConfig;
+class AMapGimmickManager;
 
 UCLASS()
 class BUMPERCART_API AMainGameMode : public AGameMode
@@ -67,16 +68,10 @@ private:
 
 #pragma region Managers
 private:
-    /*
-    UPROPERTY(EditAnywhere, Category = "GameMode | Managers")
-    TObjectPtr<ABC_EventManager> BC_EventManager = nullptr;
 
     UPROPERTY(EditAnywhere, Category = "GameMode | Managers")
-    TObjectPtr<AMapGimmickManager> MapGimmickManager = nullptr;
+    AMapGimmickManager* MapGimmickManager;
 
-    UPROPERTY(EditAnywhere, Category = "GameMode | Managers")
-    TObjectPtr<AProductShelfManager> ProductShelfManager = nullptr;
-*/
     UPROPERTY()
     ACheckoutManager* CheckoutManagerRef;
 
@@ -88,12 +83,8 @@ private:
 
     UPROPERTY(EditAnywhere, Category = "Config")
     TObjectPtr<ULimitedEventConfig> LimitedEventConfig;
-    /*
-public:
-    // 게임모드를 통해 매니저를 찾을 수 있도록 Getter
-    FORCEINLINE AProductShelfManager* GetProductShelfManager() const { return ProductShelfManager; }
-    FORCEINLINE AMapGimmickManager* GetMapGimmickManager() const { return MapGimmickManager; }
-    FORCEINLINE ABC_EventManager * GetBC_EventManager () const { return BC_EventManager ; }
-    */
+
+
+
 #pragma endregion
 };

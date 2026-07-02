@@ -131,7 +131,7 @@ void AMapGimmickManager::RespawnObstacles()
     SpawnObstacles();
 
     // 테스트용
-    //StartNPCRush();
+    StartNPCRush();
 }
 
 void AMapGimmickManager::EndSpawnObstacle()
