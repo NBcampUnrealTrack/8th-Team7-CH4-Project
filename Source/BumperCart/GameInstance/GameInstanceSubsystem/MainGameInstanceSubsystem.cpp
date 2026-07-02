@@ -64,21 +64,21 @@ void UMainGameInstanceSubsystem::Login(const FString& CredentialName)
     */
 
 
-#if WITH_EDITOR
+
     // 에디터(PIE) 환경 - DevAuthTool을 이용한 개발자 테스트용 로그인
     Credentials.Type  = TEXT("Developer");
     Credentials.Id    = TEXT("Localhost:7777");
     Credentials.Token = CredentialName;
 
     UE_LOG(LogTemp, Log, TEXT("[EOS] (Editor) Developer 로그인 시도 - Credential: %s"), *CredentialName);
-#else
+    /*
     // 배포 빌드 - AccountPortal을 통한 실제 로그인 (Id/Token은 EOS가 자동 처리)
     Credentials.Type  = TEXT("AccountPortal");
     Credentials.Id    = TEXT("");
     Credentials.Token = TEXT("");
-
+    */
     UE_LOG(LogTemp, Log, TEXT("[EOS] (Build) AccountPortal 로그인 시도"));
-#endif
+
 
     Identity->ClearOnLoginCompleteDelegates(0, this);
     Identity->OnLoginCompleteDelegates[0].AddUObject(this, &UMainGameInstanceSubsystem::OnLoginComplete);
