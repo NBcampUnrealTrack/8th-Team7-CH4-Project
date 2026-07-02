@@ -129,6 +129,9 @@ void AMapGimmickManager::RespawnObstacles()
     ClearAllObstacles();
 
     SpawnObstacles();
+
+    // 테스트용
+    StartNPCRush();
 }
 
 void AMapGimmickManager::EndSpawnObstacle()

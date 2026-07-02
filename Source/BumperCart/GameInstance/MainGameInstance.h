@@ -13,6 +13,11 @@ class BUMPERCART_API UMainGameInstance : public UGameInstance
 	GENERATED_BODY()
 
 public:
-    UPROPERTY(BlueprintReadOnly, Category = "Game|Setting")
-    bool bIsHardMode = false;
+    // 레벨 경로
+    UPROPERTY(EditDefaultsOnly, Category = "Level")
+    TSoftObjectPtr<UWorld> TitleLevel;
+    UPROPERTY(EditDefaultsOnly,  Category = "Level")
+    TSoftObjectPtr<UWorld> LobbyLevel;
+    UPROPERTY(EditDefaultsOnly, Category = "Level")
+    TSoftObjectPtr<UWorld> GamePlayLevel;
 };

@@ -92,6 +92,7 @@ public:
     // 테스트용 타이머
     FTimerHandle GameStartTimerHandle;
 
+    // 데이터 에셋 적용
     void InitializeConfig(UProductShelfManagerConfig* InConfig);
 
     FORCEINLINE int32 GetCurrentProductCount() const { return CurrentProductCount; }

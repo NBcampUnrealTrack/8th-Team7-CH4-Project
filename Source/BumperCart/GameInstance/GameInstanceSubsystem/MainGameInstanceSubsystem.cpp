@@ -10,8 +10,7 @@
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "Engine/Engine.h"
-
-
+#include "GameInstance/MainGameInstance.h"
 
 
 IOnlineSessionPtr UMainGameInstanceSubsystem::GetSessionInterface() const
@@ -65,21 +64,21 @@ void UMainGameInstanceSubsystem::Login(const FString& CredentialName)
     */
 
 
-#if WITH_EDITOR
+
     // 에디터(PIE) 환경 - DevAuthTool을 이용한 개발자 테스트용 로그인
     Credentials.Type  = TEXT("Developer");
     Credentials.Id    = TEXT("Localhost:7777");
     Credentials.Token = CredentialName;
 
     UE_LOG(LogTemp, Log, TEXT("[EOS] (Editor) Developer 로그인 시도 - Credential: %s"), *CredentialName);
-#else
+    /*
     // 배포 빌드 - AccountPortal을 통한 실제 로그인 (Id/Token은 EOS가 자동 처리)
     Credentials.Type  = TEXT("AccountPortal");
     Credentials.Id    = TEXT("");
     Credentials.Token = TEXT("");
-
+    */
     UE_LOG(LogTemp, Log, TEXT("[EOS] (Build) AccountPortal 로그인 시도"));
-#endif
+
 
     Identity->ClearOnLoginCompleteDelegates(0, this);
     Identity->OnLoginCompleteDelegates[0].AddUObject(this, &UMainGameInstanceSubsystem::OnLoginComplete);
@@ -182,8 +181,17 @@ void UMainGameInstanceSubsystem::OnCreateSessionComplete(FName SessionName, bool
 
     UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 생성 성공: %s"), *SessionName.ToString());
 
+    UMainGameInstance* MainGI = Cast<UMainGameInstance>(GetGameInstance());
+    if (!MainGI) return;
+
+    const FString LobbyPath = GetLevelPath(MainGI->LobbyLevel);
+    if (LobbyPath.IsEmpty())
+    {
+        return;
+    }
+
    //?listen이 핵심 해당 클라이언트가 서버가 되는 부분
-    GetWorld()->ServerTravel(TEXT("/Game/BumperCart/Map/L_RoomLobby?listen"));
+    GetWorld()->ServerTravel(LobbyPath+TEXT("?listen"));
 }
 
 void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
@@ -266,7 +274,7 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
 
 
 
-    //UI에 결과 전달 필요 시 해당 부분에 작성
+    // UI에 결과 전달 필요 시 해당 부분에 작성
     OnSessionsFound.Broadcast(FilteredResults.Num());
 }
 
@@ -290,7 +298,7 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     FString CurrentRoomPassword;
     Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, CurrentRoomPassword);
 
-    //비밀번호가 비어있으면 그냥 입장 가능
+    // 비밀번호가 비어있으면 그냥 입장 가능
     if (!CurrentRoomPassword.IsEmpty() && CurrentRoomPassword != InputPassWord)
     {
         UE_LOG(LogTemp, Warning, TEXT("[EOS] 비밀번호가 일치하지 않습니다. (Index: %d)"), Index);
@@ -302,8 +310,89 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     Result.Session.SessionSettings.Get(SETTING_ROOMNAME, RoomName);
 
     Sessions->OnJoinSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnJoinSessionComplete);
-    //Index에 들어온 값에따라 방 참가
+    // Index에 들어온 값에따라 방 참가
     Sessions->JoinSession(Index, NAME_GameSession, Result);
+}
+
+// 세션 나가기
+// 호스트가 호출 세션 파괴
+// 참가자가 호출 시 세션에서 이탈
+void UMainGameInstanceSubsystem::LeaveSession()
+{
+
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid() || !Sessions->GetNamedSession(NAME_GameSession))
+    {
+        //나갈 세션이 존재하지 않으므로 바로 타이틀로 이동 안전코드
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 나갈 세션이 없습니다. 타이틀로 이동"));
+        ReturnToTitle();
+        return;
+    }
+
+
+    //DestroySession은 비동기이므로 델리게이트 등록하여 추후에 콜백 받음
+    Sessions->OnDestroySessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnLeaveSessionComplete);
+    Sessions->DestroySession(NAME_GameSession);
+}
+
+void UMainGameInstanceSubsystem::OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful)
+{
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (Sessions.IsValid())
+    {
+        Sessions->ClearOnDestroySessionCompleteDelegates(this);
+    }
+
+    //세션 파괴 실패해도 타이틀로 이동 다만 로그로 확인
+    if (bWasSuccessful)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 나가기 성공: %s"), *SessionName.ToString());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 세션 나가기(파괴) 실패: %s - 그래도 타이틀로 이동합니다."), *SessionName.ToString());
+    }
+
+    //방 정보 초기화
+    RoomName.Empty();
+    RoomPassword.Empty();
+    bIsHardMode = false;
+
+    OnLeaveSessionResult.Broadcast(bWasSuccessful);
+
+    ReturnToTitle();
+}
+
+void UMainGameInstanceSubsystem::ReturnToTitle()
+{
+    UWorld* World = GetWorld();
+    if (!World) return;
+
+    UMainGameInstance* MainGI = Cast<UMainGameInstance>(World->GetGameInstance());
+    if (!MainGI) return;
+
+    const FString LevelPath = GetLevelPath(MainGI->TitleLevel);
+    if (LevelPath.IsEmpty()) return;
+
+    const ENetMode CurrentNetMode = World->GetNetMode();
+    if (CurrentNetMode == NM_ListenServer )
+    {
+        UE_LOG(LogTemp, Log, TEXT("[EOS] 호스트: 타이틀 이동 "));
+        World->ServerTravel(LevelPath, true);
+    }
+    else if (CurrentNetMode == NM_Client)
+    {
+        APlayerController* PC = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController(GetWorld()) : nullptr;
+        if (PC)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[EOS] 참가자 타이틀로 이동"));
+            PC->ClientTravel(LevelPath, TRAVEL_Absolute);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[EOS] PlayerController를 찾을 수 없어 타이틀로 이동할 수 없습니다."));
+        }
+    }
 }
 
 void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
@@ -407,4 +496,15 @@ void UMainGameInstanceSubsystem::UpdateRoomDifficulty(bool bHardMode)
 
     bIsHardMode = bHardMode;
     UE_LOG(LogTemp, Warning, TEXT("[Room] 난이도 변경: %s"), bIsHardMode ? TEXT("HardMode") : TEXT("NormalMode"));
+}
+
+FString UMainGameInstanceSubsystem::GetLevelPath(const TSoftObjectPtr<UWorld>& Level) const
+{
+    if (Level.IsNull())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 에디터에서 레벨이 설정되지 않았습니다."));
+        return FString();
+    }
+
+    return Level.ToSoftObjectPath().GetLongPackageName();
 }

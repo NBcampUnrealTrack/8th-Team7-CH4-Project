@@ -108,6 +108,9 @@ private:
     // 로봇손 연출 종료하는 함수
     void FinishGrabVisual();
 
+    // 로봇손 Open/Close 메시 교체
+    void SetHandOpen(bool bIsOpen);
+
     // 연출용 메시 보여주기
     void ShowVisualProductMesh(AProductBase* Product);
 
@@ -158,9 +161,13 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
     TObjectPtr<UStaticMesh> ArmMeshAsset;
 
-    // 로봇손 손에 사용할 에셋
+    // 로봇손 열린 메시 에셋
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
     TObjectPtr<UStaticMesh> HandMeshAsset;
+
+    // 로봇손 닫힌 메시 에셋
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UStaticMesh> CloseHandMeshAsset;
 
     // 로봇손 팔 스플라인 메시 컴포넌트
     UPROPERTY()

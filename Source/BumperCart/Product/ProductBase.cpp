@@ -10,6 +10,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Net/UnrealNetwork.h"
+#include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 
 AProductBase::AProductBase()
 {
@@ -36,10 +37,23 @@ AProductBase::AProductBase()
     bOnSale = false;
 }
 
+void AProductBase::Destroyed()
+{
+    UWorld* World = GetWorld();
+    if (IsValid(World))
+    {
+        if (UProductShelfSubsystem* ShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
+        {
+            ShelfSubsystem->OnProductDestroyed();
+        }
+    }
+
+    Super::Destroyed();
+}
+
 void AProductBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     Super::EndPlay(EndPlayReason);
-
 
     switch (EndPlayReason)
     {
