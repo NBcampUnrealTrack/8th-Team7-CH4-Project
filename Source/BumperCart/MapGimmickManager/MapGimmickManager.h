@@ -6,6 +6,8 @@
 
 class AWaterHoleGimmick;
 class AObstacleGimmick;
+class UNiagaraSystem;
+class ANPCRushGimmick;
 
 USTRUCT(BlueprintType)
 struct FObstacleSpawnInfo
@@ -43,6 +45,9 @@ private:
     UPROPERTY()
     TArray<TObjectPtr<class ATargetPoint>> GimmickSpawnPointList;
 
+    UPROPERTY()
+    TArray<TObjectPtr<class ATargetPoint>> NPCRushStartPointList;
+
 #pragma endregion
 
 #pragma region Gimmick
@@ -55,6 +60,13 @@ private:
     TArray<FObstacleSpawnInfo> ObstacleSpawnList;
 
     TArray<AActor*> SpawnedObstacleList;
+
+    FTimerHandle RespawnTimerHandle;
+
+protected:
+    // 장애물 리스폰 시간
+    UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
+    float ObstacleRespawnInterval = 20.0f;
 
 public:
     // 게임 시작시 호출 - 게임 모드에서 호출
@@ -74,53 +86,15 @@ public:
 
 #pragma endregion
 
-
-#pragma region Water Hole
-protected:
-    // 스폰할 물 웅덩이
-    UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
-    TSubclassOf<AWaterHoleGimmick> WaterHoleClass;
-
-    // 스폰될 물 웅덩이 수
-    UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
-    int32 TotalWaterHoleSpawnCount = 3;
-
-    // 물 웅덩이 리스폰 시간
-    UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
-    float WaterHoleRespawnInterval = 20.0f;
-
+#pragma region NPC Rush
 private:
-    // 스폰된 물 웅덩이 저장
-    UPROPERTY()
-    TArray<TObjectPtr<class AWaterHoleGimmick>> SpawnedWaterHoles;
+    UPROPERTY(EditAnywhere, Category = "Gimmick | NPC Rush")
+    TSubclassOf<ANPCRushGimmick> NPCRushGimmick;
 
-    FTimerHandle RespawnTimerHandle;
-
-    // 물 웅덩이 리스폰
-    void RespawnWaterHole();
-
-    // 스폰된 물 웅덩이 정리
-    void ClearAllWaterHole();
-
-    // 물 웅덩이 스폰
-    void SpawnWaterHole();
-
-    // 라운드 끝 정리용
-    void EndSpawnWaterHole();
+public:
+    void StartNPCRush();
 
 #pragma endregion
-
-#pragma region Obstacle
-protected:
-    // 스폰할 장애물
-    UPROPERTY(EditAnywhere, Category = "Gimmick | Obstacle")
-    TArray<TSubclassOf<AObstacleGimmick>> ObstacleList;
-
-    UPROPERTY(EditAnywhere, Category = "Gimmick | Obstacle")
-    int32 TotalObstacleSpawnCount = 5;
-
-#pragma endregion
-
 
 
 };
