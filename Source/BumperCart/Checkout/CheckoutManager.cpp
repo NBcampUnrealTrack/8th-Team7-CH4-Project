@@ -36,6 +36,40 @@ void ACheckoutManager::BeginPlay()
 }
 
 // ------------------------------------------------------------
+// 차단벽 설정
+// ------------------------------------------------------------
+
+void ACheckoutManager::SetUseCheckoutBarrier(bool bUseBarrier)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (bUseCheckoutBarrier == bUseBarrier)
+    {
+        return;
+    }
+
+    bUseCheckoutBarrier = bUseBarrier;
+
+    for (ACheckoutZone* CheckoutZone : CheckoutZones)
+    {
+        if (!IsValid(CheckoutZone))
+        {
+            continue;
+        }
+
+        CheckoutZone->SetUseCheckoutBarrier(bUseCheckoutBarrier);
+    }
+}
+
+bool ACheckoutManager::IsUsingCheckoutBarrier() const
+{
+    return bUseCheckoutBarrier;
+}
+
+// ------------------------------------------------------------
 // 계산대 목록 및 세팅
 // ------------------------------------------------------------
 
@@ -63,6 +97,8 @@ bool ACheckoutManager::InitializeCheckoutZones()
         CheckoutZone->OnCheckoutCompleted.AddUObject(this, &ThisClass::HandleCheckoutCompleted);
         // 모든 계산대 오픈
         CheckoutZone->SetCheckoutZoneState(ECheckoutZoneState::Open);
+        // 차단벽 적용 설정 적용
+        CheckoutZone->SetUseCheckoutBarrier(bUseCheckoutBarrier);
     }
 
     return true;

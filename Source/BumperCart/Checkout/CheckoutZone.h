@@ -245,7 +245,7 @@ private:
     // false: 기존 계산대 방식
     // true: 정산 중 원형 차단벽 사용
     // 복제 데이터
-    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_UseCheckoutBarrier, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_UseCheckoutBarrier, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
     bool bUseCheckoutBarrier = false;
 
     // 입구 차단벽의 활성 상태
@@ -269,9 +269,6 @@ private:
     // sweep 검사하여 다른 카트 or 계산대와 충돌할 지 감지
     bool IsEjectPathClear(const ACartPawn* PlayerCharacter, const FVector& TargetLocation) const;
 
-    // 점유 확정 후 입구 차단벽 닫기
-    void CloseCheckoutBarrier();
-
 private:
     // 현재 계산대 밖으로 배출될 플레이어
     UPROPERTY(VisibleAnywhere, Category = "Checkout|Player")
@@ -280,14 +277,6 @@ private:
     // 비점유 플레이어 배출 세기
     UPROPERTY(EditAnywhere, Category = "Checkout|Barrier", meta = (ClampMin = "0.0"))
     float EjectStrength = 300.0f;
-
-    // 첫 점유 확정 후 입구벽이 닫히기까지의 시간
-    // 이 시간 동안 거의 동시에 들어온 플레이어를 배출한다.
-    UPROPERTY(EditAnywhere, Category = "Checkout|Barrier", meta = (ClampMin = "0.0"))
-    float CheckoutBarrierCloseDelay = 0.2f;
-
-    FTimerHandle CheckoutBarrierCloseTimerHandle;
-
 
 // ------------------------------------------------------------
 // 계산대 정보
