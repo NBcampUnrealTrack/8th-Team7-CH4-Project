@@ -4,7 +4,6 @@
 #include "Components/PrimitiveComponent.h"
 #include "Product/ProductBase.h"
 #include "Kismet/GameplayStatics.h"
-#include "ItemSpawn/ProductShelfManager/ProductShelfManager.h"
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
@@ -106,17 +105,22 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
 
             if (UWorld* World = GetWorld())
             {
-                if (IsValid(SpawnFX))
+                if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
                 {
-                    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-                        World,
-                        SpawnFX,
-                        SpawnLocation,
-                        SpawnRotation,
-                        FVector(1.0f),
-                        true,
-                        true
+                    UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
+
+                    if (IsValid(SpawnFX))
+                    {
+                        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+                            World,
+                            SpawnFX,
+                            SpawnLocation,
+                            SpawnRotation,
+                            FVector(1.0f),
+                            true,
+                            true
                         );
+                    }
                 }
             }
         }

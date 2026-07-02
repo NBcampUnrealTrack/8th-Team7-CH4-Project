@@ -7,7 +7,6 @@
 #include "ProductShelf.generated.h"
 
 class AProductBase;
-class UNiagaraSystem;
 
 UCLASS()
 class BUMPERCART_API AProductShelf : public AActor
@@ -55,9 +54,6 @@ protected:
     // 아이템 발사 세기
     UPROPERTY(EditAnywhere, Category = "Spawning")
     float LaunchForce = 500.0f;
-
-    UPROPERTY(EditAnywhere, Category = "Component")
-    TObjectPtr<UNiagaraSystem> SpawnFX;
 
 public:
     // 제품 목록중 랜덤 선택후 스폰 호출, 제품 반환
