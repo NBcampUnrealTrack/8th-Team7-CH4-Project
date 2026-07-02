@@ -188,15 +188,28 @@ private:
     void ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Style);
 
 // ------------------------------------------------------------
-// 정산 진행 사운드
+// 사운드
 // ------------------------------------------------------------
+private:
+    // 서버와 모든 클라이언트에서 정산 완료음 재생
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastPlayCheckoutCompleteSound();
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void MulticastPlayCheckoutOpenSound();
+
 private:
     // 정산 중 반복할 비프음
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
     TObjectPtr<UAudioComponent> CheckoutProcessingAudio;
 
+    // 정산 완료 후 
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
+    TObjectPtr<USoundBase> CheckoutCompleteSound;
 
-
+    // 계산대 오픈 사운드
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
+    TObjectPtr<USoundBase> CheckoutOpenSound;
 
 // ------------------------------------------------------------
 // 차단벽

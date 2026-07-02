@@ -240,6 +240,34 @@ void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Styl
 }
 
 // ------------------------------------------------------------
+// 사운드
+// ------------------------------------------------------------
+
+void ACheckoutZone::MulticastPlayCheckoutCompleteSound_Implementation()
+{
+    if (!IsValid(CheckoutCompleteSound))
+    {
+        return;
+    }
+
+    UGameplayStatics::PlaySoundAtLocation(this, CheckoutCompleteSound, GetActorLocation());
+
+    UE_LOG(LogTemp, Warning, TEXT("정산 완료 사운드 재생"));
+}
+
+void ACheckoutZone::MulticastPlayCheckoutOpenSound_Implementation()
+{
+    if (!IsValid(CheckoutOpenSound))
+    {
+        return;
+    }
+
+    UGameplayStatics::PlaySoundAtLocation(this, CheckoutOpenSound, GetActorLocation());
+
+    UE_LOG(LogTemp, Warning, TEXT("계산대 오픈"));
+}
+
+// ------------------------------------------------------------
 // 차단벽
 // ------------------------------------------------------------
 
@@ -829,12 +857,6 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     // 정산 시작 시 호출
     OnRep_CheckoutSession();
 
-    // 정산 중 사운드 반복 재생
-    if (IsValid(CheckoutProcessingAudio))
-    {
-        CheckoutProcessingAudio->Play();
-    }
-
     UE_LOG(LogTemp, Warning, TEXT("%s 정산 시작"), *GetNameSafe(CurrentCheckoutPlayer));
 }
 
@@ -968,6 +990,8 @@ void ACheckoutZone::CompleteCheckout()
     MainPlayerState->AddPlayerScore(LastCheckoutScore);
     MainPlayerState->AddCheckoutCount(1);
 
+    MulticastPlayCheckoutCompleteSound();
+
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
     if (GEngine)
     {
@@ -1030,12 +1054,6 @@ void ACheckoutZone::ResetCheckout()
 
     // 정산 초기화 시 호출
     OnRep_CheckoutSession();
-
-    // 사운드 종료
-    if (IsValid(CheckoutProcessingAudio))
-    {
-        CheckoutProcessingAudio->Stop();
-    }
 }
 
 // ------------------------------------------------------------
@@ -1149,16 +1167,19 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
 
     CurrentCheckoutZoneState = NewState;
 
-    // 콜백 함수 호출
-    // 계산대 상태에 따른 색상, UI 등 변경
     OnRep_CurrentCheckoutZoneState();
 
     // 계산대가 닫혔다 다시 열렸을 때,
     // 이미 구역 안에 대기중이던 플레이어 바로 정산 시작
     if (CurrentCheckoutZoneState == ECheckoutZoneState::Open)
     {
+        MulticastPlayCheckoutOpenSound();
+
         TryStartCheckout();
     }
+
+    // 클라이언트에 상태 변경을 빠르게 복제
+    ForceNetUpdate();
 }
 
 // ------------------------------------------------------------
@@ -1200,7 +1221,17 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 
 void ACheckoutZone::OnRep_CheckoutSession()
 {
-    //SetCheckoutBarrierEnabled(bIsCheckoutInProgress);
-
     OnCheckoutSessionChanged.Broadcast(CheckoutZoneID, CurrentCheckoutPlayer, bIsCheckoutInProgress);
+
+    if (bIsCheckoutInProgress)
+    {
+        if (!CheckoutProcessingAudio->IsPlaying())
+        {
+            CheckoutProcessingAudio->Play();
+        }
+    }
+    else
+    {
+        CheckoutProcessingAudio->Stop();
+    }
 }
