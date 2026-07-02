@@ -103,4 +103,17 @@ private:
     static inline const FName SETTING_ROOMPASSWORD = TEXT("ROOMPW");
     static inline const FName SETTING_OWNERNAME    = TEXT("OWNERNAME");
 
+#pragma region RoomSettings
+public:
+    UFUNCTION()
+    void UpdateRoomDifficulty(bool bHardMode);
+
+    UFUNCTION(BlueprintPure, Category = "Room|Settings")
+    bool GetRoomDifficulty() const { return bIsHardMode; }
+
+private:
+    bool bIsHardMode = false;
+
+
+#pragma endregion
 };
