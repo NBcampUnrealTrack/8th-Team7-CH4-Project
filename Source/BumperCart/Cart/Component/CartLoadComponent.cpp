@@ -9,6 +9,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
+#include "PlayerState/MainPlayerState.h"
 
 
 UCartLoadComponent::UCartLoadComponent()
@@ -122,6 +123,23 @@ void UCartLoadComponent::DropProducts(float Impulse, EDropCollisionRole Role)
     // 충격량만큼 떨어뜨릴 개수 판정
     int32 DropCount = CalculateDropCount(Impulse, Role);
     int32 ActualDropCount = FMath::Min(DropCount, LoadedProducts.Num());
+
+    // 무시할 수 있는 충격량 이상으로 충돌이 발생하면 충돌횟수 증가
+    if (DropCount > 0)
+    {
+        APawn* OwnerPawn = Cast<APawn>(GetOwner());
+        if (IsValid(OwnerPawn))
+        {
+            AMainPlayerState* PS = OwnerPawn->GetPlayerState<AMainPlayerState>();
+            if (IsValid(PS))
+            {
+                // 충돌횟수는 1증가, 상품 떨어지는 횟수는 실제 떨어진 개수 증가
+                PS->AddCartBumpCount(1);
+                PS->AddDroppedItemCount(ActualDropCount);
+            }
+        }
+    }
+
     if (ActualDropCount <= 0) return;
 
     // 현재 적재중인 상품에서 랜덤 인덱스 선택
