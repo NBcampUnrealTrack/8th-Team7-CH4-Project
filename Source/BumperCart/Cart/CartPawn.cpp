@@ -54,8 +54,11 @@ ACartPawn::ACartPawn()
 	CameraBoom->bInheritYaw = true; //카트 회전을 따라 뒤에서 쫓아감
 	CameraBoom->bInheritRoll = false;
 	CameraBoom->bDoCollisionTest = false; //벽에 카메라가 당겨지지 않게
+	//카메라 랙(트레일): 위치·회전을 살짝 뒤늦게 따라오게 해 급가감속·회전 시 화면 출렁임/멀미 완화 (낮을수록 더 늘어짐)
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = 8.f;
+	CameraBoom->bEnableCameraRotationLag = true;
+	CameraBoom->CameraRotationLagSpeed = 8.f;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
