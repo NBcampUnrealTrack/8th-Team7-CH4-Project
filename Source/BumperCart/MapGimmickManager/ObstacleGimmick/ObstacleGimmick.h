@@ -2,12 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Cart/Bumpable.h"
 #include "ObstacleGimmick.generated.h"
 
 class UStaticMeshComponent;
 
 UCLASS()
-class BUMPERCART_API AObstacleGimmick : public AActor
+class BUMPERCART_API AObstacleGimmick : public AActor, public IBumpable
 {
 	GENERATED_BODY()
 	

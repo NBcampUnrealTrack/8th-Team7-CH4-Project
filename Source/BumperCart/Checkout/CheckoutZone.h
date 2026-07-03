@@ -412,6 +412,10 @@ private:
     UPROPERTY(EditAnywhere, Category = " Checkout|Time")
     float AdditionalCheckoutTime = 1.0f;
 
+    // 최대 정산 시간
+    UPROPERTY(EditAnywhere, Category = "Checkout|Time", meta = (ClampMin = "0.1"))
+    float MaxCheckoutTime = 5.0f;
+
 // ------------------------------------------------------------
 // 최종 점수 계산
 // ------------------------------------------------------------

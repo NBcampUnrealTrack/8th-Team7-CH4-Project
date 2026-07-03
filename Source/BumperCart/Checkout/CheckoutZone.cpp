@@ -1089,7 +1089,16 @@ void ACheckoutZone::ResetCheckout()
 // ------------------------------------------------------------
 float ACheckoutZone::CalculateCheckoutDuration(int32 ProductCount) const
 {
-    return BaseCheckoutTime + AdditionalCheckoutTime * ProductCount;
+    // 아이템 수
+    const int32 SafeProductCount = FMath::Max(ProductCount, 0);
+
+    // 기본 정산 시간
+    const float CalculatedDuration = BaseCheckoutTime + AdditionalCheckoutTime * SafeProductCount;
+
+    // 최대 정산 시간
+    const float SafeMaxCheckoutTime = FMath::Max(MaxCheckoutTime, BaseCheckoutTime);
+
+    return FMath::Min(CalculatedDuration, SafeMaxCheckoutTime);
 }
 
 // ------------------------------------------------------------

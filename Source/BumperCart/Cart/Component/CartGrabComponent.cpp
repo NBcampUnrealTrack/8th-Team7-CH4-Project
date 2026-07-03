@@ -79,8 +79,8 @@ UCartGrabComponent::UCartGrabComponent()
     AimPlaneZ = 20.f;
 
     // 로봇손 관련
-    GrabSpeed = 500.f;
-    GrabRange = 400.f;
+    GrabSpeed = 1400.f;
+    GrabRange = 500.f;
     GrabRadius = 10.f;
     bCanGrab = true;
     SocketName = TEXT("ProductSocket");
