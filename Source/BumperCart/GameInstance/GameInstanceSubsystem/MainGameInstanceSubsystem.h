@@ -14,6 +14,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSessionsFoundSignature, int32, Fo
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLoginResult, bool, bWasSuccessful, const FString&, ErrorMessage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnJoinPasswordIncorrect);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLeaveSessionResult, bool, bWasSuccessful);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnQuickMatchNoSessionFound);
+
 
 
 UCLASS(Blueprintable)
@@ -39,8 +41,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     void JoinFoundSession(int32 Index, const FString& InputPassword);
 
+    // 방 나가기
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     void LeaveSession();
+
+    // 퀵 매치
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    void QuickMatch();
 
     // 세션 검색 처리 결과
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
@@ -57,6 +64,10 @@ public:
     // 세션 나가기 처리 결과
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
     FOnLeaveSessionResult OnLeaveSessionResult;
+
+    // 퀵매치 시 참가 가능한 방이 없을 때 브로드캐스트
+    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    FOnQuickMatchNoSessionFound OnQuickMatchNoSessionFound;
 
     // 로그인된 유저 이름/ID를 UI에서 바로 가져다 쓸 수 있게 캐싱
     UPROPERTY(BlueprintReadOnly, Category = "EOS")
@@ -91,6 +102,8 @@ private:
     void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
     // 세션 나가기 완료 시 호출
     void OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful);
+    // 퀵 매치 진행
+    void TryJoinQuickMatchSession();
 
 
     // 실제 세션 생성 로직 (재시도/재생성 시에도 캐싱된 RoomName/RoomPassword 사용)
@@ -112,6 +125,9 @@ private:
 
     // 방 검색시 사용될 방 이름
     FString SearchRoomNameFilter;
+
+    // 진행 중인 검색이 퀵 매치를 통한 요청인지 확인
+    bool bIsQuickMatchRequest;
 
     // 검색된 방 결과들
     TArray<FOnlineSessionSearchResult> FilteredResults;

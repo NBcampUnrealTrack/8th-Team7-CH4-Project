@@ -213,7 +213,7 @@ void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, boo
     }
 }
 
-//만들어진 세션 찾기
+// 찾을 세션 설정 및 찾기 시도
 void UMainGameInstanceSubsystem::FindSessions(const FString& RoomNameFilter)
 {
     SearchRoomNameFilter = RoomNameFilter;
@@ -232,6 +232,8 @@ void UMainGameInstanceSubsystem::FindSessions(const FString& RoomNameFilter)
     Sessions->FindSessions(0, SearchSettings.ToSharedRef());
 }
 
+// 퀵 매치 분기 추가
+// 방 찾은 이후 정보 가공
 void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
 {
     IOnlineSessionPtr Sessions = GetSessionInterface();
@@ -243,6 +245,14 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
     if (!bWasSuccessful || !SearchSettings.IsValid())
     {
         UE_LOG(LogTemp, Warning, TEXT("[EOS] 세션 검색 실패"));
+        return;
+    }
+
+    // 퀵매치 요청 시
+    if (bIsQuickMatchRequest)
+    {
+        bIsQuickMatchRequest = false;
+        TryJoinQuickMatchSession();
         return;
     }
 
@@ -314,6 +324,59 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     Sessions->JoinSession(Index, NAME_GameSession, Result);
 }
 
+void UMainGameInstanceSubsystem::TryJoinQuickMatchSession()
+{
+    if (!SearchSettings.IsValid())
+    {
+        OnQuickMatchNoSessionFound.Broadcast();
+        return;
+    }
+
+    const TArray<FOnlineSessionSearchResult>& Results = SearchSettings->SearchResults;
+
+    int32 BestIndex = INDEX_NONE;
+    int32 BestPing = MAX_int32;
+
+    for (int32 i = 0; i < Results.Num(); ++i)
+    {
+        const FOnlineSessionSearchResult& Result = Results[i];
+        if (!Result.IsValid()) continue;
+
+
+        // 방 정원 가득 찻을 시 넘어감
+        if (Result.Session.NumOpenPublicConnections <= 0)
+        {
+            continue;
+        }
+
+
+        //방에 비밀번호가 존재할 시 넘어감
+        FString Password;
+        Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, Password);
+        if (!Password.IsEmpty()) continue;
+
+
+        //핑을 비교하여 핑이 더 낮은 index 저장
+        if (Result.PingInMs < BestPing)
+        {
+            BestPing = Result.PingInMs;
+            BestIndex = i;
+        }
+
+        // 비밀번호가 없는 방 존재 X
+        if (BestIndex == INDEX_NONE)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[EOS] 퀵매치: 참가 가능한(비밀번호 없는) 방을 찾지 못했습니다."));
+            OnQuickMatchNoSessionFound.Broadcast();
+            return;
+        }
+
+        UE_LOG(LogTemp, Log, TEXT("[EOS] 퀵매치: Index %d 방 참가 시도 (Ping: %d ms)"), BestIndex, BestPing);
+
+        JoinFoundSession(BestIndex, TEXT(""));
+    }
+}
+
 // 세션 나가기
 // 호스트가 호출 세션 파괴
 // 참가자가 호출 시 세션에서 이탈
@@ -333,6 +396,28 @@ void UMainGameInstanceSubsystem::LeaveSession()
     //DestroySession은 비동기이므로 델리게이트 등록하여 추후에 콜백 받음
     Sessions->OnDestroySessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnLeaveSessionComplete);
     Sessions->DestroySession(NAME_GameSession);
+}
+
+void UMainGameInstanceSubsystem::QuickMatch()
+{
+    SearchRoomNameFilter.Empty();
+    bIsQuickMatchRequest = true;
+
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid())
+    {
+        bIsQuickMatchRequest = false;
+        return;
+    }
+
+    SearchSettings = MakeShareable(new FOnlineSessionSearch());
+    SearchSettings->MaxSearchResults = 50;
+    SearchSettings->bIsLanQuery = false;
+    SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+    SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineComparisonOp::Equals);
+
+    Sessions->OnFindSessionsCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnFindSessionComplete);
+    Sessions->FindSessions(0, SearchSettings.ToSharedRef());
 }
 
 void UMainGameInstanceSubsystem::OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful)
