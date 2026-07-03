@@ -321,6 +321,7 @@ void UCartLoadComponent::CreateDummyMeshes()
         Dummy->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Dummy->SetVisibility(false);
         Dummy->SetReceivesDecals(false);
+        Dummy->SetRelativeScale3D(FVector(1.5f, 1.5f, 1.5f));
         Dummy->SetupAttachment(CartMesh, SocketName);
 
         OwnerActor->AddInstanceComponent(Dummy);

@@ -255,14 +255,14 @@ void ACheckoutZone::MulticastPlayCheckoutCompleteSound_Implementation()
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 사운드 재생"));
 }
 
-void ACheckoutZone::MulticastPlayCheckoutOpenSound_Implementation()
+void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
 {
-    if (!IsValid(CheckoutOpenSound))
+    if (!IsValid(CheckoutStateChangeSound))
     {
         return;
     }
 
-    UGameplayStatics::PlaySoundAtLocation(this, CheckoutOpenSound, GetActorLocation());
+    UGameplayStatics::PlaySoundAtLocation(this, CheckoutStateChangeSound, GetActorLocation());
 
     UE_LOG(LogTemp, Warning, TEXT("계산대 오픈"));
 }
@@ -541,6 +541,67 @@ bool ACheckoutZone::IsEjectPathClear(const ACartPawn* PlayerCharacter, const FVe
         );
 
     return !bHasBlockingHit;
+}
+
+// ------------------------------------------------------------
+// 충돌 무시
+// ------------------------------------------------------------
+
+void ACheckoutZone::SetPlayerBarrierIgnore(ACartPawn* PlayerCharacter, bool bShouldIgnore)
+{
+    if (!IsValid(PlayerCharacter))
+    {
+        return;
+    }
+
+    // 차단벽 있는지
+    ACheckoutBarrier* CheckoutBarrier = GetCheckoutBarrier();
+    if (!IsValid(CheckoutBarrier))
+    {
+        return;
+    }
+
+    // 캡슐 컴포넌트 있는지
+    UCapsuleComponent* CapsuleComponent =  PlayerCharacter->FindComponentByClass<UCapsuleComponent>();
+    if (!IsValid(CapsuleComponent))
+    {
+        return;
+    }
+
+    CapsuleComponent->IgnoreActorWhenMoving(CheckoutBarrier, bShouldIgnore);
+}
+
+void ACheckoutZone::UpdateCheckoutPlayerBarrierIgnore()
+{
+    ACartPawn* NewIgnoredPlayer = nullptr;
+
+    if (bUseCheckoutBarrier &&
+        bIsCheckoutInProgress &&
+        IsValid(CurrentCheckoutPlayer))
+    {
+        NewIgnoredPlayer = CurrentCheckoutPlayer;
+    }
+
+    ACartPawn* PreviousIgnoredPlayer = BarrierIgnoredPlayer.Get();
+
+    if (PreviousIgnoredPlayer == NewIgnoredPlayer)
+    {
+        return;
+    }
+
+    // 이전 정산 플레이어 복구
+    if (IsValid(PreviousIgnoredPlayer))
+    {
+        SetPlayerBarrierIgnore(PreviousIgnoredPlayer, false);
+    }
+
+    BarrierIgnoredPlayer = NewIgnoredPlayer;
+
+    // 현재 정산 플레이어만 이 계산대 차단벽 무시
+    if (IsValid(NewIgnoredPlayer))
+    {
+        SetPlayerBarrierIgnore(NewIgnoredPlayer, true);
+    }
 }
 
 // ------------------------------------------------------------
@@ -1136,12 +1197,17 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
 
     OnRep_CurrentCheckoutZoneState();
 
+    // 계산대 열리거나 닫혔을 때 사운드 재생
+    if (CurrentCheckoutZoneState == ECheckoutZoneState::Open ||
+        CurrentCheckoutZoneState == ECheckoutZoneState::Closed)
+    {
+        MulticastPlayCheckoutStateChangeSound();
+    }
+
     // 계산대가 닫혔다 다시 열렸을 때,
     // 이미 구역 안에 대기중이던 플레이어 바로 정산 시작
     if (CurrentCheckoutZoneState == ECheckoutZoneState::Open)
     {
-        MulticastPlayCheckoutOpenSound();
-
         TryStartCheckout();
     }
 
@@ -1188,8 +1254,16 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 
 void ACheckoutZone::OnRep_CheckoutSession()
 {
+    UpdateCheckoutPlayerBarrierIgnore();
+
     OnCheckoutSessionChanged.Broadcast(CheckoutZoneID, CurrentCheckoutPlayer, bIsCheckoutInProgress);
 
+    if (!IsValid(CheckoutProcessingAudio))
+    {
+        return;
+    }
+
+    // 정산자만 정산 중 오디오 재생
     if (bIsCheckoutInProgress)
     {
         if (!CheckoutProcessingAudio->IsPlaying())

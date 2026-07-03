@@ -64,7 +64,11 @@ void AMapGimmickManager::SpawnObstacles()
 {
     if (!HasAuthority()) return;
 
-    if (!GetWorld() || GimmickSpawnPointList.Num() == 0) return;
+    if (!GetWorld() || GimmickSpawnPointList.Num() == 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] 기믹 스폰 포인트가 없습니다."));
+        return;
+    }
 
     for (int32 i = GimmickSpawnPointList.Num() - 1; i > 0; --i)
     {
@@ -141,6 +145,12 @@ void AMapGimmickManager::EndSpawnObstacle()
 
 void AMapGimmickManager::StartNPCRush()
 {
+    if (NPCRushStartPointList.Num() == 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 포인트가 없습니다."));
+        return;
+    }
+
     for (int32 i = NPCRushStartPointList.Num() - 1; i > 0; --i)
     {
         int32 RandomIndex = FMath::RandRange(0, i);
@@ -169,7 +179,7 @@ void AMapGimmickManager::StartNPCRush()
 
             if (IsValid(SpawnedGimmick))
             {
-                UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 시작"))
+                UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 시작"));
             }
         }
     }

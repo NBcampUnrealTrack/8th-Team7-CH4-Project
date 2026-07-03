@@ -196,20 +196,20 @@ private:
     void MulticastPlayCheckoutCompleteSound();
 
     UFUNCTION(NetMulticast, Unreliable)
-    void MulticastPlayCheckoutOpenSound();
+    void MulticastPlayCheckoutStateChangeSound();
 
 private:
     // 정산 중 반복할 비프음
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
     TObjectPtr<UAudioComponent> CheckoutProcessingAudio;
 
-    // 정산 완료 후 
+    // 정산 완료 및 점수 획득 
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
     TObjectPtr<USoundBase> CheckoutCompleteSound;
 
-    // 계산대 오픈 사운드
+    // 계산대 열림/폐쇄 사운드
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
-    TObjectPtr<USoundBase> CheckoutOpenSound;
+    TObjectPtr<USoundBase> CheckoutStateChangeSound;
 
 // ------------------------------------------------------------
 // 차단벽
@@ -277,6 +277,20 @@ private:
     // 비점유 플레이어 배출 세기
     UPROPERTY(EditAnywhere, Category = "Checkout|Barrier", meta = (ClampMin = "0.0"))
     float EjectStrength = 300.0f;
+
+// ------------------------------------------------------------
+// 충돌 무시
+// ------------------------------------------------------------
+private:
+    // 플레이어 계산대 차단 무시
+    void SetPlayerBarrierIgnore(ACartPawn* PlayerCharacter,  bool bShouldIgnore);
+
+    // 정산 시간 동안 차단벽 무시
+    void UpdateCheckoutPlayerBarrierIgnore();
+
+private:
+    // 이전 플레이어의 Ignore를 정상 복구하기 위한 참조
+    TWeakObjectPtr<ACartPawn> BarrierIgnoredPlayer;
 
 // ------------------------------------------------------------
 // 계산대 정보

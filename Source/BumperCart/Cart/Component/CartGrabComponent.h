@@ -24,6 +24,14 @@ enum class EGrabVisualState : uint8
     Returning
 };
 
+UENUM(BlueprintType)
+enum class EGrabResult : uint8
+{
+    None,
+    ProductGrabbed,
+    Blocked
+};
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BUMPERCART_API UCartGrabComponent : public UActorComponent
 {
@@ -38,9 +46,6 @@ public:
     void SetupInput();
 
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-    // 게임 시작 시 마우스 조준선 타이머 시작하는 함수
-    void StartAimTimer();
 
 protected:
     virtual void BeginPlay() override;
@@ -81,13 +86,14 @@ private:
     void Multicast_PlayGrab(FVector_NetQuantize Start, FVector_NetQuantize Target);
 
     // 그랩 컴포넌트 Tick 설정을 상황에 따라 변경하는 함수
-    void RefreshGrabTick();
+    // 로컬은 항상 켜져있지만, simulated pawn 들은 그랩했을때만 키도록
+    void RefreshTickEnabled();
 
     // 틱마다 서버에서 Sweep으로 그랩 판정하는 함수
     void TickGrabSweep(float DeltaTime);
 
     // 그랩 Sweep 시도하는 함수, 성공하면 붙잡은 거리를 알려줌
-    bool TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance);
+    EGrabResult TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance);
 
     // 그랩 회수 시작 알리는 함수
     void StartGrabReturn(float ReturnDuration);
@@ -96,8 +102,11 @@ private:
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_StartGrabReturn(float ReturnDuration, AProductBase* Product);
 
-    // 게임 종료 시 마우스 조준선 타이머 끄는 함수
-    void StopAimTimer();
+    // 게임 시작 시 마우스 조준선 키는 함수
+    void StartAimVisual();
+
+    // 게임 종료 시 마우스 조준선 끄는 함수
+    void StopAimVisual();
 
     // 로봇손 연출 갱신하는 함수
     void UpdateGrabVisual(const FVector& Location);
@@ -249,10 +258,6 @@ private:
     // 저장한 조준선 까지의 길이
     float CachedAimDistance;
 
-    // 마우스 조준선 갱신 빈도
-    UPROPERTY(EditAnywhere, Category = "Cart|Grab|Aim")
-    float AimUpdateInterval;
-
 
     /* ------------------ 조준선 나이아가라 ------------------ */
 
@@ -298,6 +303,9 @@ private:
     float ServerGrabMaxDistance;
     float ServerGrabCurrentDistance;
 
+    // 상품과 같은 Z로 조절하기 위한 변수
+    float AimPlaneZ;
+
 
     /* ---------------- 로봇손 밸런스 ---------------- */
 
@@ -330,7 +338,4 @@ private:
 
     // 그랩 종료 확인용 타이머
     FTimerHandle GrabFinishTimer;
-
-    // 조준선 갱신 타이머
-    FTimerHandle GrabAimUpdateTimer;
 };

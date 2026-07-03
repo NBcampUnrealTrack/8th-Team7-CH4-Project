@@ -18,7 +18,7 @@ ANPCRushGimmick::ANPCRushGimmick()
 
     CartMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CartMesh"));
     CartMesh->SetupAttachment(RootComponent);
-    CartMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    //CartMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     NPCRushFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
     NPCRushFX->SetupAttachment(CartMesh);

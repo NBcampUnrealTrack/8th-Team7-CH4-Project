@@ -80,11 +80,6 @@ private:
     float OriginalBrakingDeceleration;
     FRotator TargetRotation;
 
-    // 타이머에 의해 주기적으로 회전 실행
-    void UpdateCharacterSpin();
-
-    // 회전이 끝났을 때 정지
-    void StopCharacterSpin();
 #pragma endregion
 
 
