@@ -15,6 +15,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLoginResult, bool, bWasSuccessfu
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnJoinPasswordIncorrect);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLeaveSessionResult, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnQuickMatchNoSessionFound);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPrivateRoomNotFound);
 
 
 
@@ -41,6 +42,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     void JoinFoundSession(int32 Index, const FString& InputPassword);
 
+    // 비공개 방 참가
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    void JoinPrivateRoomByName(const FString& InRoomName, const FString& InRoomPassword);
+
     // 방 나가기
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     void LeaveSession();
@@ -53,21 +58,25 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
     FOnSessionsFoundSignature OnSessionsFound;
 
-    // 로그인 결과
+    // 로그인 결과 나올 시 브로드 캐스트
     UPROPERTY(BlueprintAssignable, Category = "EOS")
     FOnLoginResult OnLoginResult;
 
-    // 방 참가 시 비밀번호 오입력 결과
+    // 방 참가 시 비밀번호 오입력 시 브로드 캐스트
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
     FOnJoinPasswordIncorrect OnJoinPasswordIncorrect;
 
-    // 세션 나가기 처리 결과
+    // 세션 나가기 성공했을 때 브로드캐스트
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
     FOnLeaveSessionResult OnLeaveSessionResult;
 
     // 퀵매치 시 참가 가능한 방이 없을 때 브로드캐스트
     UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
     FOnQuickMatchNoSessionFound OnQuickMatchNoSessionFound;
+
+    // 비공개 방 참가 시 해당 방 제목의 방을 찾지 못했을 때 브로드캐스트
+    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    FOnPrivateRoomNotFound OnPrivateRoomNotFound;
 
     // 로그인된 유저 이름/ID를 UI에서 바로 가져다 쓸 수 있게 캐싱
     UPROPERTY(BlueprintReadOnly, Category = "EOS")
@@ -96,6 +105,10 @@ private:
     void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
     // 세션 검색 완료 시 호출
     void OnFindSessionComplete(bool bWasSuccessful);
+    // 세션 검색 완료 시 호출 (퀵매치 전용)
+    void OnQuickMatchFindSessionComplete(bool bWasSuccessful);
+    // 세션 검색 완료 시 호출 (비공개 방 참가 전용)
+    void OnPrivateJoinFindSessionComplete(bool bWasSuccessful);
     // 세션 참가 완료 시 호출
     void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
     // 기존 세션 제거 성공 시 호출
@@ -104,10 +117,15 @@ private:
     void OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful);
     // 퀵 매치 진행
     void TryJoinQuickMatchSession();
+    // 비공개 방 참가 시도
+    void TryJoinPrivateSession();
 
 
     // 실제 세션 생성 로직 (재시도/재생성 시에도 캐싱된 RoomName/RoomPassword 사용)
     void CreateSessionInternal();
+
+    // 공통으로 사용하는 검색 세팅 설정
+    void CreateSearchSettings();
 
     // 타이틀 화면으로 복귀
     void ReturnToTitle();
@@ -119,12 +137,16 @@ private:
     IOnlineSessionPtr GetSessionInterface() const;
     IOnlineIdentityPtr GetIdentityInterface() const;
 
-    // 방 생성 이름 및 비밀번호
+    // 방 생성 시 사용되는 이름 및 비밀번호
     FString RoomName;
     FString RoomPassword;
 
-    // 방 검색시 사용될 방 이름
+    // 방 검색 시 사용될 방 이름
     FString SearchRoomNameFilter;
+
+    // 비공개 방 검색 시 사용되는 방 이름 및 비밀번호
+    FString PrivateRoomName;
+    FString PrivateRoomPassword;
 
     // 진행 중인 검색이 퀵 매치를 통한 요청인지 확인
     bool bIsQuickMatchRequest;
