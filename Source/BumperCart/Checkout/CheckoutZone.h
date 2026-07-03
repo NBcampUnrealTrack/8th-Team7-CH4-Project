@@ -279,6 +279,20 @@ private:
     float EjectStrength = 300.0f;
 
 // ------------------------------------------------------------
+// 충돌 무시
+// ------------------------------------------------------------
+private:
+    // 플레이어 계산대 차단 무시
+    void SetPlayerBarrierIgnore(ACartPawn* PlayerCharacter,  bool bShouldIgnore);
+
+    // 정산 시간 동안 차단벽 무시
+    void UpdateCheckoutPlayerBarrierIgnore();
+
+private:
+    // 이전 플레이어의 Ignore를 정상 복구하기 위한 참조
+    TWeakObjectPtr<ACartPawn> BarrierIgnoredPlayer;
+
+// ------------------------------------------------------------
 // 계산대 정보
 // ------------------------------------------------------------
 

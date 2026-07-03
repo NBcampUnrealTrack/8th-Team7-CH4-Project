@@ -544,6 +544,67 @@ bool ACheckoutZone::IsEjectPathClear(const ACartPawn* PlayerCharacter, const FVe
 }
 
 // ------------------------------------------------------------
+// 충돌 무시
+// ------------------------------------------------------------
+
+void ACheckoutZone::SetPlayerBarrierIgnore(ACartPawn* PlayerCharacter, bool bShouldIgnore)
+{
+    if (!IsValid(PlayerCharacter))
+    {
+        return;
+    }
+
+    // 차단벽 있는지
+    ACheckoutBarrier* CheckoutBarrier = GetCheckoutBarrier();
+    if (!IsValid(CheckoutBarrier))
+    {
+        return;
+    }
+
+    // 캡슐 컴포넌트 있는지
+    UCapsuleComponent* CapsuleComponent =  PlayerCharacter->FindComponentByClass<UCapsuleComponent>();
+    if (!IsValid(CapsuleComponent))
+    {
+        return;
+    }
+
+    CapsuleComponent->IgnoreActorWhenMoving(CheckoutBarrier, bShouldIgnore);
+}
+
+void ACheckoutZone::UpdateCheckoutPlayerBarrierIgnore()
+{
+    ACartPawn* NewIgnoredPlayer = nullptr;
+
+    if (bUseCheckoutBarrier &&
+        bIsCheckoutInProgress &&
+        IsValid(CurrentCheckoutPlayer))
+    {
+        NewIgnoredPlayer = CurrentCheckoutPlayer;
+    }
+
+    ACartPawn* PreviousIgnoredPlayer = BarrierIgnoredPlayer.Get();
+
+    if (PreviousIgnoredPlayer == NewIgnoredPlayer)
+    {
+        return;
+    }
+
+    // 이전 정산 플레이어 복구
+    if (IsValid(PreviousIgnoredPlayer))
+    {
+        SetPlayerBarrierIgnore(PreviousIgnoredPlayer, false);
+    }
+
+    BarrierIgnoredPlayer = NewIgnoredPlayer;
+
+    // 현재 정산 플레이어만 이 계산대 차단벽 무시
+    if (IsValid(NewIgnoredPlayer))
+    {
+        SetPlayerBarrierIgnore(NewIgnoredPlayer, true);
+    }
+}
+
+// ------------------------------------------------------------
 // 구역 내 플레이어
 // ------------------------------------------------------------
 void ACheckoutZone::AddPlayerInZone(ACartPawn* PlayerCharacter)
@@ -1188,6 +1249,8 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 
 void ACheckoutZone::OnRep_CheckoutSession()
 {
+    UpdateCheckoutPlayerBarrierIgnore();
+
     OnCheckoutSessionChanged.Broadcast(CheckoutZoneID, CurrentCheckoutPlayer, bIsCheckoutInProgress);
 
     if (bIsCheckoutInProgress)
