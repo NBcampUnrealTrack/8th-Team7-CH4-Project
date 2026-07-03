@@ -133,6 +133,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
 	float BrakeDeceleration = 1000.f;
 
+	//이 속도(cm/s) 이하로 느려지면 브레이크 키를 눌러도 브레이크가 비활성(정지 상태에선 브레이크 안 걸림)
+	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
+	float BrakeStopSpeed = 20.f;
+
     //전진 중 후진키를 눌렀을 때의 감속도 (낮을수록 천천히)
     UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
     float ReverseSlideDeceleration = 600.f;
@@ -301,7 +305,10 @@ private:
 	float SteerInput = 0.f;
 	float CurrentSteer = 0.f; //부드럽게 보간된 조향값
 
-	//브레이크 상태 (타 클라 스파크 연출용 복제 — 부스터와 동일 패턴)
+	//브레이크 키 눌림(원입력). 실제 브레이크 상태(bIsBraking)는 이 값 + 이동 중일 때만 true
+	bool bBrakeHeld = false;
+
+	//브레이크 상태(실제 감속·연출 적용). 정지 상태에선 키를 눌러도 false. (타 클라 스파크 연출용 복제 — 부스터와 동일 패턴)
 	UPROPERTY(Replicated)
 	bool bIsBraking = false;
 

@@ -131,6 +131,21 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 	Move->MaxWalkSpeed = TargetMaxSpeed;
 
+	//--- 브레이크 상태 갱신: 키를 눌러도 정지 상태(BrakeStopSpeed 이하)면 브레이크 비활성 ---
+	//입력(bBrakeHeld)과 실제 상태(bIsBraking)를 분리. 소유자가 판정 후 서버/타 클라에 복제 (부스터와 동일 패턴)
+	if (IsLocallyControlled())
+	{
+		const bool bBrakeEffective = bBrakeHeld && Move->Velocity.Size2D() > BrakeStopSpeed;
+		if (bBrakeEffective != bIsBraking)
+		{
+			bIsBraking = bBrakeEffective;
+			if (!HasAuthority())
+			{
+				ServerSetBraking(bIsBraking); //타 클라 스파크 연출용
+			}
+		}
+	}
+
 	//--- 미끄럼(슬립) 진행: 남은 시간 경과 처리 ---
 	if (bIsSlipping)
 	{
@@ -184,7 +199,9 @@ void ACartPawn::Tick(float DeltaSeconds)
 		const float SpeedAlpha = FMath::Clamp(Speed / FMath::Max(DefaultMaxWalkSpeed, 1.f), 0.f, 1.f);
 		const float SpeedFactor = FMath::Lerp(MinSteerSpeedFactor, 1.f, SpeedAlpha);
 
-		YawDeltaTotal += CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
+		//후진 중(실제로 뒤로 갈 때)에는 조향을 반전 → 플레이어 기준 방향 유지(A=왼쪽)
+		const float SteerSign = (ForwardSpeed < -10.f) ? -1.f : 1.f;
+		YawDeltaTotal += SteerSign * CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
 	}
 
 	//미끄럼 강제 스핀: 남은 스핀각을 SlipSpinSpeedDeg 속도로 풀어낸다 (조향과 합산)
@@ -334,11 +351,11 @@ void ACartPawn::OnSteerReleased(const FInputActionValue& Value)
 
 void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
 {
-	bIsBraking = true;
-	ServerSetBraking(true); //타 클라 스파크 연출용 (부스터와 동일 패턴)
+	bBrakeHeld = true; //실제 브레이크 상태는 Tick에서 이동 중일 때만 true로 갱신
 
-	//브레이크 효과음 (소유 클라 로컬)
-	if (BrakeSound)
+	//브레이크 효과음 (소유 클라 로컬) — 정지 상태(BrakeStopSpeed 이하)에선 브레이크가 안 걸리므로 사운드도 재생 안 함
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (BrakeSound && Move && Move->Velocity.Size2D() > BrakeStopSpeed)
 	{
 		UGameplayStatics::PlaySound2D(this, BrakeSound);
 	}
@@ -346,8 +363,7 @@ void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
 
 void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
 {
-	bIsBraking = false;
-	ServerSetBraking(false);
+	bBrakeHeld = false;
 }
 
 void ACartPawn::OnBoost(const FInputActionValue& Value)
