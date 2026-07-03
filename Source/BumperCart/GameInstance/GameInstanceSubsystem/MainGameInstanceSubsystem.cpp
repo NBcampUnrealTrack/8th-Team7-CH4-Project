@@ -213,6 +213,16 @@ void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, boo
     }
 }
 
+// 공통으로 사용하는 검색 세팅 설정
+void UMainGameInstanceSubsystem::CreateSearchSettings()
+{
+    SearchSettings = MakeShareable(new FOnlineSessionSearch());
+    SearchSettings->MaxSearchResults = 50;
+    SearchSettings->bIsLanQuery = false;
+    SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+    SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineComparisonOp::Equals);
+}
+
 // 찾을 세션 설정 및 찾기 시도
 void UMainGameInstanceSubsystem::FindSessions(const FString& RoomNameFilter)
 {
@@ -221,12 +231,7 @@ void UMainGameInstanceSubsystem::FindSessions(const FString& RoomNameFilter)
     IOnlineSessionPtr Sessions = GetSessionInterface();
     if (!Sessions.IsValid()) return;
 
-
-    SearchSettings = MakeShareable(new FOnlineSessionSearch());
-    SearchSettings->MaxSearchResults = 50;
-    SearchSettings->bIsLanQuery = false;
-    SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
-    SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineComparisonOp::Equals);
+    CreateSearchSettings();
 
     Sessions->OnFindSessionsCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnFindSessionComplete);
     Sessions->FindSessions(0, SearchSettings.ToSharedRef());
@@ -248,40 +253,29 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
         return;
     }
 
-    // 퀵매치 요청 시
-    if (bIsQuickMatchRequest)
+    FilteredResults.Reset();
+    for (const FOnlineSessionSearchResult& SearchResult : SearchSettings->SearchResults)
     {
-        bIsQuickMatchRequest = false;
-        TryJoinQuickMatchSession();
-        return;
-    }
+        //비밀번호가 설정되어있으면 비공개이므로 제외
+        FString FoundPassword;
+        SearchResult.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, FoundPassword);
+        if (!FoundPassword.IsEmpty()) continue;
 
-    //방 이름 필터를 통해 방 검색 결과 사용
-    if (!SearchRoomNameFilter.IsEmpty())
-    {
-        FilteredResults.Reset();
-        for (const FOnlineSessionSearchResult& Result : SearchSettings->SearchResults)
+        //방 제목과 일치하는 방 검색
+        if (!SearchRoomNameFilter.IsEmpty())
         {
             FString FoundName;
-            Result.Session.SessionSettings.Get(SETTING_ROOMNAME, FoundName);
+            SearchResult.Session.SessionSettings.Get(SETTING_ROOMNAME, FoundName);
 
-            // 대소문자 무시하고 검색어 포함 여부 확인
-            if (FoundName.Contains(SearchRoomNameFilter, ESearchCase::IgnoreCase))
-            {
-                FilteredResults.Add(Result);
-            }
+            if (!FoundName.Contains(SearchRoomNameFilter, ESearchCase::IgnoreCase)) continue;
         }
-    }
-    else
-    {
-        // 필터 없으면 전체 결과 사용
-        FilteredResults = SearchSettings->SearchResults;
+
+        FilteredResults.Add(SearchResult);
     }
 
     UE_LOG(LogTemp, Log, TEXT("[EOS] 전체 세션 %d개 발견, 필터링 후 %d개"),
     SearchSettings->SearchResults.Num(),
     FilteredResults.Num());
-
 
 
     // UI에 결과 전달 필요 시 해당 부분에 작성
@@ -324,6 +318,122 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     Sessions->JoinSession(Index, NAME_GameSession, Result);
 }
 
+void UMainGameInstanceSubsystem::JoinPrivateRoomByName(const FString& InRoomName, const FString& InRoomPassword)
+{
+    PrivateRoomName = InRoomName.TrimStartAndEnd();
+    PrivateRoomPassword = InRoomPassword.TrimStartAndEnd();
+
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid()) return;
+
+    CreateSearchSettings();
+
+    // 비공개 방 참가 전용 콜백 바인딩
+    Sessions->OnFindSessionsCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnPrivateJoinFindSessionComplete);
+    Sessions->FindSessions(0, SearchSettings.ToSharedRef());
+}
+
+//비공개 방 검색 결과 확인
+void UMainGameInstanceSubsystem::OnPrivateJoinFindSessionComplete(bool bWasSuccessful)
+{
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (Sessions.IsValid())
+    {
+        Sessions->ClearOnFindSessionsCompleteDelegates(this);
+    }
+
+    if (!bWasSuccessful || !SearchSettings.IsValid())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비공개 방 참가: 세션 검색 실패"));
+        OnPrivateRoomNotFound.Broadcast();
+        return;
+    }
+
+    TryJoinPrivateSession();
+}
+
+//비공개 방 참가 시도
+void UMainGameInstanceSubsystem::TryJoinPrivateSession()
+{
+    if (!SearchSettings.IsValid())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비공개 방 참가: 검색 결과가 없습니다."));
+        OnPrivateRoomNotFound.Broadcast();
+        return;
+    }
+
+    const TArray<FOnlineSessionSearchResult>& Results = SearchSettings->SearchResults;
+
+
+    // 입력한 방 이름과 일치하는 방 검색
+    int32 FoundIndex = INDEX_NONE;
+    for (int32 i = 0; i < Results.Num(); ++i)
+    {
+        const FOnlineSessionSearchResult& Result = Results[i];
+        if (!Result.IsValid()) continue;
+
+        FString FoundRoomName;
+        Result.Session.SessionSettings.Get(SETTING_ROOMNAME, FoundRoomName);
+
+        // 검색한 방 이름과 일치하는지 확인 / 찾으면 반복문 탈출
+        if (FoundRoomName.Equals(PrivateRoomName, ESearchCase::IgnoreCase))
+        {
+            FoundIndex = i;
+            break;
+        }
+    }
+
+    if (FoundIndex == INDEX_NONE)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비공개 방 참가: '%s' 방을 찾을 수 없습니다."), *PrivateRoomName);
+        OnPrivateRoomNotFound.Broadcast();
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[EOS] 비공개 방 참가: Index %d 방 발견, 참가 시도"), FoundIndex);
+
+    //비밀번호 확인은 해당 함수에서 확인
+    JoinFoundSession(FoundIndex, PrivateRoomPassword);
+}
+
+void UMainGameInstanceSubsystem::QuickMatch()
+{
+    SearchRoomNameFilter.Empty();
+    bIsQuickMatchRequest = true;
+
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid())
+    {
+        bIsQuickMatchRequest = false;
+        return;
+    }
+
+    CreateSearchSettings();
+
+    Sessions->OnFindSessionsCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnQuickMatchFindSessionComplete);
+    Sessions->FindSessions(0, SearchSettings.ToSharedRef());
+}
+
+// 퀵 매치로 들어갈 방 찾을 시 호출
+void UMainGameInstanceSubsystem::OnQuickMatchFindSessionComplete(bool bWasSuccessful)
+{
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (Sessions.IsValid())
+    {
+        Sessions->ClearOnFindSessionsCompleteDelegates(this);
+    }
+
+    if (!bWasSuccessful || !SearchSettings.IsValid())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 퀵매치: 세션 검색 실패"));
+        OnQuickMatchNoSessionFound.Broadcast();
+        return;
+    }
+
+    TryJoinQuickMatchSession();
+}
+
+// 퀵 매치로 방 진입 시도
 void UMainGameInstanceSubsystem::TryJoinQuickMatchSession()
 {
     if (!SearchSettings.IsValid())
@@ -343,7 +453,7 @@ void UMainGameInstanceSubsystem::TryJoinQuickMatchSession()
         if (!Result.IsValid()) continue;
 
 
-        // 방 정원 가득 찻을 시 넘어감
+        // 방 정원 가득 찾을 시 넘어감
         if (Result.Session.NumOpenPublicConnections <= 0)
         {
             continue;
@@ -396,28 +506,6 @@ void UMainGameInstanceSubsystem::LeaveSession()
     //DestroySession은 비동기이므로 델리게이트 등록하여 추후에 콜백 받음
     Sessions->OnDestroySessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnLeaveSessionComplete);
     Sessions->DestroySession(NAME_GameSession);
-}
-
-void UMainGameInstanceSubsystem::QuickMatch()
-{
-    SearchRoomNameFilter.Empty();
-    bIsQuickMatchRequest = true;
-
-    IOnlineSessionPtr Sessions = GetSessionInterface();
-    if (!Sessions.IsValid())
-    {
-        bIsQuickMatchRequest = false;
-        return;
-    }
-
-    SearchSettings = MakeShareable(new FOnlineSessionSearch());
-    SearchSettings->MaxSearchResults = 50;
-    SearchSettings->bIsLanQuery = false;
-    SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
-    SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineComparisonOp::Equals);
-
-    Sessions->OnFindSessionsCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnFindSessionComplete);
-    Sessions->FindSessions(0, SearchSettings.ToSharedRef());
 }
 
 void UMainGameInstanceSubsystem::OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful)
