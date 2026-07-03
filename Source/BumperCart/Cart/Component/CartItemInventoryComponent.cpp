@@ -4,6 +4,13 @@
 #include "Item/ItemDataAsset.h"
 #include "Item/Action/ItemAction.h"
 
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputAction.h"
+#include "InputActionValue.h"
+#include "InputMappingContext.h"
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
 
 UCartItemInventoryComponent::UCartItemInventoryComponent()
@@ -18,6 +25,57 @@ void UCartItemInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimePro
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(UCartItemInventoryComponent, CurrentItemData);
+}
+
+void UCartItemInventoryComponent::SetupInput()
+{
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+
+    if (!IsValid(OwnerPawn))
+    {
+        return;
+    }
+
+    // 서버에 존재하는 다른 플레이어 카트는 등록 X
+    if (!OwnerPawn->IsLocallyControlled())
+    {
+        return;
+    }
+
+    // 입력 바인딩
+    if (APlayerController* PlayerController = Cast<APlayerController>(OwnerPawn->GetController()))
+    {
+        if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+            ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+        {
+            // IMC 등록
+            if (UseItemInputMappingContext)
+            {
+                Subsystem->AddMappingContext(UseItemInputMappingContext, MappingPriority);
+            }
+
+            // IA 등록
+            if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerController->InputComponent))
+            {
+                if (UseItemInputAction)
+                {
+                    EnhancedInputComponent->BindAction(
+                        UseItemInputAction,
+                        ETriggerEvent::Started,
+                        this,
+                        &ThisClass::HandleUseItemInput
+                    );
+                }
+            }
+        }
+    }
+}
+
+void UCartItemInventoryComponent::HandleUseItemInput(const FInputActionValue& InputValue)
+{
+    UE_LOG(LogTemp, Warning, TEXT("아이템 사용 입력"));
+
+    RequestUseItem();
 }
 
 // ------------------------------------------------------------
@@ -177,6 +235,7 @@ UItemDataAsset* UCartItemInventoryComponent::GetCurrentItemData() const
 
 void UCartItemInventoryComponent::HandleItemChanged()
 {
+
 }
 
 void UCartItemInventoryComponent::OnRep_CurrentItemData()

@@ -6,6 +6,11 @@
 
 class ACartPawn;
 class UItemDataAsset;
+class UInputAction;
+class UInputMappingContext;
+
+struct FInputActionValue;
+
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BUMPERCART_API UCartItemInventoryComponent : public UActorComponent
@@ -18,7 +23,29 @@ public:
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-    
+// ------------------------------------------------------------
+// 입력
+// ------------------------------------------------------------
+public:
+    // 아이템 사용 입력 초기화
+    void SetupInput();
+
+    // 아이템 사용 입력 처리
+    void HandleUseItemInput(const FInputActionValue& InputValue);
+
+protected:
+    // 아이템 입력 매핑
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Input")
+    TObjectPtr<UInputMappingContext> UseItemInputMappingContext;
+
+    // 아이템 사용 입력
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Input")
+    TObjectPtr<UInputAction> UseItemInputAction;
+
+    // 다른 IMC와 충돌 우선 순위
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Input")
+    int32 MappingPriority = 1;
+
 // ------------------------------------------------------------
 // 아이템 정보
 // ------------------------------------------------------------
