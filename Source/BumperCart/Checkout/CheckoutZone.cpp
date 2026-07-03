@@ -255,14 +255,14 @@ void ACheckoutZone::MulticastPlayCheckoutCompleteSound_Implementation()
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 사운드 재생"));
 }
 
-void ACheckoutZone::MulticastPlayCheckoutOpenSound_Implementation()
+void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
 {
-    if (!IsValid(CheckoutOpenSound))
+    if (!IsValid(CheckoutStateChangeSound))
     {
         return;
     }
 
-    UGameplayStatics::PlaySoundAtLocation(this, CheckoutOpenSound, GetActorLocation());
+    UGameplayStatics::PlaySoundAtLocation(this, CheckoutStateChangeSound, GetActorLocation());
 
     UE_LOG(LogTemp, Warning, TEXT("계산대 오픈"));
 }
@@ -1197,12 +1197,17 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
 
     OnRep_CurrentCheckoutZoneState();
 
+    // 계산대 열리거나 닫혔을 때 사운드 재생
+    if (CurrentCheckoutZoneState == ECheckoutZoneState::Open ||
+        CurrentCheckoutZoneState == ECheckoutZoneState::Closed)
+    {
+        MulticastPlayCheckoutStateChangeSound();
+    }
+
     // 계산대가 닫혔다 다시 열렸을 때,
     // 이미 구역 안에 대기중이던 플레이어 바로 정산 시작
     if (CurrentCheckoutZoneState == ECheckoutZoneState::Open)
     {
-        MulticastPlayCheckoutOpenSound();
-
         TryStartCheckout();
     }
 
@@ -1253,6 +1258,12 @@ void ACheckoutZone::OnRep_CheckoutSession()
 
     OnCheckoutSessionChanged.Broadcast(CheckoutZoneID, CurrentCheckoutPlayer, bIsCheckoutInProgress);
 
+    if (!IsValid(CheckoutProcessingAudio))
+    {
+        return;
+    }
+
+    // 정산자만 정산 중 오디오 재생
     if (bIsCheckoutInProgress)
     {
         if (!CheckoutProcessingAudio->IsPlaying())
