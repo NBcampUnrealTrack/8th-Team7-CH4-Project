@@ -42,79 +42,10 @@ void AWaterHoleGimmick::OnWaterHoleBeginOverlap(UPrimitiveComponent* OverlappedC
 
     const float Yaw = FMath::RandBool() ? 60.f : -60.f;
     ISlideAffectable::Execute_ApplySlip(OtherActor, EffectDuration, Yaw);
+
+    Destroy();
 }
 
 void AWaterHoleGimmick::OnWaterHoleEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 }
-
-void AWaterHoleGimmick::UpdateCharacterSpin()
-{
-    /*if (!IsValid(SpinningCharacter))
-    {
-        GetWorldTimerManager().ClearTimer(SpinTimerHandle);
-        return;
-    }
-
-    SpinElapsed += TimerInterval;
-    UCharacterMovementComponent* MoveComp = SpinningCharacter->GetCharacterMovement();
-
-    if (SpinElapsed <= SpinDuration)
-    {
-        FRotator CurrentRot = SpinningCharacter->GetActorRotation();
-        FRotator NewRot = FMath::RInterpTo(CurrentRot, TargetRotation, TimerInterval, 15.0f);
-        SpinningCharacter->SetActorRotation(NewRot);
-    }
-    else if (SpinElapsed > SpinDuration && !SpinningCharacter->bUseControllerRotationYaw)
-    {
-        SpinningCharacter->bUseControllerRotationYaw = true;
-        if (IsValid(MoveComp))
-        {
-            MoveComp->bOrientRotationToMovement = true;
-        }
-    }
-
-    if (SpinElapsed >= EffectDuration)
-    {
-        if (IsValid(MoveComp))
-        {
-            MoveComp->GroundFriction = OriginalGroundFriction;
-            MoveComp->BrakingDecelerationWalking = OriginalBrakingDeceleration;
-        }
-
-        SpinningCharacter->bUseControllerRotationYaw = true;
-        if (IsValid(MoveComp))
-        {
-            MoveComp->bOrientRotationToMovement = true;
-        }
-
-        UE_LOG(LogTemp, Log, TEXT("스핀 종료"));
-
-        GetWorldTimerManager().ClearTimer(SpinTimerHandle);
-
-        SpinningCharacter = nullptr;
-    }*/
-
-}
-
-void AWaterHoleGimmick::StopCharacterSpin()
-{
-    /*GetWorldTimerManager().ClearTimer(SpinTimerHandle);
-
-    if (IsValid(SpinningCharacter))
-    {
-        UCharacterMovementComponent* MoveComp = SpinningCharacter->GetCharacterMovement();
-        if (IsValid(MoveComp))
-        {
-            MoveComp->GroundFriction = OriginalGroundFriction;
-            MoveComp->BrakingDecelerationWalking = OriginalBrakingDeceleration;
-
-            MoveComp->bOrientRotationToMovement = true;
-        }
-
-        UE_LOG(LogTemp, Log, TEXT("[WaterHoleGimmick] %s 캐릭터 회전 종료"), *SpinningCharacter->GetName());
-
-        SpinningCharacter = nullptr;
-    }*/
-}
-
