@@ -24,6 +24,14 @@ enum class EGrabVisualState : uint8
     Returning
 };
 
+UENUM(BlueprintType)
+enum class EGrabResult : uint8
+{
+    None,
+    ProductGrabbed,
+    Blocked
+};
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BUMPERCART_API UCartGrabComponent : public UActorComponent
 {
@@ -85,7 +93,7 @@ private:
     void TickGrabSweep(float DeltaTime);
 
     // 그랩 Sweep 시도하는 함수, 성공하면 붙잡은 거리를 알려줌
-    bool TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance);
+    EGrabResult TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance);
 
     // 그랩 회수 시작 알리는 함수
     void StartGrabReturn(float ReturnDuration);

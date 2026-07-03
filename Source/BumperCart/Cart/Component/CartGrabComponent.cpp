@@ -76,11 +76,11 @@ UCartGrabComponent::UCartGrabComponent()
     ServerGrabDirection = FVector::ZeroVector;
     ServerGrabMaxDistance = 0.f;
     ServerGrabCurrentDistance = 0.f;
-    AimPlaneZ = 10.f;
+    AimPlaneZ = 20.f;
 
     // 로봇손 관련
-    GrabSpeed = 300.f;
-    GrabRange = 500.f;
+    GrabSpeed = 500.f;
+    GrabRange = 400.f;
     GrabRadius = 10.f;
     bCanGrab = true;
     SocketName = TEXT("ProductSocket");
@@ -474,7 +474,9 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
     ServerGrabCurrentDistance = FMath::Min(ServerGrabCurrentDistance + GrabSpeed * DeltaTime, ServerGrabMaxDistance);
 
     float ActualDistance = 0.f;
-    if (TrySweepGrab(PreviousDistance, ServerGrabCurrentDistance, ActualDistance))
+    EGrabResult Result = TrySweepGrab(PreviousDistance, ServerGrabCurrentDistance, ActualDistance);
+
+    if (Result == EGrabResult::ProductGrabbed)
     {
         bServerGrab = false;
 
@@ -484,6 +486,25 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
         Multicast_StartGrabReturn(ReturnDuration, GrabbedProduct.Get());
 
         // 서버에서 회수 처리
+        StartGrabReturn(ReturnDuration);
+
+        RefreshTickEnabled();
+        return;
+    }
+    // 벽과 충돌하면
+    else if (Result == EGrabResult::Blocked)
+    {
+        bServerGrab = false;
+
+        float ReturnDuration = ActualDistance / FMath::Max(GrabSpeed, 1.f);
+
+        // 실패 나이아가라 이펙트 Multicast
+        FVector HitLocation = ServerGrabStartLocation + ServerGrabDirection * ActualDistance;
+        HitLocation.Z = ServerGrabStartLocation.Z + GrabFailEffectOffset;
+
+        Multicast_PlayGrabFailEffect(HitLocation);
+
+        Multicast_StartGrabReturn(ReturnDuration, nullptr);
         StartGrabReturn(ReturnDuration);
 
         RefreshTickEnabled();
@@ -508,13 +529,13 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
     }
 }
 
-bool UCartGrabComponent::TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance)
+EGrabResult UCartGrabComponent::TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance)
 {
     UWorld* World = GetWorld();
-    if (!IsValid(World)) return false;
+    if (!IsValid(World)) return EGrabResult::None;
 
     AActor* OwnerActor = GetOwner();
-    if (!IsValid(OwnerActor)) return false;
+    if (!IsValid(OwnerActor)) return EGrabResult::None;
 
     // 직전 위치, 현재 위치를 Sweep 할 것
     FVector Start = ServerGrabStartLocation + ServerGrabDirection * FromDistance;
@@ -534,32 +555,30 @@ bool UCartGrabComponent::TrySweepGrab(float FromDistance, float ToDistance, floa
         Params
     );
 
-    if (!bHit) return false;
+    if (!bHit) return EGrabResult::None;
 
     AActor* HitActor = Hit.GetActor();
-    AProductBase* Product = Cast<AProductBase>(HitActor);
 
-    if (IsValid(Product) && Product->TrySetGrabbed())
-    {
-        GrabbedProduct = Product;
-
-        float HitDistance = FVector::DotProduct(Hit.Location - ServerGrabStartLocation, ServerGrabDirection);
-        OutDistance = FMath::Clamp(HitDistance, FromDistance, ToDistance);
-
-        return true;
-    }
-
-    // 상품이 아닌 다른것과 충돌했다면 벽이나 카트에 충돌한거라 회수해야 함
+    // 충돌했다면
     if (IsValid(HitActor))
     {
         float HitDistance = FVector::DotProduct(Hit.Location - ServerGrabStartLocation, ServerGrabDirection);
         OutDistance = FMath::Clamp(HitDistance, FromDistance, ToDistance);
 
-        // 회수 처리 추가 필요
-        return false;
+        AProductBase* Product = Cast<AProductBase>(HitActor);
+        // 충돌한게 상품이면
+        if (IsValid(Product) && Product->TrySetGrabbed())
+        {
+            GrabbedProduct = Product;
+            return EGrabResult::ProductGrabbed;
+        }
+
+        // 충돌한게 상품이 아니면
+        GrabbedProduct = nullptr;
+        return EGrabResult::Blocked;
     }
 
-    return false;
+    return EGrabResult::None;
 }
 
 void UCartGrabComponent::StartGrabReturn(float ReturnDuration)
