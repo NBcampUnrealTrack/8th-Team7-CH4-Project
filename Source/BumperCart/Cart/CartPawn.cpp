@@ -36,24 +36,25 @@ ACartPawn::ACartPawn()
 		Move->bUseSeparateBrakingFriction = true;
 		Move->GroundFriction = 3.0f; //낮을수록 미끄러짐(드리프트)
 		Move->BrakingFriction = 1.5f;
-		Move->MaxAcceleration = 1200.f;
-		Move->MaxWalkSpeed = 700.f;
+		Move->MaxAcceleration = BaseMaxAcceleration;
+		Move->MaxWalkSpeed = BaseMaxWalkSpeed;
 		Move->BrakingDecelerationWalking = 1400.f;
 		Move->JumpZVelocity = 0.f; //카트는 점프 없음
 		Move->AirControl = 0.f;
 	}
 
-	//카메라: 고정 쿼터뷰. 카트가 회전해도 각도는 고정되고 위치만 따라간다.
+	//카메라: 3인칭. 카트 뒤를 따라가며(InheritYaw) 완만하게 내려다본다. 세부 위치는 BP_CartPawn에서 미세조정
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 800.f; //쿼터뷰
-	CameraBoom->SetRelativeRotation(FRotator(-55.f, 0.f, 0.f)); //아래로 비스듬히
+	CameraBoom->TargetArmLength = 800.f;
+	CameraBoom->SetRelativeLocation(FVector(371.72f, 0.f, 34.98f)); //앞으로 당겨 전방 시야 확보
+	CameraBoom->SetRelativeRotation(FRotator(-15.f, 0.f, 0.f)); //완만하게 내려봄(3인칭)
 	CameraBoom->bUsePawnControlRotation = false;
-	CameraBoom->bInheritPitch = false; //카트 회전과 무관하게 각도 고정
-	CameraBoom->bInheritYaw = false;
+	CameraBoom->bInheritPitch = false;
+	CameraBoom->bInheritYaw = true; //카트 회전을 따라 뒤에서 쫓아감
 	CameraBoom->bInheritRoll = false;
 	CameraBoom->bDoCollisionTest = false; //벽에 카메라가 당겨지지 않게
-	CameraBoom->bEnableCameraLag = true; //위치만 따라감
+	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = 8.f;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -86,6 +87,10 @@ void ACartPawn::BeginPlay()
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
+		//BP에서 튜닝한 기본 이속·가속을 이동 컴포넌트에 반영 (생성자 이후 BP 오버라이드까지 최종 반영)
+		Move->MaxWalkSpeed = BaseMaxWalkSpeed;
+		Move->MaxAcceleration = BaseMaxAcceleration;
+
 		DefaultMaxWalkSpeed = Move->MaxWalkSpeed;
 		DefaultBrakingDeceleration = Move->BrakingDecelerationWalking;
 		DefaultGroundFriction = Move->GroundFriction;
@@ -114,9 +119,12 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 
 	//적재 무게 반영 배율
-	const float LoadSpeedMul = FMath::Lerp(1.f, LoadMaxSpeedScale, LoadRatio);
-	const float LoadTurnMul = FMath::Lerp(1.f, LoadTurnScale, LoadRatio);
-	const float LoadBrakeMul = FMath::Lerp(1.f, LoadBrakeScale, LoadRatio);
+	//속도: 무거움까지는 무게 비례(1.0→0.6), 과적(적재율 1.0 초과)이면 담는 양 무관하게 고정 배율(0.3)로 뚝 떨어져 답답하게
+	//회전·브레이크: 과적 페널티 없음 → 적재율을 1.0로 클램프해 무거움 수준 유지
+	const float ClampedLoad = FMath::Min(LoadRatio, 1.f);
+	const float LoadSpeedMul = (LoadRatio > 1.f) ? OverloadSpeedScale : FMath::Lerp(1.f, LoadMaxSpeedScale, LoadRatio);
+	const float LoadTurnMul = FMath::Lerp(1.f, LoadTurnScale, ClampedLoad);
+	const float LoadBrakeMul = FMath::Lerp(1.f, LoadBrakeScale, ClampedLoad);
 
 	//--- 최고 속도: 부스터 > 후진 > 기본, 적재 무게 반영 ---
 	float TargetMaxSpeed = DefaultMaxWalkSpeed * LoadSpeedMul;
@@ -483,7 +491,8 @@ void ACartPawn::EndSlip()
 
 void ACartPawn::SetLoadRatio(float InLoadRatio)
 {
-	LoadRatio = FMath::Clamp(InLoadRatio, 0.f, 1.f);
+	//상한을 1이 아니라 2로 — 1 초과(과적)를 살려서 속도 페널티에 사용 (회전·브레이크는 Tick에서 1로 클램프)
+	LoadRatio = FMath::Clamp(InLoadRatio, 0.f, 2.f);
 }
 
 //적재 변경 델리게이트 핸들러
