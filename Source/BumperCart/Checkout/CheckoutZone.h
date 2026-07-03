@@ -196,20 +196,20 @@ private:
     void MulticastPlayCheckoutCompleteSound();
 
     UFUNCTION(NetMulticast, Unreliable)
-    void MulticastPlayCheckoutOpenSound();
+    void MulticastPlayCheckoutStateChangeSound();
 
 private:
     // 정산 중 반복할 비프음
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
     TObjectPtr<UAudioComponent> CheckoutProcessingAudio;
 
-    // 정산 완료 후 
+    // 정산 완료 및 점수 획득 
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
     TObjectPtr<USoundBase> CheckoutCompleteSound;
 
-    // 계산대 오픈 사운드
+    // 계산대 열림/폐쇄 사운드
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
-    TObjectPtr<USoundBase> CheckoutOpenSound;
+    TObjectPtr<USoundBase> CheckoutStateChangeSound;
 
 // ------------------------------------------------------------
 // 차단벽
