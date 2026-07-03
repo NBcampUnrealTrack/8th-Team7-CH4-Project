@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Cart/Bumpable.h"
 #include "NPCRushGimmick.generated.h"
 
 class UBoxComponent;
@@ -9,7 +10,7 @@ class UProjectileMovementComponent;
 class UNiagaraComponent;
 
 UCLASS()
-class BUMPERCART_API ANPCRushGimmick : public AActor
+class BUMPERCART_API ANPCRushGimmick : public AActor, public IBumpable
 {
 	GENERATED_BODY()
 	
