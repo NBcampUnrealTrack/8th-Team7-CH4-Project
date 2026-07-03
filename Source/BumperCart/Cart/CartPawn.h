@@ -107,6 +107,14 @@ protected:
 	UInputAction* BoostAction; //Shift
 
 	//---------- 전후진 ----------
+	//기본 전진 최고 속도(cm/s). 부스트 속도 = 이 값 * BoostSpeedMultiplier 로 자동 계산됨. (BeginPlay에서 이동 컴포넌트에 적용)
+	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0"))
+	float BaseMaxWalkSpeed = 1050.f;
+
+	//기본 가속도(cm/s^2). 최고 속도에 얼마나 빨리 도달하는지 (BeginPlay에서 이동 컴포넌트에 적용)
+	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0"))
+	float BaseMaxAcceleration = 1800.f;
+
 	//후진 최고 속도 = 전진 최고 속도 * MaxReverseSpeedRatio (쇼핑카트는 후진이 느리다)
 	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0", ClampMax = "1"))
 	float MaxReverseSpeedRatio = 0.5f;
@@ -114,7 +122,7 @@ protected:
 	//---------- 조향 튜닝 ----------
 	//초당 회전 각도(도)
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0"))
-	float TurnRateDegPerSec = 130.f;
+	float TurnRateDegPerSec = 145.f;
 
 	//정지 상태에서의 최소 조향 배율
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0", ClampMax = "1"))
@@ -153,27 +161,27 @@ protected:
 
 
     //---------- 카메라 속도감 연출 ----------
-    //이 속도(cm/s)에서 줌이 최대에 도달 (0~이 값 사이를 보간)
+    //이 속도(cm/s)에서 줌이 최대에 도달 (0~이 값 사이를 보간). 기본 최고 속도(BaseMaxWalkSpeed)에 맞춤
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1"))
-    float SpeedZoomFullSpeed = 700.f;
+    float SpeedZoomFullSpeed = 1050.f;
 
     //저속/고속 카메라 암길이
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
     float CameraArmMin = 800.f;
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float CameraArmMax = 870.f;
+    float CameraArmMax = 900.f;
 
-    //저속/고속 FOV
+    //저속/고속 FOV (3인칭 기준으로 상향 — 고속에서 넓어져 속도감)
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
-    float CameraFovMin = 90.f;
+    float CameraFovMin = 95.f;
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
-    float CameraFovMax = 97.f;
+    float CameraFovMax = 115.f;
 
     //부스트 시 추가 빼기/넓히기
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
     float BoostExtraArm = 20.f;
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float BoostExtraFov = 3.f;
+    float BoostExtraFov = 7.f;
 
     //FOV/줌 보간 속도 (낮을수록 부드럽게)
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
@@ -196,13 +204,17 @@ protected:
 	UCartLoadComponent* LoadComponent;
 
 	//---------- 적재 무게감 ----------
-	//현재 적재율 0~1
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	//현재 적재율. 0~1 = 가벼움~무거움, 1 초과 = 과적(무게가 MaxWeight를 넘음)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "2"))
 	float LoadRatio = 0.f;
 
-	//가득 실었을 때 최고 속도 배율 (낮을수록 무거우면 느림)
+	//무거움(적재율 1.0=무게 MaxWeight)일 때 최고 속도 배율 (낮을수록 무거우면 느림). 무거움의 '그나마 움직이는' 바닥 속도
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
 	float LoadMaxSpeedScale = 0.6f;
+
+	//과적(적재율 1.0 초과) 시 속도 배율 — 담는 양과 무관하게 고정. 무거움(0.6)보다 확 느려 답답하게(과유불급)
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
+	float OverloadSpeedScale = 0.3f;
 
 	//가득 실었을 때 회전 배율
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
