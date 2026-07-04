@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Item/Action/ItemAction.h"
-#include "WatermelonItemAction.generated.h"
+#include "TomatoItemAction.generated.h"
 
 
 UCLASS()
-class BUMPERCART_API UWatermelonItemAction : public UItemAction
+class BUMPERCART_API UTomatoItemAction : public UItemAction
 {
 	GENERATED_BODY()
 

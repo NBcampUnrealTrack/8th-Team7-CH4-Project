@@ -1,4 +1,4 @@
-﻿#include "Item/Spawn/ItemRandomBox.h"
+﻿#include "Item/Spawn/RandomItemBox.h"
 
 #include "Cart/CartPawn.h"
 #include "Cart/Component/CartItemInventoryComponent.h"
@@ -9,7 +9,7 @@
 #include "Components/SceneComponent.h"
 #include "Net/UnrealNetwork.h"
 
-AItemRandomBox::AItemRandomBox()
+ARandomItemBox::ARandomItemBox()
 {
     PrimaryActorTick.bCanEverTick = false;
     bReplicates = true;
@@ -34,7 +34,7 @@ AItemRandomBox::AItemRandomBox()
     PickupTrigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 }
 
-void AItemRandomBox::BeginPlay()
+void ARandomItemBox::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -46,18 +46,18 @@ void AItemRandomBox::BeginPlay()
     ApplyItemBoxActiveState();
 }
 
-void AItemRandomBox::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+void ARandomItemBox::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(AItemRandomBox, bIsItemBoxActive);
+    DOREPLIFETIME(ARandomItemBox, bIsItemBoxActive);
 }
 
 // ------------------------------------------------------------
 // Overlap
 // ------------------------------------------------------------
 
-void AItemRandomBox::OnPickupTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void ARandomItemBox::OnPickupTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
     // 서버에서만 처리
     if (!HasAuthority())
@@ -102,7 +102,7 @@ void AItemRandomBox::OnPickupTriggerBeginOverlap(UPrimitiveComponent* Overlapped
 // 아이템 활성화 여부
 // ------------------------------------------------------------
 
-void AItemRandomBox::SetItemBoxActive(bool bIsActive)
+void ARandomItemBox::SetItemBoxActive(bool bIsActive)
 {
     if (!HasAuthority())
     {
@@ -121,7 +121,7 @@ void AItemRandomBox::SetItemBoxActive(bool bIsActive)
     ForceNetUpdate();
 }
 
-void AItemRandomBox::ApplyItemBoxActiveState()
+void ARandomItemBox::ApplyItemBoxActiveState()
 {
     if(IsValid(ItemBoxMesh))
     {
@@ -139,7 +139,7 @@ void AItemRandomBox::ApplyItemBoxActiveState()
     }
 }
 
-void AItemRandomBox::OnRep_IsItemBoxActive()
+void ARandomItemBox::OnRep_IsItemBoxActive()
 {
     ApplyItemBoxActiveState();
 }
@@ -148,7 +148,7 @@ void AItemRandomBox::OnRep_IsItemBoxActive()
 // 아이템 지급
 // ------------------------------------------------------------
 
-UItemDataAsset* AItemRandomBox::SelectRandomItem() const
+UItemDataAsset* ARandomItemBox::SelectRandomItem() const
 {
     TArray<UItemDataAsset*> ValidItemList;
 

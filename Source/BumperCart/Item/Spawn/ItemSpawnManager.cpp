@@ -1,12 +1,12 @@
-﻿#include "Item/Spawn/ItemRandomBoxSpawner.h"
+﻿#include "Item/Spawn/ItemSpawnManager.h"
 
-#include "Item/Spawn/ItemRandomBox.h"
+#include "Item/Spawn/RandomItemBox.h"
 #include "GameState/MainGameState.h"
 
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 
-AItemRandomBoxSpawner::AItemRandomBoxSpawner()
+AItemSpawnManager::AItemSpawnManager()
 {
  	PrimaryActorTick.bCanEverTick = false;
     bReplicates = false;
@@ -15,7 +15,7 @@ AItemRandomBoxSpawner::AItemRandomBoxSpawner()
     SetRootComponent(SceneRoot);
 }
 
-void AItemRandomBoxSpawner::BeginPlay()
+void AItemSpawnManager::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -31,15 +31,15 @@ void AItemRandomBoxSpawner::BeginPlay()
     }
 }
 
-void AItemRandomBoxSpawner::SpawnItemRandomBoxes()
+void AItemSpawnManager::SpawnRandomItemBoxes()
 {
     if (!HasAuthority())
     {
         return;
     }
 
-    // BP_ItemRandomBox 지정
-    if (!ItemRandomBoxClass)
+    // BP_RandomItemBox 지정
+    if (!RandomItemBoxClass)
     {
         return;
     }
@@ -48,15 +48,15 @@ void AItemRandomBoxSpawner::SpawnItemRandomBoxes()
     ClearInvalidSpawnedItemBoxes();
 
     // 모든 슬롯 순회하면서 비어있는 위치에만 아이템 박스 스폰
-    for (FItemRandomBoxSpawnSlot& SpawnSlot : ItemBoxSpawnSlots)
+    for (FRandomItemBoxSpawnSlot& SpawnSlot : ItemBoxSpawnSlots)
     {
-        SpawnItemRandomBoxAtSlot(SpawnSlot);
+        SpawnRandomItemBoxAtSlot(SpawnSlot);
     }
 }
 
-void AItemRandomBoxSpawner::ClearInvalidSpawnedItemBoxes()
+void AItemSpawnManager::ClearInvalidSpawnedItemBoxes()
 {
-    for (FItemRandomBoxSpawnSlot& SpawnSlot : ItemBoxSpawnSlots)
+    for (FRandomItemBoxSpawnSlot& SpawnSlot : ItemBoxSpawnSlots)
     {
         // 박스가 Destroy되면 Invalid가 false가 됨
         // 슬롯 재사용 가능하도록 nullptr 사용
@@ -67,7 +67,7 @@ void AItemRandomBoxSpawner::ClearInvalidSpawnedItemBoxes()
     }
 }
 
-void AItemRandomBoxSpawner::SpawnItemRandomBoxAtSlot(FItemRandomBoxSpawnSlot& SpawnSlot)
+void AItemSpawnManager::SpawnRandomItemBoxAtSlot(FRandomItemBoxSpawnSlot& SpawnSlot)
 {
     if (!HasAuthority())
     {
@@ -92,9 +92,9 @@ void AItemRandomBoxSpawner::SpawnItemRandomBoxAtSlot(FItemRandomBoxSpawnSlot& Sp
     SpawnParams.Owner = this;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-    // ItemRandomBoxClass에 지정된 BP_ItemRandomBox를 SapwnPoint 위치에 생성함
-    AItemRandomBox* SpawnedItemBox = GetWorld()->SpawnActor<AItemRandomBox>(
-        ItemRandomBoxClass,
+    // RandomItemBoxClass에 지정된 BP_RandomItemBox를 SapwnPoint 위치에 생성함
+    ARandomItemBox* SpawnedItemBox = GetWorld()->SpawnActor<ARandomItemBox>(
+        RandomItemBoxClass,
         SpawnTransform,
         SpawnParams
     );
@@ -111,14 +111,14 @@ void AItemRandomBoxSpawner::SpawnItemRandomBoxAtSlot(FItemRandomBoxSpawnSlot& Sp
 }
 
 
-void AItemRandomBoxSpawner::ClearSpawnedItemRandomBoxes()
+void AItemSpawnManager::ClearSpawnedRandomItemBoxes()
 {
     if (!HasAuthority())
     {
         return;
     }
 
-    for (FItemRandomBoxSpawnSlot& SpawnSlot : ItemBoxSpawnSlots)
+    for (FRandomItemBoxSpawnSlot& SpawnSlot : ItemBoxSpawnSlots)
     {
         // 라운드 종료 시 남아 있는 박스 제거
         if (IsValid(SpawnSlot.SpawnedItemBox))

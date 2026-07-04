@@ -2,18 +2,18 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "ItemRandomBox.generated.h"
+#include "RandomItemBox.generated.h"
 
 class UBoxComponent;
 class UItemDataAsset;
 
 UCLASS()
-class BUMPERCART_API AItemRandomBox : public AActor
+class BUMPERCART_API ARandomItemBox : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
-	AItemRandomBox();
+	ARandomItemBox();
 
 protected:
 	virtual void BeginPlay() override;

@@ -2,12 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "ItemRandomBoxSpawner.generated.h"
+#include "ItemSpawnManager.generated.h"
 
-class AItemRandomBox;
+class ARandomItemBox;
 
 USTRUCT(BlueprintType)
-struct FItemRandomBoxSpawnSlot
+struct FRandomItemBoxSpawnSlot
 {
     GENERATED_BODY()
 
@@ -18,16 +18,16 @@ public:
 
     // SpawnPoint에 생성될 아이템 박스
     UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "ItemBox|Spawn")
-    TObjectPtr<AItemRandomBox> SpawnedItemBox = nullptr;
+    TObjectPtr<ARandomItemBox> SpawnedItemBox = nullptr;
 };
 
 UCLASS()
-class BUMPERCART_API AItemRandomBoxSpawner : public AActor
+class BUMPERCART_API AItemSpawnManager  : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
-	AItemRandomBoxSpawner();
+	AItemSpawnManager ();
 
 protected:
 	virtual void BeginPlay() override;
@@ -46,15 +46,15 @@ public:
     // 모든 SpawnPoint를 확인하고,
     // 비어 있는 곳에 아이템 박스 생성
     UFUNCTION(BlueprintCallable, Category = "ItemBox|Spawn")
-    void SpawnItemRandomBoxes();
+    void SpawnRandomItemBoxes();
 
     // 라운드 종료 시 남아 있는 아이템 박스 모두 제거
     UFUNCTION(BlueprintCallable, Category = "ItemBox|Spawn")
-    void ClearSpawnedItemRandomBoxes();
+    void ClearSpawnedRandomItemBoxes();
 
 private:
     // 슬롯에 아이템 박스 생성
-    void SpawnItemRandomBoxAtSlot(FItemRandomBoxSpawnSlot& SpawnSlot);
+    void SpawnRandomItemBoxAtSlot(FRandomItemBoxSpawnSlot& SpawnSlot);
 
     // Destroy된 박스 정리
     void ClearInvalidSpawnedItemBoxes();
@@ -65,10 +65,10 @@ private:
 private:
     // 스폰할 아이템 랜덤 박스 클래스
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ItemBox|Spawn", meta = (AllowPrivateAccess = "true"))
-    TSubclassOf<AItemRandomBox> ItemRandomBoxClass;
+    TSubclassOf<ARandomItemBox> RandomItemBoxClass;
 
     // 아이템 박스가 생성될 모든 위치
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ItemBox|Spawn", meta = (AllowPrivateAccess = "true"))
-    TArray<FItemRandomBoxSpawnSlot> ItemBoxSpawnSlots;
+    TArray<FRandomItemBoxSpawnSlot> ItemBoxSpawnSlots;
 
 };
