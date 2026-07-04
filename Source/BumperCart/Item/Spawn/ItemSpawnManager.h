@@ -31,6 +31,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 // ------------------------------------------------------------
 // 컴포넌트
@@ -38,6 +39,38 @@ protected:
 private:
     UPROPERTY(VisibleAnywhere, Category = "ItemBox|Components")
     TObjectPtr<USceneComponent> SceneRoot;
+
+// ------------------------------------------------------------
+// 타이머
+// ------------------------------------------------------------
+public:
+    // 아이템 박스 스폰 시작
+    UFUNCTION(BlueprintCallable, Category = "ItemBox|Spawn")
+    void StartSpawning();
+
+    // 아이템 박스 스폰 정지
+    UFUNCTION(BlueprintCallable, Category = "ItemBox|Spawn")
+    void StopSpawning();
+
+    // 현재 스폰 타이머가 동작 중인지
+    UFUNCTION(BlueprintPure, Category = "ItemBox|Spawn")
+    bool IsSpawning() const;
+
+private:
+    // 스폰 주기 지나면 호출
+    void HandleSpawnIntervalElapsed();
+
+private:
+    // 아이템 박스 스폰 타이머
+    FTimerHandle RandomItemBoxSpawnTimerHandle;
+
+    // 스폰 주기
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ItemBox|Spawn", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
+    float SpawnInterval = 30.0f;
+
+    // 게임 시작 즉시 한 번 스폰할지
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ItemBox|Spawn", meta = (AllowPrivateAccess = "true"))
+    bool bSpawnImmediatelyOnStart = true;
 
 // ------------------------------------------------------------
 // 아이템 박스 스폰
@@ -70,5 +103,4 @@ private:
     // 아이템 박스가 생성될 모든 위치
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ItemBox|Spawn", meta = (AllowPrivateAccess = "true"))
     TArray<FRandomItemBoxSpawnSlot> ItemBoxSpawnSlots;
-
 };

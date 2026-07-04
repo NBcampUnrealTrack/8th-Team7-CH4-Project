@@ -4,6 +4,7 @@
 #include "GameState/MainGameState.h"
 
 #include "Components/SceneComponent.h"
+#include "TimerManager.h"
 #include "Engine/World.h"
 
 AItemSpawnManager::AItemSpawnManager()
@@ -30,6 +31,91 @@ void AItemSpawnManager::BeginPlay()
 
     }
 }
+
+void AItemSpawnManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    StopSpawning();
+
+    Super::EndPlay(EndPlayReason);
+}
+// ------------------------------------------------------------
+// 타이머
+// ------------------------------------------------------------
+
+void AItemSpawnManager::StartSpawning()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (SpawnInterval <= KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+
+    if (!RandomItemBoxClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("RandomItemBoxClass가 지정되지 않음"));
+        return;
+    }
+
+    StopSpawning();
+
+    // 게임 시작 시 바로 아이템 박스 스폰
+    if (bSpawnImmediatelyOnStart)
+    {
+        SpawnRandomItemBoxes();
+    }
+
+    GetWorldTimerManager().SetTimer(
+        RandomItemBoxSpawnTimerHandle,
+        this,
+        &ThisClass::HandleSpawnIntervalElapsed,
+        SpawnInterval,
+        true
+    );
+}
+
+void AItemSpawnManager::StopSpawning()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!GetWorldTimerManager().IsTimerActive(RandomItemBoxSpawnTimerHandle))
+    {
+        return;
+    }
+
+    GetWorldTimerManager().ClearTimer(RandomItemBoxSpawnTimerHandle);
+}
+
+bool AItemSpawnManager::IsSpawning() const
+{
+    if (!HasAuthority())
+    {
+        return false;
+    }
+
+    return GetWorldTimerManager().IsTimerActive(RandomItemBoxSpawnTimerHandle);
+}
+
+void AItemSpawnManager::HandleSpawnIntervalElapsed()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    // 아이템 스폰
+    SpawnRandomItemBoxes();
+}
+
+// ------------------------------------------------------------
+// 아이템 박스 스폰
+// ------------------------------------------------------------
 
 void AItemSpawnManager::SpawnRandomItemBoxes()
 {
