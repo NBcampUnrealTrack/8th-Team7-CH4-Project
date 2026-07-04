@@ -169,13 +169,13 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
     float CameraArmMin = 800.f;
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float CameraArmMax = 900.f;
+    float CameraArmMax = 850.f;
 
-    //저속/고속 FOV (3인칭 기준으로 상향 — 고속에서 넓어져 속도감)
+    //저속/고속 FOV (폭을 작게 — 가감속 반복 시 FOV 출렁임/멀미 완화)
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
-    float CameraFovMin = 95.f;
+    float CameraFovMin = 90.f;
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
-    float CameraFovMax = 115.f;
+    float CameraFovMax = 95.f;
 
     //부스트 시 추가 빼기/넓히기
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
@@ -183,9 +183,9 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
     float BoostExtraFov = 7.f;
 
-    //FOV/줌 보간 속도 (낮을수록 부드럽게)
+    //FOV/줌 보간 속도 (낮을수록 부드럽게 — 가감속 시 FOV가 천천히 반응해 멀미 완화)
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
-    float CameraZoomInterpSpeed = 7.f;
+    float CameraZoomInterpSpeed = 3.f;
 
 
     //---------- 연출 (FX) ----------
