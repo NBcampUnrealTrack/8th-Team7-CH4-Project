@@ -116,12 +116,6 @@ bool UCartItemInventoryComponent::AcquireItem(UItemDataAsset* NewItemData)
 
 void UCartItemInventoryComponent::RequestUseItem()
 {
-    // 아이템 보유 여부
-    if (!HasItem())
-    {
-        return;
-    }
-
     AActor* OwnerActor = GetOwner();
 
     if (!IsValid(OwnerActor))
@@ -160,7 +154,7 @@ void UCartItemInventoryComponent::UseItem()
     }
 
     // 아이템 보유 여부
-    if (!CurrentItemData)
+    if (!HasItem())
     {
         return;
     }
