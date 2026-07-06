@@ -153,8 +153,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "1"))
 	float BoostSpeedMultiplier = 1.8f;
 
+	//부스트 지속 시간(초). 아이템화로 사용 기회가 줄어드는 만큼 길게 (B13 밸런싱)
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
-	float BoostDuration = 0.6f;
+	float BoostDuration = 2.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
 	float BoostCooldown = 1.0f;
@@ -236,14 +237,6 @@ protected:
 	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초) — 모든 스필(충돌·부스터오용) 공통
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BumpDropCooldown = 0.5f;
-
-	//B5 : 부스터 오용(브레이크/급회전)으로 쏟을 때의 충격량
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BoostMisuseImpulse = 800.f;
-
-	//B5 : 부스터 중 누적 회전각(도)이 이 값을 넘으면 쏟음
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BoostTurnSpillAngle = 60.f;
 
 	//충돌 시 재생할 카메라 쉐이크 (BP_CartPawn에 BP_CartBumpShake 지정). 비어있으면 흔들지 않음
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump")
@@ -352,9 +345,6 @@ private:
 
     //소유 클라가 전담하는 절대 회전값(도). 매 프레임 SetActorRotation으로 재확정해 서버 보정 롤백에 면역
     float ControlledYaw = 0.f;
-
-	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
-	float BoostTurnAccumDeg = 0.f;
 
 	//미끄럼(슬립) 상태
 	bool bIsSlipping = false;
