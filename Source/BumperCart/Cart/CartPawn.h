@@ -17,6 +17,7 @@ struct FInputActionValue;
 class UCartGrabComponent;
 class UCartScreenFXComponent;
 class UCartItemInventoryComponent;
+class UStaticMeshComponent;
 
 UCLASS(abstract)
 class ACartPawn : public ACharacter, public ISlideAffectable, public IBumpable
@@ -273,9 +274,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
 	float SlipBrakingDeceleration = 0.f;
 
-	//미끄럼 시작 시 강제 스핀이 풀리는 속도(도/초)
+	//미끄럼 지속시간 클램프(초) — 기믹이 주는 값이 짧거나 길어도 이 범위로 보정 (조작 불능 시간)
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
-	float SlipSpinSpeedDeg = 240.f;
+	float SlipMinDuration = 1.5f;
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
+	float SlipMaxDuration = 2.f;
+
+	//미끄럼 동안 카트 메시가 도는 바퀴 수 — 정수 바퀴라 끝나면 원래 방향으로 복귀
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "1"))
+	int32 SlipSpinTurns = 2;
+
+	//빙글 돌릴 카트 메시 컴포넌트 이름 (BP_CartPawn의 카트 스태틱 메시)
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip")
+	FName SlipSpinMeshName = TEXT("Cart");
 
 	//---------- 효과음 (SFX) — BP_CartPawn에서 사운드 지정. 비어있으면 무음 ----------
 	//충돌(범프) 시 효과음
@@ -289,6 +300,10 @@ protected:
 	//브레이크 시 효과음
 	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
 	USoundBase* BrakeSound;
+
+	//미끄럼(물웅덩이) 시작 시 효과음 — 내 카트는 2D, 상대 카트는 3D로 재생 (StartSlip은 전 클라 실행)
+	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
+	USoundBase* SlipSound;
 
 protected:
 	//---------- 입력 핸들러 ----------
@@ -356,9 +371,15 @@ private:
     //소유 클라가 전담하는 절대 회전값(도). 매 프레임 SetActorRotation으로 재확정해 서버 보정 롤백에 면역
     float ControlledYaw = 0.f;
 
-	//미끄럼(슬립) 상태
+	//미끄럼(슬립) 상태 — 액터 yaw는 건드리지 않고(카메라 정면 유지) 카트 메시만 제자리 스핀
 	bool bIsSlipping = false;
 	float SlipTimeRemaining = 0.f;     //남은 미끄럼 시간(초)
-	float SlipSpinRemainingDeg = 0.f;  //남은 강제 스핀 각(도)
+	float SlipDurationTotal = 0.f;     //이번 미끄럼 총 시간(초) — 스핀 진행도 계산용
+	float SlipSpinDir = 1.f;           //스핀 방향(+1/-1) — 기믹이 준 SpinAngleDeg의 부호
 	float DefaultGroundFriction = 0.f; //미끄럼 후 마찰 복구용 백업
+
+	//빙글 돌릴 카트 메시 (SlipSpinMeshName으로 최초 1회 탐색·캐시) + 원래 상대 회전(복구용)
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> SlipSpinMesh;
+	FRotator SlipSpinMeshBaseRelRot = FRotator::ZeroRotator;
 };
