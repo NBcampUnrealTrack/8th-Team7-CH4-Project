@@ -76,7 +76,7 @@ UCartGrabComponent::UCartGrabComponent()
     ServerGrabDirection = FVector::ZeroVector;
     ServerGrabMaxDistance = 0.f;
     ServerGrabCurrentDistance = 0.f;
-    AimPlaneZ = 20.f;
+    AimPlaneZ = 120.f;
 
     // 로봇손 관련
     GrabSpeed = 1400.f;

@@ -11,30 +11,47 @@
 #include "Engine/StaticMesh.h"
 #include "Net/UnrealNetwork.h"
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
+#include "Components/SceneComponent.h"
 
 AProductBase::AProductBase()
 {
- 	PrimaryActorTick.bCanEverTick = false;
+ 	PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false;
 
     bReplicates = true;
-    SetReplicateMovement(true);
+    SetReplicateMovement(false);
 
     // 컴포넌트 설정
+    Scene = CreateDefaultSubobject<USceneComponent>(TEXT("Scene"));
+    SetRootComponent(Scene);
+
     Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
+    Mesh->SetupAttachment(Scene);
     Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     Mesh->SetCollisionProfileName(TEXT("ProductPhysics"));
     Mesh->SetSimulatePhysics(false);
     Mesh->SetMobility(EComponentMobility::Movable);
     Mesh->SetReceivesDecals(false);
-    SetRootComponent(Mesh);
 
     GrabCollision = CreateDefaultSubobject<USphereComponent>(TEXT("GrabCollision"));
-    GrabCollision->SetupAttachment(Mesh);
+    GrabCollision->SetupAttachment(Scene);
     GrabCollision->SetSphereRadius(40.f);
     GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     GrabCollision->SetCollisionProfileName(TEXT("ProductGrab"));
 
     bOnSale = false;
+
+    ElapsedTime = 0.f;
+    HeightOffset = 120.f;
+    BobbingAmplitude = 30.f;
+    BobbingSpeed = 1.5f;
+    RotationSpeed = 60.f;
+
+    FallingStartLocation = FVector::ZeroVector;
+    FallingEndLocation = FVector::ZeroVector;
+    FallingElapsedTime = 0.f;
+    FallingMinHeight = 120.f;
+    FallingMaxHeight = 200.f;
 }
 
 void AProductBase::Destroyed()
@@ -72,13 +89,30 @@ void AProductBase::BeginPlay()
     Super::BeginPlay();
 
     ApplyDataAsset();
+
+    FVector BobbingLocation = GetActorLocation();
+    BobbingLocation.Z = HeightOffset;
+    SetActorLocation(BobbingLocation, false, nullptr, ETeleportType::TeleportPhysics);
+
+    // 랜덤한 위아래 움직임을 위해 시작 시간을 다르게 함
+    // 연출이라 모든 클라가 같을 필요는 없음
+    ElapsedTime = FMath::RandRange(0.f, 2.f);
+
     SetProductState(EProductState::Display);
 }
 
-void AProductBase::Initialize(const FVector& SpawnLocation)
+void AProductBase::Tick(float DeltaTime)
 {
-    SetActorLocation(SpawnLocation);
-    SetProductState(EProductState::Display);
+    Super::Tick(DeltaTime);
+
+    if (ProductState.State == EProductState::Display)
+    {
+        TickDisplay(DeltaTime);
+    }
+    else if (ProductState.State == EProductState::Falling)
+    {
+        TickFalling(DeltaTime);
+    }
 }
 
 void AProductBase::OnConstruction(const FTransform& Transform)
@@ -111,13 +145,20 @@ void AProductBase::ApplyProductState()
     {
     case EProductState::Display:
         SetActorHiddenInGame(false);
-        SetNetUpdateFrequency(20.f);
-        SetReplicateMovement(true);
+        SetNetUpdateFrequency(1.f);
+        SetReplicateMovement(false);
 
-        Mesh->SetSimulatePhysics(true);
+        Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+        Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
         GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+        // 클라이언트면 둥둥 떠다니는 연출위해 Tick 켜기
+        if (GetNetMode() != NM_DedicatedServer)
+        {
+            SetActorTickEnabled(true);
+        }
         break;
 
     case EProductState::Grabbed:
@@ -125,7 +166,6 @@ void AProductBase::ApplyProductState()
         SetNetUpdateFrequency(1.f);
         SetReplicateMovement(false);
 
-        Mesh->SetSimulatePhysics(false);
         Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
         Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -138,7 +178,6 @@ void AProductBase::ApplyProductState()
         SetNetUpdateFrequency(1.f);
         SetReplicateMovement(false);
 
-        Mesh->SetSimulatePhysics(false);
         Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
         Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -149,13 +188,15 @@ void AProductBase::ApplyProductState()
     case EProductState::Falling:
         SetActorHiddenInGame(false);
         SetNetUpdateFrequency(30.f);
-        SetReplicateMovement(true);
+        SetReplicateMovement(false);
 
-        Mesh->SetSimulatePhysics(true);
+        Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+        Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
         Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 
-        // 떨어지는 중에도 회수 가능하면 QueryOnly, 아니면 NoCollision
         GrabCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+        SetActorTickEnabled(true);
         break;
 
     case EProductState::Paid:
@@ -163,7 +204,6 @@ void AProductBase::ApplyProductState()
         SetNetUpdateFrequency(1.f);
         SetReplicateMovement(false);
 
-        Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionProfileName(TEXT("NoCollision"));
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -176,7 +216,6 @@ void AProductBase::ApplyProductState()
         SetNetUpdateFrequency(1.f);
         SetReplicateMovement(false);
 
-        Mesh->SetSimulatePhysics(false);
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
         GrabCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -223,74 +262,55 @@ void AProductBase::DropFromCart(AActor* CartActor)
     if (!HasAuthority()) return;
     if (!IsValid(CartActor) || !IsValid(DropConfig)) return;
 
-    // 카트에서 떨어뜨림
-    //DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-
-    // 물리/충돌 잠깐 해제
-    Mesh->SetSimulatePhysics(false);
+    // 충돌 잠깐 끄기
     Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
     Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
     Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // 위치 잡기
+    // Faling 오프셋 결정
     FVector Offset = FVector(
         FMath::RandRange(-DropConfig->HorizontalOffset, DropConfig->HorizontalOffset),
         FMath::RandRange(-DropConfig->HorizontalOffset, DropConfig->HorizontalOffset),
         0.f);
-    FVector DropLocation = CartActor->GetActorLocation() + Offset + FVector(0.f, 0.f, DropConfig->HeightOffset);
-    SetActorLocation(DropLocation, false, nullptr, ETeleportType::TeleportPhysics);
 
-    // 위쪽 방향 기준으로 랜덤 원뿔 위치 방향에 줄 Impulse 계산
-    float SpreadRadian = FMath::DegreesToRadians(DropConfig->HalfAngle);
-    float ImpulseVal = FMath::RandRange(DropConfig->MinImpulse, DropConfig->MaxImpulse);
-    FVector ImpulseDirection = FMath::VRandCone(FVector::UpVector, SpreadRadian) * ImpulseVal;
+    FallingHeight = FMath::RandRange(FallingMinHeight, FallingMaxHeight);
 
-    ProductState.DropLocation = DropLocation;
+    // Falling 시작 위치 잡기
+    FallingStartLocation = CartActor->GetActorLocation();
+    FallingStartLocation.Z = HeightOffset;
+
+    // Falling 목표 위치 잡기, 시간 0 으로 설정
+    FallingEndLocation = FallingStartLocation + Offset;
+    FallingElapsedTime = 0.f;
+
+    ProductState.FallingStartLocation = FallingStartLocation;
+    ProductState.FallingEndLocation = FallingEndLocation;
+    ProductState.FallingHeight = FallingHeight;
+
+    // Falling 시작 위치로 일단 이동
+    SetActorLocation(FallingStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
 
     // Falling 상태로 변환
     SetProductState(EProductState::Falling);
 
-    // 물리 활성화
-    Mesh->WakeAllRigidBodies();
-
-    Mesh->AddImpulse(ImpulseDirection, NAME_None, true);
-
     // 강제로 위치 업데이트
     ForceNetUpdate();
-
-    // 일정 시간뒤 진열 상태로 전환
-    GetWorldTimerManager().SetTimer(
-        ReturnDisplayTimer,
-        this,
-        &ThisClass::HandleReturnDisplay,
-        DropConfig->FallingDuration,
-        false
-    );
 }
 
 void AProductBase::OnRep_ProductState()
 {
-    // Falling의 경우 물리를 먼저 끄고 위치를 조정한다음 상태 반영
+    // Falling으로 변할땐 위치 지정
     if (ProductState.State == EProductState::Falling)
     {
-        Mesh->SetSimulatePhysics(false);
-        Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
-        Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+        FallingStartLocation = ProductState.FallingStartLocation;
+        FallingEndLocation = ProductState.FallingEndLocation;
+        FallingHeight = ProductState.FallingHeight;
+        FallingElapsedTime = 0.f;
 
-        SetActorLocation(ProductState.DropLocation, false, nullptr, ETeleportType::TeleportPhysics);
+        SetActorLocation(ProductState.FallingStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
     }
 
     ApplyProductState();
-}
-
-void AProductBase::HandleReturnDisplay()
-{
-    // 떨어지는 중에 아이템을 먹으면 Loaded이므로 제한함
-    // Falling 일때만 Display로 바꿈
-    if (ProductState.State == EProductState::Falling)
-    {
-        SetProductState(EProductState::Display);
-    }
 }
 
 int32 AProductBase::GetWeight() const
@@ -346,4 +366,60 @@ bool AProductBase::CanGrab() const
 {
     return ProductState.State == EProductState::Display ||
         ProductState.State == EProductState::Falling;
+}
+
+void AProductBase::TickDisplay(float DeltaTime)
+{
+    if (!IsValid(Mesh)) return;
+
+    ElapsedTime += DeltaTime;
+
+    // 메시만 SIn 함수 따라 상대 좌표 위아래로 이동
+    float BobZ = FMath::Sin(ElapsedTime * BobbingSpeed) * BobbingAmplitude;
+    Mesh->SetRelativeLocation(FVector(0.f, 0.f, BobZ));
+
+    // 회전값 적용
+    FRotator Rotation = Mesh->GetRelativeRotation();
+    Rotation.Yaw = RotationSpeed * ElapsedTime;
+    Mesh->SetRelativeRotation(Rotation);
+}
+
+void AProductBase::TickFalling(float DeltaTime)
+{
+    if (ProductState.State != EProductState::Falling) return;
+
+    FallingElapsedTime += DeltaTime;
+
+    float Alpha = FallingElapsedTime / FMath::Max(DropConfig->FallingDuration, KINDA_SMALL_NUMBER);
+    FVector Location = GetFallLocation(Alpha);
+
+    SetActorLocation(Location, true);
+
+    if (Alpha >= 1.f)
+    {
+        SetActorLocation(FallingEndLocation, true);
+
+        if (HasAuthority())
+        {
+            SetProductState(EProductState::Display);
+            ForceNetUpdate();
+        }
+    }
+}
+
+void AProductBase::SetBaseLocation(const FVector& Location)
+{
+}
+
+FVector AProductBase::GetFallLocation(float Alpha) const
+{
+    Alpha = FMath::Clamp(Alpha, 0.f, 1.f);
+
+    FVector Location = FMath::Lerp(FallingStartLocation, FallingEndLocation, Alpha);
+
+    // PI 까지만 Sin 함수 이용하면 위로 올라갔다가 내려옴
+    float Z = FMath::Sin(Alpha * PI) * FallingHeight;
+    Location.Z += Z;
+
+    return Location;
 }

@@ -57,7 +57,15 @@ public:
     UPROPERTY(BlueprintReadOnly)
     EProductState State = EProductState::None;
 
-    // 서버가 계산한 드롭 시작하는 위치
+    // 서버가 계산한 Falling 시작 지점
     UPROPERTY(BlueprintReadOnly)
-    FVector_NetQuantize10 DropLocation = FVector::ZeroVector;
+    FVector_NetQuantize10 FallingStartLocation = FVector::ZeroVector;
+
+    // 서버가 계산한 Falling 도착 지점
+    UPROPERTY(BlueprintReadOnly)
+    FVector_NetQuantize10 FallingEndLocation = FVector::ZeroVector;
+
+    // 서버가 계산한 튀어오르는 높이
+    UPROPERTY(BlueprintReadOnly)
+    float FallingHeight = 0.f;
 };
