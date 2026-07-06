@@ -4,9 +4,11 @@
 #include "GameMode/MainGameMode.h"
 
 #include "Checkout/CheckoutManager.h"
+#include "DataAsset/CharacterSelectionConfig.h"
 #include "Kismet/GameplayStatics.h"
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 #include "EventManager/BC_EventSubsystem.h"
+#include "GameInstance/MainGameInstance.h"
 #include "MapGimmickManager/MapGimmickManager.h"
 #include "PlayerState/MainPlayerState.h"
 
@@ -33,6 +35,31 @@ AMainGameMode::AMainGameMode()
     CheckoutManagerRef = nullptr;
 
 
+}
+
+UClass* AMainGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+    if (APlayerState* PS = InController ? InController->PlayerState : nullptr)
+    {
+        if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+        {
+            const int32 CharacterIndex = GI->GetPlayerCharacter(PS->GetUniqueId());
+
+            if (GI->CharacterSelectionConfig && GI->CharacterSelectionConfig->CharacterDatas.IsValidIndex(CharacterIndex))
+            {
+                const FCharacterData& Data = GI->CharacterSelectionConfig->CharacterDatas[CharacterIndex];
+                if (TSubclassOf<APawn> SelectedPawnClass = GI->CharacterSelectionConfig->CharacterDatas[CharacterIndex].PawnClass)
+                {
+                    UE_LOG(LogMainGameMode, Warning, TEXT("[캐릭터 스폰 적용] 플레이어: %s / 적용된 캐릭터: %s (Index: %d)"),
+                     *PS->GetPlayerName(), *Data.DisplayName.ToString(), CharacterIndex);
+
+                    return *SelectedPawnClass;
+                }
+            }
+        }
+    }
+
+    return Super::GetDefaultPawnClassForController_Implementation(InController);
 }
 
 void AMainGameMode::BeginPlay()

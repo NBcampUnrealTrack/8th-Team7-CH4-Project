@@ -237,7 +237,6 @@ void UMainGameInstanceSubsystem::FindSessions(const FString& RoomNameFilter)
     Sessions->FindSessions(0, SearchSettings.ToSharedRef());
 }
 
-// 퀵 매치 분기 추가
 // 방 찾은 이후 정보 가공
 void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
 {
@@ -256,11 +255,6 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
     FilteredResults.Reset();
     for (const FOnlineSessionSearchResult& SearchResult : SearchSettings->SearchResults)
     {
-        //비밀번호가 설정되어있으면 비공개이므로 제외
-        FString FoundPassword;
-        SearchResult.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, FoundPassword);
-        if (!FoundPassword.IsEmpty()) continue;
-
         //방 제목과 일치하는 방 검색
         if (!SearchRoomNameFilter.IsEmpty())
         {
@@ -636,7 +630,7 @@ FString UMainGameInstanceSubsystem::GetFoundSessionRoomName(int32 Index) const
     if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return FString();
 
     FString FoundRoomName;
-    SearchSettings->SearchResults[Index].Session.SessionSettings.Get(SETTING_ROOMNAME, FoundRoomName);
+    FilteredResults[Index].Session.SessionSettings.Get(SETTING_ROOMNAME, FoundRoomName);
     return FoundRoomName;
 }
 
@@ -645,8 +639,18 @@ FString UMainGameInstanceSubsystem::GetFoundSessionOwnerName(int32 Index) const
     if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return FString();
 
     FString FoundOwnerName;
-    SearchSettings->SearchResults[Index].Session.SessionSettings.Get(SETTING_OWNERNAME, FoundOwnerName);
+    FilteredResults[Index].Session.SessionSettings.Get(SETTING_OWNERNAME, FoundOwnerName);
     return FoundOwnerName;
+}
+
+// 방에 비밀번호가 존재하다면 비공개 방으로 판단
+bool UMainGameInstanceSubsystem::GetFoundSessionIsPrivate(int32 Index) const
+{
+    if (!FilteredResults.IsValidIndex(Index)) return false;
+
+    FString FoundPassword;
+    FilteredResults[Index].Session.SessionSettings.Get(SETTING_ROOMPASSWORD, FoundPassword);
+    return !FoundPassword.IsEmpty();
 }
 
 int32 UMainGameInstanceSubsystem::GetFoundSessionCount() const

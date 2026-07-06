@@ -10,6 +10,9 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "BumperCart.h"
+#include "Blueprint/UserWidget.h"
+#include "GameFramework/PlayerController.h"
+#include "TimerManager.h"
 
 UCartScreenFXComponent::UCartScreenFXComponent()
 {
@@ -196,4 +199,84 @@ void UCartScreenFXComponent::DriveWheelFX(float ForwardSpeed, float DeltaTime)
 	}
 	if (SparkFXLeft) { SparkFXLeft->SetVariableFloat(FName("BrakeHeat"), BrakeHeat); }
 	if (SparkFXRight) { SparkFXRight->SetVariableFloat(FName("BrakeHeat"), BrakeHeat); }
+}
+
+//컴포넌트 종료 시 남아있는 토마토 위젯 정리
+void UCartScreenFXComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	RemoveTomatoScreenBlock();
+
+	Super::EndPlay(EndPlayReason);
+}
+
+//토마토에 맞으면 화면 가림 위젯을 Duration초간 표시 (로컬 플레이어만)
+void UCartScreenFXComponent::ApplyTomatoScreenBlock(float Duration)
+{
+	if (!OwnerCart)
+	{
+		return;
+	}
+
+	//로컬 플레이어만 가림
+	if (!OwnerCart->IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (!TomatoScreenBlockWidgetClass)
+	{
+		return;
+	}
+
+	APlayerController* PlayerController = Cast<APlayerController>(OwnerCart->GetController());
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	//이미 토마토가 화면을 가릴 경우, 제거 후 다시 화면 가림
+	RemoveTomatoScreenBlock();
+
+	TomatoScreenBlockWidget = CreateWidget<UUserWidget>(PlayerController, TomatoScreenBlockWidgetClass);
+	if (!TomatoScreenBlockWidget)
+	{
+		return;
+	}
+
+	TomatoScreenBlockWidget->AddToViewport(TomatoScreenBlockZOrder);
+
+	if (Duration <= 0.f)
+	{
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		TomatoScreenBlockTimerHandle,
+		this,
+		&ThisClass::RemoveTomatoScreenBlock,
+		Duration,
+		false
+	);
+}
+
+//토마토 화면 가림 위젯 제거
+void UCartScreenFXComponent::RemoveTomatoScreenBlock()
+{
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(TomatoScreenBlockTimerHandle);
+	}
+
+	if (TomatoScreenBlockWidget)
+	{
+		TomatoScreenBlockWidget->RemoveFromParent();
+		TomatoScreenBlockWidget = nullptr;
+	}
 }

@@ -15,6 +15,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
 #include "Component/CartScreenFXComponent.h"
+#include "Component/CartItemInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
@@ -80,6 +81,9 @@ ACartPawn::ACartPawn()
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
     GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
 
+    // 아이템 인벤토리 컴포넌트 부착, SetupPlayerInputComponent에서 아이템 사용 입력 바인딩
+    ItemInventoryComponent = CreateDefaultSubobject<UCartItemInventoryComponent>(TEXT("ItemInventoryComponent"));
+
     //연출(FX) 전담 컴포넌트 — 화면 스피드라인·바닥 리본·브레이크 스파크. 에셋·소켓은 BP의 이 컴포넌트에서 지정
     ScreenFXComponent = CreateDefaultSubobject<UCartScreenFXComponent>(TEXT("CartScreenFXComponent"));
 }
@@ -136,9 +140,9 @@ void ACartPawn::Tick(float DeltaSeconds)
 	{
 		TargetMaxSpeed *= MaxReverseSpeedRatio;
 	}
-	if (bIsBoosting) //부스터가 최우선
+	if (bIsBoosting) //부스터가 최우선 — 무게 감속 무시(아이템, 굼뜬 카트의 풀스피드 탈출/공격)
 	{
-		TargetMaxSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier * LoadSpeedMul;
+		TargetMaxSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier;
 	}
 	Move->MaxWalkSpeed = TargetMaxSpeed;
 
@@ -146,7 +150,8 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//입력(bBrakeHeld)과 실제 상태(bIsBraking)를 분리. 소유자가 판정 후 서버/타 클라에 복제 (부스터와 동일 패턴)
 	if (IsLocallyControlled())
 	{
-		const bool bBrakeEffective = bBrakeHeld && Move->Velocity.Size2D() > BrakeStopSpeed;
+		//부스트 중엔 브레이크 무시(부스트는 커밋된 돌진) → 감속·스파크·스피드라인 모두 부스트 상태 유지
+		const bool bBrakeEffective = bBrakeHeld && !bIsBoosting && Move->Velocity.Size2D() > BrakeStopSpeed;
 		if (bBrakeEffective != bIsBraking)
 		{
 			bIsBraking = bBrakeEffective;
@@ -248,24 +253,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		SetActorRotation(FMath::RInterpTo(GetActorRotation(), Target, DeltaSeconds, RemoteYawInterpSpeed));
 	}
 
-	//--- B5 : 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
-	//입력 기반이라 서버가 모름 => 내 카트(소유 클라)에서 판정, RequestSpill이 서버로 전달
-	if (bIsBoosting && IsLocallyControlled())
-	{
-		//부스터 중 브레이크
-		if (bIsBraking)
-		{
-			RequestSpill(BoostMisuseImpulse, EDropCollisionRole::Normal);
-		}
-
-		//부스터 중 누적 회전각이 임계를 넘으면 (살짝 보정은 OK, 확 꺾으면 쏟음)
-		BoostTurnAccumDeg += FMath::Abs(CurrentSteer) * TurnRateDegPerSec * DeltaSeconds;
-		if (BoostTurnAccumDeg >= BoostTurnSpillAngle)
-		{
-			RequestSpill(BoostMisuseImpulse, EDropCollisionRole::Normal);
-			BoostTurnAccumDeg = 0.f;
-		}
-	}
+	//(부스터 오용 스필 제거됨 — 부스터 아이템화 밸런싱: 급브레이크/급회전 패널티 없음)
 
     //--- 카메라 속도감 연출 ---
     if (IsLocallyControlled() && CameraBoom && FollowCamera)
@@ -338,6 +326,12 @@ void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
     {
         GrabComponent->SetupInput();
     }
+
+    // 아이템 사용 입력(Shift) 연결
+    if (IsValid(ItemInventoryComponent))
+    {
+        ItemInventoryComponent->SetupInput();
+    }
 }
 
 void ACartPawn::OnThrottle(const FInputActionValue& Value)
@@ -386,7 +380,6 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 
 	bIsBoosting = true;
 	bBoostOnCooldown = true;
-	BoostTurnAccumDeg = 0.f; //새 부스터마다 누적 회전 리셋
 	ServerSetBoosting(true); //서버에도 부스터 상태 통지 (충돌 역할용)
 
 	//부스터 효과음 (소유 클라 로컬)
@@ -588,6 +581,22 @@ void ACartPawn::ClientPlayBumpSound_Implementation()
 	{
 		UGameplayStatics::PlaySound2D(this, BumpSound);
 	}
+}
+
+//토마토 피격 시 서버가 소유 클라에 호출 → 화면 가림 위젯 표시
+void ACartPawn::ClientApplyTomatoScreenBlock_Implementation(float Duration)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (!IsValid(ScreenFXComponent))
+	{
+		return;
+	}
+
+	ScreenFXComponent->ApplyTomatoScreenBlock(Duration);
 }
 
 //스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청 (충돌·부스터오용 공용)

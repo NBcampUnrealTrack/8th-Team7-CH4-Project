@@ -90,6 +90,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     FString GetFoundSessionOwnerName(int32 Index) const;
 
+    // 비공개 방인지 아닌지 조회
+    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    bool GetFoundSessionIsPrivate(int32 Index) const;
+
     // 검색 결과 개수 조회
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     int32 GetFoundSessionCount() const;
