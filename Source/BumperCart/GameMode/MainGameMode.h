@@ -48,6 +48,8 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Round Schedule")
     TMap<float, ERoundPhase> PhaseScheduleMap;
 
+    virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
+
 private:
 
     TArray<float> SortedTriggerTimes;
