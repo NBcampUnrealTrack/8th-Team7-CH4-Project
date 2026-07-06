@@ -55,8 +55,8 @@ ACartPawn::ACartPawn()
 	CameraBoom->bInheritPitch = false;
 	CameraBoom->bInheritYaw = true; //카트 회전을 따라 뒤에서 쫓아감
 	CameraBoom->bInheritRoll = false;
-	CameraBoom->bDoCollisionTest = false; //벽에 카메라가 당겨지지 않게
-	//카메라 랙(트레일): 위치·회전을 살짝 뒤늦게 따라오게 해 급가감속·회전 시 화면 출렁임/멀미 완화 (낮을수록 더 늘어짐)
+	CameraBoom->bDoCollisionTest = false; //기본 충돌은 즉시 스냅이라 시점이 튐 => Tick에서 커스텀 스무딩 충돌로 대체
+	//카메라 랙(트레일): 위치/회전을 살짝 뒤늦게 따라오게 해 급가감속·회전 시 화면 출렁임/멀미 완화 (낮을수록 더 늘어짐)
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = 8.f;
 	CameraBoom->bEnableCameraRotationLag = true;
@@ -238,7 +238,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//--- 회전 적용 + 네트워크 동기화 (회전은 '소유 클라 전담') ---
 	if (IsLocallyControlled())
 	{
-		//소유자: 절대 yaw를 매 프레임 재확정 → 서버 보정 롤백에 면역 (상대 회전은 롤백 시 각도를 까먹어 클라만 느려짐)
+		//소유자: 절대 yaw를 매 프레임 재확정 => 서버 보정 롤백에 면역 (상대 회전은 롤백 시 각도를 까먹어 클라만 느려짐)
 		ControlledYaw = FRotator::NormalizeAxis(ControlledYaw + YawDeltaTotal);
 		SetActorRotation(FRotator(0.f, ControlledYaw, 0.f));
 
@@ -249,7 +249,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		else if (!FMath::IsNearlyEqual(ControlledYaw, LastSentYaw, 0.1f))
 		{
 			LastSentYaw = ControlledYaw;
-			ServerSetCartYaw(ControlledYaw); //클라: 서버에 통지 → 서버가 ReplicatedYaw 갱신 → 타 클라 복제
+			ServerSetCartYaw(ControlledYaw); //클라: 서버에 통지 => 서버가 ReplicatedYaw 갱신 → 타 클라 복제
 		}
 	}
 	else
@@ -276,8 +276,34 @@ void ACartPawn::Tick(float DeltaSeconds)
             TargetFov += BoostExtraFov;
         }
 
-        //튐 방지로 부드럽게 보간
-        CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArm, DeltaSeconds, CameraZoomInterpSpeed);
+        //--- 커스텀 카메라 충돌: 카트 본체에서 원하는 카메라 위치까지 구 스윕 => 막히면 그 거리로 암 제한 ---
+        //카트 본체에서 카메라까지로 검사
+        float SafeArm = TargetArm;
+        if (UWorld* World = GetWorld())
+        {
+            const FVector BoomOrigin = CameraBoom->GetComponentLocation();
+            const FRotator BoomRot   = CameraBoom->GetComponentRotation();
+            const FVector ArmDir      = BoomRot.RotateVector(FVector(-1.f, 0.f, 0.f)); //암이 뻗는 방향(뒤·아래), 단위벡터
+            const FVector DesiredCamPos = BoomOrigin + ArmDir * TargetArm;
+
+            //트레이스 시작은 카트 본체
+            const FVector TraceStart = GetActorLocation();
+
+            FHitResult Hit;
+            FCollisionQueryParams Params(SCENE_QUERY_STAT(CartCameraCollision), false, this);
+            if (World->SweepSingleByChannel(Hit, TraceStart, DesiredCamPos, FQuat::Identity, ECC_Camera,
+                    FCollisionShape::MakeSphere(CameraCollisionProbeSize), Params))
+            {
+                //막힌 지점을 붐 원점 기준 암 길이로 환산(암 방향에 투영) 후, 최소 암 이하로는 안 당김
+                const float BlockedArm = FVector::DotProduct(Hit.Location - BoomOrigin, ArmDir);
+                SafeArm = FMath::Clamp(BlockedArm, CameraCollisionMinArm, TargetArm);
+            }
+        }
+
+        //충돌 결과를 향해 비대칭 보간(당길 땐 빠르게 관통 최소화, 풀 땐 천천히 출렁임 방지) + FOV는 기존 줌 속도
+        const bool bPullingIn = SafeArm < CameraBoom->TargetArmLength;
+        const float ArmInterpSpeed = bPullingIn ? CameraCollisionPullInSpeed : CameraCollisionPullOutSpeed;
+        CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, SafeArm, DeltaSeconds, ArmInterpSpeed);
         FollowCamera->FieldOfView   = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFov, DeltaSeconds, CameraZoomInterpSpeed);
 
     }
@@ -521,7 +547,7 @@ void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->GroundFriction = SlipGroundFriction;
-	}   
+	}
 }
 
 //미끄럼 종료 — 마찰·메시 회전 원복
