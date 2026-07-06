@@ -93,7 +93,7 @@ private:
     void TickGrabSweep(float DeltaTime);
 
     // 그랩 Sweep 시도하는 함수, 성공하면 붙잡은 거리를 알려줌
-    EGrabResult TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance);
+    EGrabResult TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance, FVector& OutHitLocation, FVector& OutHitNormal);
 
     // 그랩 회수 시작 알리는 함수
     void StartGrabReturn(float ReturnDuration);
@@ -158,7 +158,11 @@ private:
 
     // 그랩 실패 이펙트 멀티캐스트 함수
     UFUNCTION(NetMulticast, Unreliable)
-    void Multicast_PlayGrabFailEffect(FVector_NetQuantize EffectLocation);
+    void Multicast_PlayGrabMissEffect(FVector_NetQuantize EffectLocation);
+
+    // 그랩 막힐때 이펙트 멀티캐스트 함수
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayGrabBlockedEffect(FVector_NetQuantize EffectLocation, FVector_NetQuantizeNormal EffectNormal);
 
     // 로컬 플레이어인지 확인하는 함수
     bool IsLocallyControlled() const;
@@ -208,6 +212,14 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
     TObjectPtr<USoundBase> GrabLaunchSound;
 
+    // 로봇손 벽에 막힐 시 나이아가라 연출
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
+    TObjectPtr<UNiagaraSystem> GrabBlockedEffect;
+
+    // 로봇손 벽에 막힐 시 사운드
+    UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
+    TObjectPtr<USoundBase> GrabBlockedSound;
+
 
     /* ---------------- 상품 획득 연출 관련  ----------------   */
     // Pop Scale 연출
@@ -238,16 +250,16 @@ private:
 
     // 획득 실패 시 나이아가라 연출
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
-    TObjectPtr<UNiagaraSystem> GrabFailDustEffect;
+    TObjectPtr<UNiagaraSystem> GrabMissEffect;
 
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Visual")
-    float GrabFailEffectOffset;
+    float GrabMissEffectOffset;
 
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
     TObjectPtr<USoundBase> GrabSuccessSound;
 
     UPROPERTY(EditDefaultsOnly, Category = "Cart|Grab|Sound")
-    TObjectPtr<USoundBase> GrabFailSound;
+    TObjectPtr<USoundBase> GrabMissSound;
 
     /* ---------------- 조준선 갱신 관련 변수들  ----------------   */
 
