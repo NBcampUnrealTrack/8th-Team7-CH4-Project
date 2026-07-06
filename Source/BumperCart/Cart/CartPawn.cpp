@@ -15,6 +15,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
 #include "Component/CartScreenFXComponent.h"
+#include "Component/CartItemInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
@@ -79,6 +80,9 @@ ACartPawn::ACartPawn()
 
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
     GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
+
+    // 아이템 인벤토리 컴포넌트 부착 (이진영 D11), SetupPlayerInputComponent에서 아이템 사용 입력 바인딩
+    ItemInventoryComponent = CreateDefaultSubobject<UCartItemInventoryComponent>(TEXT("ItemInventoryComponent"));
 
     //연출(FX) 전담 컴포넌트 — 화면 스피드라인·바닥 리본·브레이크 스파크. 에셋·소켓은 BP의 이 컴포넌트에서 지정
     ScreenFXComponent = CreateDefaultSubobject<UCartScreenFXComponent>(TEXT("CartScreenFXComponent"));
@@ -321,6 +325,12 @@ void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
     if (IsValid(GrabComponent))
     {
         GrabComponent->SetupInput();
+    }
+
+    // 아이템 사용 입력(Shift) 연결 (이진영 D11)
+    if (IsValid(ItemInventoryComponent))
+    {
+        ItemInventoryComponent->SetupInput();
     }
 }
 
@@ -571,6 +581,22 @@ void ACartPawn::ClientPlayBumpSound_Implementation()
 	{
 		UGameplayStatics::PlaySound2D(this, BumpSound);
 	}
+}
+
+//토마토 피격 시 서버가 소유 클라에 호출 → 화면 가림 위젯 표시 (이진영 D11)
+void ACartPawn::ClientApplyTomatoScreenBlock_Implementation(float Duration)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (!IsValid(ScreenFXComponent))
+	{
+		return;
+	}
+
+	ScreenFXComponent->ApplyTomatoScreenBlock(Duration);
 }
 
 //스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청 (충돌·부스터오용 공용)
