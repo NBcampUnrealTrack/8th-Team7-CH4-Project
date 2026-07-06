@@ -55,6 +55,11 @@ public:
     UFUNCTION(Client, Reliable)
     void ClientApplyTomatoScreenBlock(float Duration);
 
+    //카메라 셰이크를 이 카트 소유 클라 화면에 재생 (서버에서 호출 → 소유 클라 실행).
+    //범프 충돌 외에도 거대 카트 충돌·아이템 드롭 등 다른 시스템이 공용으로 호출. ShakeClass가 비면 카트 기본(BumpCameraShakeClass) 사용
+    UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Cart|Camera")
+    void ClientPlayCameraShake(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -143,9 +148,9 @@ protected:
 	float RemoteYawInterpSpeed = 15.f;
 
 	//---------- 브레이크 ----------
-	//브레이크 시 감속도 (낮을수록 제동거리가 길다 — 즉시 멈춤 방지, 스파크 연출 시간 확보)
+	//브레이크 시 감속도 (낮을수록 제동거리가 길다 — 일부러 무겁게: 확 끌려가다 멈추는 불편한 조작감 의도)
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
-	float BrakeDeceleration = 1000.f;
+	float BrakeDeceleration = 150.f;
 
 	//이 속도(cm/s) 이하로 느려지면 브레이크 키를 눌러도 브레이크가 비활성(정지 상태에선 브레이크 안 걸림)
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))

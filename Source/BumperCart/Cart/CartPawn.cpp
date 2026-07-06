@@ -3,6 +3,7 @@
 #include "CartPawn.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraShakeBase.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -626,17 +627,14 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		return; //약하게 스치는 접촉은 무시
 	}
 
-	//충돌 연출: 이 카트를 조종하는 클라 화면만 흔든다 (서버 → 소유 클라 Client RPC)
+	//충돌 연출: 세기만 여기서 계산하고, 재생은 공용 함수로 위임 (서버 → 소유 클라)
 	if (BumpCameraShakeClass)
 	{
-		if (APlayerController* PC = Cast<APlayerController>(GetController()))
-		{
-			const float ShakeScale = FMath::GetMappedRangeValueClamped(
-				FVector2D(MinBumpSpeed, BumpShakeFullSpeed),
-				FVector2D(BumpShakeScale, BumpShakeMaxScale),
-				ClosingSpeed);
-			PC->ClientStartCameraShake(BumpCameraShakeClass, ShakeScale);
-		}
+		const float ShakeScale = FMath::GetMappedRangeValueClamped(
+			FVector2D(MinBumpSpeed, BumpShakeFullSpeed),
+			FVector2D(BumpShakeScale, BumpShakeMaxScale),
+			ClosingSpeed);
+		ClientPlayCameraShake(BumpCameraShakeClass, ShakeScale);
 	}
 
 	//충돌음: 소유 클라에서 재생
@@ -663,6 +661,24 @@ void ACartPawn::ClientPlayBumpSound_Implementation()
 	{
 		UGameplayStatics::PlaySound2D(this, BumpSound);
 	}
+}
+
+//지정한 셰이크(없으면 기본 범프 셰이크)를 소유 클라 카메라에 재생 — 여러 충돌 시스템이 공용으로 호출하는 진입점
+void ACartPawn::ClientPlayCameraShake_Implementation(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale)
+{
+	const TSubclassOf<UCameraShakeBase> ShakeToPlay = ShakeClass ? ShakeClass : BumpCameraShakeClass;
+	if (!ShakeToPlay)
+	{
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC || !PC->PlayerCameraManager)
+	{
+		return;
+	}
+
+	PC->PlayerCameraManager->StartCameraShake(ShakeToPlay, Scale);
 }
 
 //토마토 피격 시 서버가 소유 클라에 호출 → 화면 가림 위젯 표시
