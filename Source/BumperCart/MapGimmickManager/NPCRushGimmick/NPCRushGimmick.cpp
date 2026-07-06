@@ -6,6 +6,7 @@
 #include "NiagaraComponent.h"
 #include "Kismet/KismetStringLibrary.h"
 #include "Cart/CartPawn.h"
+#include "Cart/CartLoadTypes.h"
 
 ANPCRushGimmick::ANPCRushGimmick()
 {
@@ -31,7 +32,7 @@ ANPCRushGimmick::ANPCRushGimmick()
         ProjectileMovement->MaxSpeed = 1000.0f;
         ProjectileMovement->ProjectileGravityScale = 0.0f;
     }
-    
+
 }
 
 void ANPCRushGimmick::BeginPlay()
@@ -46,6 +47,8 @@ void ANPCRushGimmick::BeginPlay()
 
 void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+    if (!HasAuthority()) return;
+
     if (!OtherActor || OtherActor == this) return;
 
     if (OtherComp && OtherComp->GetCollisionObjectType() == ECC_WorldStatic)
@@ -58,6 +61,46 @@ void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor*
     if (ACartPawn* HitPlayer = Cast<ACartPawn>(OtherActor))
     {
         UE_LOG(LogTemp, Log, TEXT("[NPCRush] 플레이어 오버랩 감지"));
+
+        // 중복 실행 방지
+        float CurrentTime = GetWorld()->GetTimeSeconds();
+        if (CurrentTime - LastHitTime < 1.5f)    return;
+
+        LastHitTime = CurrentTime;
+
+        Knockback(HitPlayer);
     }
+}
+
+void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
+{
+    if (!HasAuthority()) return;
+
+    if (!PlayerCart) return;
+
+    FVector CartForward = GetActorForwardVector().GetSafeNormal2D();
+    FVector CartRight = GetActorRightVector().GetSafeNormal2D();
+
+    FVector ToPlayer = (PlayerCart->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+
+    float SideDot = FVector::DotProduct(ToPlayer, CartRight);
+
+    FVector FinalKnockbackDir = FVector::ZeroVector;
+
+    if (SideDot >= 0.0f)
+    {
+        FinalKnockbackDir = (CartForward + CartRight).GetSafeNormal2D();
+    }
+    else
+    {
+        FinalKnockbackDir = (CartForward - CartRight).GetSafeNormal2D();
+    }
+
+    EDropCollisionRole DropRole = EDropCollisionRole::Normal;
+
+    // 아이템 드롭 protected로 막혀있음
+    //PlayerCart->RequestSpill(FinalKnockbackDir.Size2D(), DropRole);
+
+    PlayerCart->ApplyExternalKnockback(FinalKnockbackDir, Strength);
 }
 

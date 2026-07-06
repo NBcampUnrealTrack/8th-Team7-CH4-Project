@@ -8,6 +8,7 @@
 class UBoxComponent;
 class UProjectileMovementComponent;
 class UNiagaraComponent;
+class ACartPawn;
 
 UCLASS()
 class BUMPERCART_API ANPCRushGimmick : public AActor, public IBumpable
@@ -42,8 +43,15 @@ protected:
 
 #pragma endregion
 
+private:
+    UPROPERTY(EditAnywhere, Category = "Gimmick | Config")
+    float Strength = 500.0f;
+
+    float LastHitTime = 0.0f;
+
 protected:
     UFUNCTION()
     void OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+    void Knockback(ACartPawn* PlayerCart);
 };

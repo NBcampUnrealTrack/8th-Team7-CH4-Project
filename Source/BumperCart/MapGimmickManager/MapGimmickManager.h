@@ -61,7 +61,7 @@ private:
     UPROPERTY(EditAnywhere, Category = "Gimmick | Settings")
     TArray<FObstacleSpawnInfo> ObstacleSpawnList;
 
-    TArray<AActor*> SpawnedObstacleList;
+    TArray<TWeakObjectPtr<AActor>> SpawnedObstacleList;
 
     FTimerHandle RespawnTimerHandle;
 
