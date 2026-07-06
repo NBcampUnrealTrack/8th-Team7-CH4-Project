@@ -37,7 +37,7 @@ public:
     FOnLobbyPlayersChanged OnLobbyPlayersChanged;
 
     //플레이어 정보 갱신
-    void RefreshPlayerInfos();
+    void RefreshPlayerInfos(APlayerState* ExcludedPlayerState = nullptr);
 
     //시작전 모든 플레이어 준비 완료 확인
     UFUNCTION(BlueprintPure, Category = "Lobby")

@@ -30,12 +30,14 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 
 void ALobbyGameMode::Logout(AController* Exiting)
 {
+    APlayerState* ExitingPS = Exiting ? Exiting->PlayerState : nullptr;
+
     Super::Logout(Exiting);
     UE_LOG(LogTemp, Warning, TEXT("플레이어 퇴장: %s"), *Exiting->GetName());
 
     if (ALobbyGameState* GS = GetGameState<ALobbyGameState>())
     {
-        GS->RefreshPlayerInfos();
+        GS->RefreshPlayerInfos(ExitingPS);
     }
 }
 
