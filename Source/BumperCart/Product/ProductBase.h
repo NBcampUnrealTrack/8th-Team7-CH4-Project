@@ -11,7 +11,6 @@ class UProductDataAsset;
 class UStaticMeshComponent;
 class USphereComponent;
 class UProductDropConfig;
-class USceneComponent;
 
 
 UCLASS()
@@ -80,13 +79,10 @@ protected:
     /* 컴포넌트 */
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
-    TObjectPtr<USceneComponent> Scene;
+    TObjectPtr<USphereComponent> ProductCollision;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
     TObjectPtr<UStaticMeshComponent> Mesh;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
-    TObjectPtr<USphereComponent> GrabCollision;
 
     /* Product 기본 변수 */
 
@@ -105,6 +101,14 @@ protected:
     // 이벤트 대상 상품인지 확인하는 변수
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     bool bOnSale;
+
+    // 메시의 기본 상대 위치값
+    UPROPERTY()
+    FVector BaseMeshLocation;
+
+    // 메시의 기본 상대 회전값
+    UPROPERTY()
+    FRotator BaseMeshRotation;
 
     // 회전한지 얼마나 지났는지 누적용
     UPROPERTY()
@@ -152,9 +156,8 @@ private:
 
     void TickFalling(float DeltaTime);
 
-    void SetBaseLocation(const FVector& Location);
-
-    FVector GetFallLocation(float Alpha) const;
+    // 가판대 안쪽이 DropEnd가 되지 않게 바깥쪽 위치를 구해주는 함수
+    FVector GetSafeLocation(const FVector& Start, const FVector& End, AActor* IgnoreActor);
 
 private:
     FTimerHandle ReturnDisplayTimer;

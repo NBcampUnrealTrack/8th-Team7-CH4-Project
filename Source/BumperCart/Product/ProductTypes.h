@@ -65,7 +65,15 @@ public:
     UPROPERTY(BlueprintReadOnly)
     FVector_NetQuantize10 FallingEndLocation = FVector::ZeroVector;
 
+    // 서버가 계산한 실제 보여지는 위치
+    UPROPERTY(BlueprintReadOnly)
+    FVector_NetQuantize10 DisplayLocation = FVector::ZeroVector;
+
     // 서버가 계산한 튀어오르는 높이
     UPROPERTY(BlueprintReadOnly)
     float FallingHeight = 0.f;
+
+    // Falling 상태로 전환됐었는지 확인
+    UPROPERTY(BlueprintReadOnly)
+    bool bIsFell = false;
 };
