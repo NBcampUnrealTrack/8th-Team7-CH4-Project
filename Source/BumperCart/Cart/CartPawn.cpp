@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -150,8 +151,8 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//입력(bBrakeHeld)과 실제 상태(bIsBraking)를 분리. 소유자가 판정 후 서버/타 클라에 복제 (부스터와 동일 패턴)
 	if (IsLocallyControlled())
 	{
-		//부스트 중엔 브레이크 무시(부스트는 커밋된 돌진) → 감속·스파크·스피드라인 모두 부스트 상태 유지
-		const bool bBrakeEffective = bBrakeHeld && !bIsBoosting && Move->Velocity.Size2D() > BrakeStopSpeed;
+		//부스트 중엔 브레이크 무시(부스트는 커밋된 돌진), 미끄럼 중엔 조작 불능 → 감속·스파크 연출도 차단
+		const bool bBrakeEffective = bBrakeHeld && !bIsBoosting && !bIsSlipping && Move->Velocity.Size2D() > BrakeStopSpeed;
 		if (bBrakeEffective != bIsBraking)
 		{
 			bIsBraking = bBrakeEffective;
@@ -162,13 +163,21 @@ void ACartPawn::Tick(float DeltaSeconds)
 		}
 	}
 
-	//--- 미끄럼(슬립) 진행: 남은 시간 경과 처리 ---
+	//--- 미끄럼(슬립) 진행: 시간 경과 + 카트 메시 제자리 스핀 (액터 yaw 불변 → 카메라 정면 유지) ---
 	if (bIsSlipping)
 	{
 		SlipTimeRemaining -= DeltaSeconds;
 		if (SlipTimeRemaining <= 0.f)
 		{
 			EndSlip();
+		}
+		else if (SlipSpinMesh)
+		{
+			//진행도(0→1)에 이즈아웃 — 처음엔 빠르게 돌고 끝엔 감속. 정수 바퀴라 종료 시 원래 방향
+			const float Progress = 1.f - (SlipTimeRemaining / FMath::Max(SlipDurationTotal, KINDA_SMALL_NUMBER));
+			const float Eased = 1.f - FMath::Square(1.f - Progress);
+			const float SpinYaw = SlipSpinDir * SlipSpinTurns * 360.f * Eased;
+			SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot + FRotator(0.f, SpinYaw, 0.f));
 		}
 	}
 
@@ -188,6 +197,12 @@ void ACartPawn::Tick(float DeltaSeconds)
 	        EffectiveThrottle = 1.f;
 	    }
 
+	    //미끄럼 중 조작 불능 — 추력 차단, 관성으로만 미끄러짐
+	    if (bIsSlipping)
+	    {
+	        EffectiveThrottle = 0.f;
+	    }
+
 	    //전진 중 후진 => 약한 감속
  	    const bool bReverseWhileForward = (EffectiveThrottle < 0.f && ForwardSpeed > 10.f);
 
@@ -205,10 +220,10 @@ void ACartPawn::Tick(float DeltaSeconds)
 	    }
 	}
 
-	//--- 조향(A/D)·미끄럼 스핀을 하나의 yaw 델타로 합산 (회전은 아래에서 한 번에 적용) ---
+	//--- 조향(A/D) yaw 델타 계산 (미끄럼 중엔 조향 불능, 회전은 아래에서 한 번에 적용) ---
 	CurrentSteer = FMath::FInterpTo(CurrentSteer, SteerInput, DeltaSeconds, SteerInterpSpeed);
 	float YawDeltaTotal = 0.f;
-	if (!FMath::IsNearlyZero(CurrentSteer))
+	if (!bIsSlipping && !FMath::IsNearlyZero(CurrentSteer))
 	{
 		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용
 		const float Speed = Move->Velocity.Size2D();
@@ -218,15 +233,6 @@ void ACartPawn::Tick(float DeltaSeconds)
 		//후진 중(실제로 뒤로 갈 때)에는 조향을 반전 → 플레이어 기준 방향 유지(A=왼쪽)
 		const float SteerSign = (ForwardSpeed < -10.f) ? -1.f : 1.f;
 		YawDeltaTotal += SteerSign * CurrentSteer * TurnRateDegPerSec * LoadTurnMul * SpeedFactor * DeltaSeconds;
-	}
-
-	//미끄럼 강제 스핀: 남은 스핀각을 SlipSpinSpeedDeg 속도로 풀어낸다 (조향과 합산)
-	if (bIsSlipping && !FMath::IsNearlyZero(SlipSpinRemainingDeg))
-	{
-		const float MaxStep = SlipSpinSpeedDeg * DeltaSeconds;
-		const float Step = FMath::Clamp(SlipSpinRemainingDeg, -MaxStep, MaxStep);
-		YawDeltaTotal += Step;
-		SlipSpinRemainingDeg -= Step;
 	}
 
 	//--- 회전 적용 + 네트워크 동기화 (회전은 '소유 클라 전담') ---
@@ -358,9 +364,10 @@ void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
 {
 	bBrakeHeld = true; //실제 브레이크 상태는 Tick에서 이동 중일 때만 true로 갱신
 
-	//브레이크 효과음 (소유 클라 로컬) — 정지 상태(BrakeStopSpeed 이하)에선 브레이크가 안 걸리므로 사운드도 재생 안 함
+	//브레이크 효과음 (소유 클라 로컬) — 실제로 브레이크가 걸릴 때만.
+	//정지 상태(BrakeStopSpeed 이하)·부스트 중·미끄럼 중엔 브레이크가 무효라 사운드도 재생 안 함 (Tick의 bBrakeEffective와 동일 조건)
 	const UCharacterMovementComponent* Move = GetCharacterMovement();
-	if (BrakeSound && Move && Move->Velocity.Size2D() > BrakeStopSpeed)
+	if (BrakeSound && Move && !bIsBoosting && !bIsSlipping && Move->Velocity.Size2D() > BrakeStopSpeed)
 	{
 		UGameplayStatics::PlaySound2D(this, BrakeSound);
 	}
@@ -373,7 +380,7 @@ void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
 
 void ACartPawn::OnBoost(const FInputActionValue& Value)
 {
-	if (bIsBoosting || bBoostOnCooldown)
+	if (bIsBoosting || bBoostOnCooldown || bIsSlipping) //미끄럼 중엔 부스트 발동 불가
 	{
 		return;
 	}
@@ -459,25 +466,74 @@ void ACartPawn::MulticastApplySlip_Implementation(float Duration, float SpinAngl
 	StartSlip(Duration, SpinAngleDeg);
 }
 
-//미끄럼 시작 — 마찰을 낮추고 강제 스핀 각을 적재 (실제 처리는 Tick에서)
+//미끄럼 시작 — 조작을 잠그고 마찰을 낮춰 관성으로만 미끄러뜨린다. 연출은 카트 메시 제자리 스핀(Tick)
 void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
 {
+	if (bIsSlipping)
+	{
+		return; //이미 미끄러지는 중이면 무시 (메시 원래 회전 백업 보호)
+	}
+
 	bIsSlipping = true;
-	SlipTimeRemaining = Duration;
-	SlipSpinRemainingDeg = SpinAngleDeg;
+	SlipDurationTotal = FMath::Clamp(Duration, SlipMinDuration, SlipMaxDuration);
+	SlipTimeRemaining = SlipDurationTotal;
+	SlipSpinDir = (SpinAngleDeg < 0.f) ? -1.f : 1.f; //기믹이 준 각도는 부호만 방향으로 사용
+
+	//빙글 돌릴 카트 메시 탐색(최초 1회 캐시) — BP_CartPawn의 카트 스태틱 메시
+	if (!SlipSpinMesh)
+	{
+		TArray<UStaticMeshComponent*> MeshComps;
+		GetComponents(MeshComps);
+		for (UStaticMeshComponent* MeshComp : MeshComps)
+		{
+			if (MeshComp && MeshComp->GetFName() == SlipSpinMeshName)
+			{
+				SlipSpinMesh = MeshComp;
+				break;
+			}
+		}
+		if (!SlipSpinMesh)
+		{
+			UE_LOG(LogBumperCart, Warning, TEXT("CartSlip: 카트 메시(%s)를 찾지 못해 스핀 연출 없이 조작 잠금만 적용합니다."), *SlipSpinMeshName.ToString());
+		}
+	}
+
+	//원래 상대 회전 백업 (종료 시 복구)
+	if (SlipSpinMesh)
+	{
+		SlipSpinMeshBaseRelRot = SlipSpinMesh->GetRelativeRotation();
+	}
+
+	//미끄럼 효과음 — 내 카트는 2D(귀에 크게), 상대 카트는 위치 기반 3D (StartSlip은 멀티캐스트로 전 클라 실행)
+	if (SlipSound)
+	{
+		if (IsLocallyControlled())
+		{
+			UGameplayStatics::PlaySound2D(this, SlipSound);
+		}
+		else
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, SlipSound, GetActorLocation());
+		}
+	}
 
 	//지면 마찰만 시작 시 한 번 낮춘다 (Tick에서 GroundFriction은 안 건드리므로)
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->GroundFriction = SlipGroundFriction;
-	}
+	}   
 }
 
-//미끄럼 종료 — 마찰 원복
+//미끄럼 종료 — 마찰·메시 회전 원복
 void ACartPawn::EndSlip()
 {
 	bIsSlipping = false;
-	SlipSpinRemainingDeg = 0.f;
+	SlipTimeRemaining = 0.f;
+
+	if (SlipSpinMesh)
+	{
+		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
+	}
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
