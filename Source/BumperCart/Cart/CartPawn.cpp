@@ -136,9 +136,9 @@ void ACartPawn::Tick(float DeltaSeconds)
 	{
 		TargetMaxSpeed *= MaxReverseSpeedRatio;
 	}
-	if (bIsBoosting) //부스터가 최우선
+	if (bIsBoosting) //부스터가 최우선 — 무게 감속 무시(아이템, 굼뜬 카트의 풀스피드 탈출/공격)
 	{
-		TargetMaxSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier * LoadSpeedMul;
+		TargetMaxSpeed = DefaultMaxWalkSpeed * BoostSpeedMultiplier;
 	}
 	Move->MaxWalkSpeed = TargetMaxSpeed;
 
@@ -146,7 +146,8 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//입력(bBrakeHeld)과 실제 상태(bIsBraking)를 분리. 소유자가 판정 후 서버/타 클라에 복제 (부스터와 동일 패턴)
 	if (IsLocallyControlled())
 	{
-		const bool bBrakeEffective = bBrakeHeld && Move->Velocity.Size2D() > BrakeStopSpeed;
+		//부스트 중엔 브레이크 무시(부스트는 커밋된 돌진) → 감속·스파크·스피드라인 모두 부스트 상태 유지
+		const bool bBrakeEffective = bBrakeHeld && !bIsBoosting && Move->Velocity.Size2D() > BrakeStopSpeed;
 		if (bBrakeEffective != bIsBraking)
 		{
 			bIsBraking = bBrakeEffective;
