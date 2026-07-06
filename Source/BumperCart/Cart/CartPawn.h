@@ -50,7 +50,7 @@ public:
     //외부에서 카트를 강제로 밀어내기
     void ApplyExternalKnockback(const FVector& Direction, float Strength);
 
-    //토마토에 맞은 소유 클라 화면에 가림 위젯 표시 (서버 → 소유 클라, 이진영 D11)
+    //토마토에 맞은 소유 클라 화면에 가림 위젯 표시 (서버 → 소유 클라)
     UFUNCTION(Client, Reliable)
     void ClientApplyTomatoScreenBlock(float Duration);
 
@@ -204,7 +204,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Grab")
     UCartGrabComponent* GrabComponent;
 
-    //---------- 아이템 인벤토리 컴포넌트 (이진영 D11) ----------
+    //---------- 아이템 인벤토리 컴포넌트 ----------
     // 생성자에서 생성, SetupPlayerInputComponent에서 아이템 사용 입력(Shift) 바인딩
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Inventory")
     UCartItemInventoryComponent* ItemInventoryComponent;

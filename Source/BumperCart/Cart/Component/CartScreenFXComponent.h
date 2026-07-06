@@ -33,7 +33,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
-	//---------- 토마토 화면 가림 (이진영 D11 아이템 연동) ----------
+	//---------- 토마토 화면 가림 ----------
 	//토마토에 맞으면 화면을 가리는 위젯을 Duration초간 표시 (로컬 플레이어만)
 	void ApplyTomatoScreenBlock(float Duration);
 	//토마토 화면 가림 위젯 제거
@@ -117,7 +117,7 @@ private:
 	//브레이크 히트 누적(0~1). 밟는 동안 차오르고, 떼면 2배 속도로 식음
 	float BrakeHeat = 0.f;
 
-	//---------- 토마토 화면 가림 위젯 (이진영 D11) ----------
+	//---------- 토마토 화면 가림 위젯 ----------
 	//토마토 위젯 클래스 (BP에서 지정)
 	UPROPERTY(EditDefaultsOnly, Category = "Cart|ScreenFX|Tomato")
 	TSubclassOf<UUserWidget> TomatoScreenBlockWidgetClass;
