@@ -248,24 +248,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		SetActorRotation(FMath::RInterpTo(GetActorRotation(), Target, DeltaSeconds, RemoteYawInterpSpeed));
 	}
 
-	//--- B5 : 부스터 오용 = 부스터 중 브레이크/급회전이면 내 물건을 쏟는다 ---
-	//입력 기반이라 서버가 모름 => 내 카트(소유 클라)에서 판정, RequestSpill이 서버로 전달
-	if (bIsBoosting && IsLocallyControlled())
-	{
-		//부스터 중 브레이크
-		if (bIsBraking)
-		{
-			RequestSpill(BoostMisuseImpulse, EDropCollisionRole::Normal);
-		}
-
-		//부스터 중 누적 회전각이 임계를 넘으면 (살짝 보정은 OK, 확 꺾으면 쏟음)
-		BoostTurnAccumDeg += FMath::Abs(CurrentSteer) * TurnRateDegPerSec * DeltaSeconds;
-		if (BoostTurnAccumDeg >= BoostTurnSpillAngle)
-		{
-			RequestSpill(BoostMisuseImpulse, EDropCollisionRole::Normal);
-			BoostTurnAccumDeg = 0.f;
-		}
-	}
+	//(부스터 오용 스필 제거됨 — 부스터 아이템화 밸런싱: 급브레이크/급회전 패널티 없음)
 
     //--- 카메라 속도감 연출 ---
     if (IsLocallyControlled() && CameraBoom && FollowCamera)
@@ -386,7 +369,6 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 
 	bIsBoosting = true;
 	bBoostOnCooldown = true;
-	BoostTurnAccumDeg = 0.f; //새 부스터마다 누적 회전 리셋
 	ServerSetBoosting(true); //서버에도 부스터 상태 통지 (충돌 역할용)
 
 	//부스터 효과음 (소유 클라 로컬)
