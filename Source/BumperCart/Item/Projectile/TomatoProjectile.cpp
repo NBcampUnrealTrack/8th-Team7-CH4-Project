@@ -1,6 +1,7 @@
 ﻿#include "Item/Projectile/TomatoProjectile.h"
 
 #include "Cart/CartPawn.h"
+#include "Cart/Component/CartScreenFXComponent.h"
 
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -125,6 +126,8 @@ void ATomatoProjectile::HandleHitCart(ACartPawn* HitPlayer)
     }
 
     UE_LOG(LogTemp, Warning, TEXT("투사체 플레이어 타격"));
+
+    //HitPlayer->ClientApplyTomatoScreenBlock(ScreenBlockDuration);
 
     Destroy();
 }

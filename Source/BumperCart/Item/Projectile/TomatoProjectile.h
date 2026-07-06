@@ -5,10 +5,10 @@
 #include "TomatoProjectile.generated.h"
 
 class ACartPawn;
+class UCartScreenFXComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 class UProjectileMovementComponent;
-
 
 UCLASS()
 class BUMPERCART_API ATomatoProjectile : public AActor
@@ -70,5 +70,13 @@ private:
     // Destroy 시간
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
     float MaxLifeTime = 3.0f;
+
+// ------------------------------------------------------------
+// 화면 가림 UI 적용
+// ------------------------------------------------------------
+private:
+    // 가려질 시간
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Effect", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
+    float ScreenBlockDuration = 3.0f;
 
 };
