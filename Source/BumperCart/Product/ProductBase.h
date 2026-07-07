@@ -61,6 +61,8 @@ public:
     bool IsOnSale() const;
 
 protected:
+    virtual void PostInitializeComponents() override;
+
 	virtual void BeginPlay() override;
 
     virtual void Tick(float DeltaTime) override;
@@ -134,9 +136,6 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Bob")
     float RotationSpeed;
 
-    // 포물선 운동 경과시간
-    float LaunchElapsedTime;
-
 
     /* Falling 관련 변수들 */
 
@@ -172,6 +171,9 @@ protected:
     TWeakObjectPtr<AActor> LaunchIgnoredActor;
 
 private:
+    // 메시 기본 Transform을 캐시했는지 확인하고 되돌리는 함수
+    void ResetBaseMeshTransform();
+
     bool CanLoad() const;
 
     bool CanGrab() const;
@@ -190,4 +192,15 @@ private:
     // 가판대 안쪽이 DropEnd가 되지 않게 바깥쪽 위치를 구해주는 함수
     FVector GetSafeLocation(const FVector& Start, const FVector& End, AActor* IgnoreActor);
 
+    // 서버 시간 구하는 함수
+    float GetServerTimeSeconds() const;
+
+    // 서버에서 포물선 운동 시작한 시간부터 얼마나 지났는지 구하는 함수
+    float GetLaunchElapsedTime() const;
+
+    // 포물선 운동 진행도를 구하는 함수
+    float GetLaunchAlpha() const;
+
+    // 포물선 운동 중 현재 진행도에 맞는 위치를 구하는 함수
+    FVector GetLaunchLocation(float Alpha) const;
 };

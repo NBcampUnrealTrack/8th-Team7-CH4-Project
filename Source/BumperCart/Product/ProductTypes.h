@@ -78,7 +78,7 @@ public:
     UPROPERTY(BlueprintReadOnly)
     float LaunchDuration = 1.f;
 
-    // 보여지는 위치가 필요한지
+    // 서버에서 연출을 시작한 시간
     UPROPERTY(BlueprintReadOnly)
-    bool bHasDisplayLocation = false;
+    float LaunchServerStartTime = 0.f;
 };

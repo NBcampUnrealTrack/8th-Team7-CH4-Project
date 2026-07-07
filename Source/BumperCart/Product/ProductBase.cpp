@@ -9,6 +9,7 @@
 #include "Engine/StaticMesh.h"
 #include "Net/UnrealNetwork.h"
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
+#include "GameFramework/GameState.h"
 
 AProductBase::AProductBase()
 {
@@ -42,14 +43,13 @@ AProductBase::AProductBase()
     BobbingSpeed = 1.5f;
     RotationSpeed = 60.f;
 
-    LaunchElapsedTime = 0.f;
     FallingMinHeight = 120.f;
     FallingMaxHeight = 200.f;
     FallingHorizontalOffset = 200.f;
     FallingDuration = 1.f;
 
-    SpawningDuration = 0.7f;
-    SpawningHeight = 160.f;
+    SpawningDuration = 1.1f;
+    SpawningHeight = 250.f;
 }
 
 void AProductBase::Destroyed()
@@ -82,6 +82,14 @@ void AProductBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
     }
 }
 
+void AProductBase::PostInitializeComponents()
+{
+    Super::PostInitializeComponents();
+
+    BaseMeshLocation = Mesh->GetRelativeLocation();
+    BaseMeshRotation = Mesh->GetRelativeRotation();
+}
+
 void AProductBase::BeginPlay()
 {
     Super::BeginPlay();
@@ -95,10 +103,6 @@ void AProductBase::BeginPlay()
     // 랜덤한 위아래 움직임을 위해 시작 시간을 다르게 함
     // 연출이라 모든 클라가 같을 필요는 없음
     ElapsedTime = FMath::RandRange(0.f, 2.f);
-
-    // 상대 위치, 회전값 저장
-    BaseMeshLocation = Mesh->GetRelativeLocation();
-    BaseMeshRotation = Mesh->GetRelativeRotation();
 
     SetProductState(EProductState::None);
 }
@@ -243,7 +247,6 @@ void AProductBase::DropFromCart(AActor* CartActor)
 
     // Falling 목표 위치 잡기, 시간 0 으로 설정
     FVector EndLocation = StartLocation + Offset;
-    LaunchElapsedTime = 0.f;
 
     StartLaunch(
         EProductState::Falling,
@@ -257,26 +260,43 @@ void AProductBase::DropFromCart(AActor* CartActor)
 
 void AProductBase::OnRep_ProductState()
 {
-    // Falling or Spawn으로 변할땐 포물선 운동 값 설정
     if (IsLaunchState())
     {
-        LaunchElapsedTime = 0.f;
+        // Falling or Spawn으로 변할땐 포물선 운동 값 설정
+        // 서버로부터 경과 시간을 받아서 시작 위치 지정
+        float Alpha = GetLaunchAlpha();
 
-        SetActorLocation(ProductState.LaunchStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
+        // 이미 연출이 끝났다면
+        //  -> 네트워크 딜레이가 길어 연출이 끝났을때 상태를 전송받으면 즉시 종료처리
+        if (Alpha >= 1.f)
+        {
+            FVector EndLocation = ProductState.LaunchEndLocation;
+            EndLocation.Z = HeightOffset;
+
+            SetActorLocation(EndLocation, false, nullptr, ETeleportType::TeleportPhysics);
+            ResetBaseMeshTransform();
+        }
+        else
+        {
+            const FVector CurrentLocation = GetLaunchLocation(Alpha);
+            SetActorLocation(CurrentLocation, false, nullptr, ETeleportType::TeleportPhysics);
+
+            // 메시를 포물선 운동 진행도에 맞게 위로 올리기
+            if (IsValid(Mesh))
+            {
+                float CurrentZ = FMath::Sin(Alpha * PI) * ProductState.LaunchHeight;
+                Mesh->SetRelativeLocation(BaseMeshLocation + FVector(0.f, 0.f, CurrentZ));
+            }
+        }
     }
-    else if (ProductState.State == EProductState::Display && ProductState.bHasDisplayLocation)
+    else if (ProductState.State == EProductState::Display)
     {
         // Falling/Spawning -> Display로 변할땐 위치 지정
         FVector ServerLocation = ProductState.DisplayLocation;
         ServerLocation.Z = HeightOffset;
 
         SetActorLocation(ServerLocation, false, nullptr, ETeleportType::TeleportPhysics);
-
-        if (IsValid(Mesh))
-        {
-            Mesh->SetRelativeLocation(BaseMeshLocation);
-            Mesh->SetRelativeRotation(BaseMeshRotation);
-        }
+        ResetBaseMeshTransform();
     }
 
     ApplyProductState();
@@ -328,6 +348,15 @@ void AProductBase::SetOnSale(bool NewValue)
 bool AProductBase::IsOnSale() const
 {
     return bOnSale;
+}
+
+void AProductBase::ResetBaseMeshTransform()
+{
+    if (IsValid(Mesh))
+    {
+        Mesh->SetRelativeLocation(BaseMeshLocation);
+        Mesh->SetRelativeRotation(BaseMeshRotation);
+    }
 }
 
 bool AProductBase::CanLoad() const
@@ -384,11 +413,9 @@ void AProductBase::StartLaunch(EProductState State, const FVector& StartLocation
     NewRepState.LaunchEndLocation = SafeEnd;
     NewRepState.LaunchHeight = InHeight;
     NewRepState.LaunchDuration = InDuration;
-    NewRepState.bHasDisplayLocation = false;
+    NewRepState.LaunchServerStartTime = GetServerTimeSeconds();
 
     ProductState = NewRepState;
-
-    LaunchElapsedTime = 0.f;
 
     // 우선 시작지점으로 이동
     SetActorLocation(ProductState.LaunchStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
@@ -399,21 +426,8 @@ void AProductBase::StartLaunch(EProductState State, const FVector& StartLocation
 
 void AProductBase::TickLaunch(float DeltaTime)
 {
-    LaunchElapsedTime += DeltaTime;
-
-    float Alpha = FMath::Clamp(
-        LaunchElapsedTime / FMath::Max(ProductState.LaunchDuration, KINDA_SMALL_NUMBER),
-        0.f,
-        1.f
-    );
-
-    // 실제 움직임은 XY만
-    FVector BaseLocation = FMath::Lerp(
-        FVector(ProductState.LaunchStartLocation),
-        FVector(ProductState.LaunchEndLocation),
-        Alpha
-    );
-    BaseLocation.Z = HeightOffset;
+    float Alpha = GetLaunchAlpha();
+    FVector BaseLocation = GetLaunchLocation(Alpha);
 
     if (HasAuthority())
     {
@@ -440,7 +454,6 @@ void AProductBase::TickLaunch(float DeltaTime)
         // 서버에서 상품이 실제로 위치한 좌표 저장
         ProductState.DisplayLocation = GetActorLocation();
         ProductState.DisplayLocation.Z = HeightOffset;
-        ProductState.bHasDisplayLocation = true;
 
         // 시작할때 무시하도록 설정했던 값 되돌리기
         if (IsValid(ProductCollision) && LaunchIgnoredActor.IsValid())
@@ -449,11 +462,7 @@ void AProductBase::TickLaunch(float DeltaTime)
         }
         LaunchIgnoredActor.Reset();
 
-        if (IsValid(Mesh))
-        {
-            Mesh->SetRelativeLocation(BaseMeshLocation);
-            Mesh->SetRelativeRotation(BaseMeshRotation);
-        }
+        ResetBaseMeshTransform();
 
         SetProductState(EProductState::Display);
         ForceNetUpdate();
@@ -479,6 +488,7 @@ FVector AProductBase::GetSafeLocation(const FVector& Start, const FVector& End, 
     FVector SafeEnd = End;
     SafeEnd.Z = HeightOffset;
 
+    // ProductSafeLocation 이란 이름으로 쿼리 설정, 복잡한 충돌체는 false (Simple Collision만)
     FCollisionQueryParams Params(SCENE_QUERY_STAT(ProductSafeLocation), false);
     Params.AddIgnoredActor(this);
     if (IsValid(IgnoreActor))
@@ -515,4 +525,43 @@ FVector AProductBase::GetSafeLocation(const FVector& Start, const FVector& End, 
     FVector SafeLocation = Hit.Location;
     SafeLocation.Z = HeightOffset;
     return SafeLocation;
+}
+
+float AProductBase::GetServerTimeSeconds() const
+{
+    UWorld* World = GetWorld();
+    if (!IsValid(World))
+    {
+        return 0.f;
+    }
+
+    if (AGameStateBase* GameState = World->GetGameState())
+    {
+        return GameState->GetServerWorldTimeSeconds();
+    }
+
+    return World->GetTimeSeconds();
+}
+
+float AProductBase::GetLaunchElapsedTime() const
+{
+    return FMath::Max(0.f, GetServerTimeSeconds() - ProductState.LaunchServerStartTime);
+}
+
+float AProductBase::GetLaunchAlpha() const
+{
+    float Duration = FMath::Max(ProductState.LaunchDuration, KINDA_SMALL_NUMBER);
+    return FMath::Clamp(GetLaunchElapsedTime() / Duration, 0.f, 1.f);
+}
+
+FVector AProductBase::GetLaunchLocation(float Alpha) const
+{
+    FVector Location = FMath::Lerp(
+        FVector(ProductState.LaunchStartLocation),
+        FVector(ProductState.LaunchEndLocation),
+        Alpha
+    );
+    Location.Z = HeightOffset;
+
+    return Location;
 }
