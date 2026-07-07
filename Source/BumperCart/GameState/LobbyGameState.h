@@ -6,6 +6,8 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLobbyPlayersChanged);
 
+class CharacterSelectionConfig;
+
 USTRUCT(BlueprintType)
 struct FLobbyPlayerInfo
 {
@@ -19,6 +21,9 @@ struct FLobbyPlayerInfo
 
     UPROPERTY(BlueprintReadOnly, Category = "Lobby")
     bool bIsHost = false;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Lobby")
+    int32 SelectedCharacterIndex = INDEX_NONE;
 };
 
 UCLASS()
@@ -32,7 +37,7 @@ public:
     FOnLobbyPlayersChanged OnLobbyPlayersChanged;
 
     //플레이어 정보 갱신
-    void RefreshPlayerInfos();
+    void RefreshPlayerInfos(APlayerState* ExcludedPlayerState = nullptr);
 
     //시작전 모든 플레이어 준비 완료 확인
     UFUNCTION(BlueprintPure, Category = "Lobby")
@@ -42,6 +47,12 @@ public:
     UFUNCTION(BlueprintPure, Category = "Lobby ")
     const TArray<FLobbyPlayerInfo>& GetReplicatedPlayerInfos() const;
 
+    // 선택 가능한 캐릭터 조회
+    UFUNCTION(BlueprintPure, Category = "Lobby|Character")
+    const TArray<FCharacterData>& GetAvailableCharacters() const;
+
+    // 다른 플레이어가 선택한 캐릭터인지 확인
+    bool IsCharacterIndexSelectedByOtherPlayer(int32 CharacterIndex, const APlayerState* PS) const;
 
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

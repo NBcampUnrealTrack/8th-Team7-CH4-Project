@@ -1,5 +1,7 @@
 #include "PlayerState/LobbyPlayerState.h"
 
+#include "DataAsset/CharacterSelectionConfig.h"
+#include "GameInstance/MainGameInstance.h"
 #include "GameState/LobbyGameState.h"
 #include "Net/UnrealNetwork.h"
 
@@ -12,40 +14,58 @@ void ALobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ALobbyPlayerState, bIsReady);
+    DOREPLIFETIME(ALobbyPlayerState, SelectedCharacterIndex);
 }
 
 //준비 완료 호출 받기
-void ALobbyPlayerState::SetReady(bool bInReady)
+void ALobbyPlayerState::SetReady(bool IsReady)
 {
-
+    UE_LOG(LogTemp, Warning, TEXT("플레이어 준비 상태"))
     if (HasAuthority())
     {
-        ApplyReady(bInReady);
+        ApplyReady(IsReady);
     }
     else
     {
-        Server_SetReady(bInReady);
+        Server_SetReady(IsReady);
     }
 
 }
 
 //클라이언트의 준비완료 호출 처리
-void ALobbyPlayerState::Server_SetReady_Implementation(bool bInReady)
+void ALobbyPlayerState::Server_SetReady_Implementation(bool IsReady)
 {
-    ApplyReady(bInReady);
+    ApplyReady(IsReady);
 }
 
 //준비완료 적용
-void ALobbyPlayerState::ApplyReady(bool bInReady)
+void ALobbyPlayerState::ApplyReady(bool IsReady)
 {
     if (!HasAuthority()) return;
 
-    if (bIsReady == bInReady) return;
+    if (bIsReady == IsReady) return;
 
-    bIsReady = bInReady;
+    ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
 
-    //서버가 직접 호출하면 OnRep이 호출되지 않으로 직접 GameState 갱신
-    if (ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr)
+    /*
+    //캐릭터 선택한 내용 저장
+    if (IsReady)
+    {
+        if (SelectedCharacterIndex == INDEX_NONE) return;
+
+        if (GS && GS->IsCharacterIndexSelectedByOtherPlayer(SelectedCharacterIndex, this)) return;
+
+        if (UMainGameInstance* MainGI = GetWorld()->GetGameInstance<UMainGameInstance>())
+        {
+            MainGI->SetPlayerCharacter(GetUniqueId(), SelectedCharacterIndex);
+        }
+     }
+    */
+    bIsReady = IsReady;
+    UE_LOG(LogTemp, Warning, TEXT("플레이어 준비 완료"))
+
+
+    if (GS)
     {
         GS->RefreshPlayerInfos();
     }
@@ -58,4 +78,64 @@ void ALobbyPlayerState::OnRep_IsReady()
     {
         GS->OnLobbyPlayersChanged.Broadcast();
     }
+}
+
+
+void ALobbyPlayerState::SelectCharacter(int32 CharacterIndex)
+{
+    if (HasAuthority())
+    {
+        ApplySelectCharacter(CharacterIndex);
+    }
+    else
+    {
+        Server_SelectCharacter(CharacterIndex);
+    }
+}
+
+void ALobbyPlayerState::Server_SelectCharacter_Implementation(int32 CharacterIndex)
+{
+    ApplySelectCharacter(CharacterIndex);
+}
+
+void ALobbyPlayerState::ApplySelectCharacter(int32 CharacterIndex)
+{
+    //서버 및 준비가 안된 플레이어만 호출 가능
+    if (!HasAuthority()) return;
+    if (bIsReady) return;
+
+    ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
+    if (!GS) return;
+
+    //다른 플레이어가 선택한 캐릭터인지 체크
+    if (GS->IsCharacterIndexSelectedByOtherPlayer(CharacterIndex, this)) return;
+
+    if (SelectedCharacterIndex == CharacterIndex) return;
+
+    SelectedCharacterIndex = CharacterIndex;
+    GS->RefreshPlayerInfos();
+
+    // 정상작동 확인 로그
+    FString CharacterName = TEXT("Unknown");
+    if (const TArray<FCharacterData>& Characters = GS->GetAvailableCharacters();
+        Characters.IsValidIndex(CharacterIndex))
+    {
+        CharacterName = Characters[CharacterIndex].DisplayName.ToString();
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[캐릭터 선택] 플레이어: %s / 선택한 캐릭터: %s (Index: %d)"),
+        *GetPlayerName(), *CharacterName, CharacterIndex);
+}
+
+void ALobbyPlayerState::OnRep_SelectedCharacter()
+{
+    if (ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr)
+    {
+        GS->OnLobbyPlayersChanged.Broadcast();
+    }
+}
+
+int32 ALobbyPlayerState::GetSelectedCharacterIndex() const
+{
+    return SelectedCharacterIndex;
 }

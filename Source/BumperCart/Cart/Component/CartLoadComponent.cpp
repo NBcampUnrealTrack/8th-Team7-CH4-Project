@@ -21,7 +21,7 @@ UCartLoadComponent::UCartLoadComponent()
     MaxWeight = 40;
     WeightScaling = 0.5f;
 
-    BoosterInstigatorDropMultiplier = 0.4f;
+    BoosterInstigatorDropMultiplier = 0.f; //부스터 사용 중 충돌 시 드롭 없음 (부스터 아이템화 밸런싱 — 방어 겸용)
     BoostedTargetDropMultiplier = 1.4f;
 
     // 드롭 개수 규칙 지정

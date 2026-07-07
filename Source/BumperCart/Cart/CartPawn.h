@@ -16,6 +16,8 @@ class USoundBase;
 struct FInputActionValue;
 class UCartGrabComponent;
 class UCartScreenFXComponent;
+class UCartItemInventoryComponent;
+class UStaticMeshComponent;
 
 UCLASS(abstract)
 class ACartPawn : public ACharacter, public ISlideAffectable, public IBumpable
@@ -48,6 +50,15 @@ public:
 
     //외부에서 카트를 강제로 밀어내기
     void ApplyExternalKnockback(const FVector& Direction, float Strength);
+
+    //토마토에 맞은 소유 클라 화면에 가림 위젯 표시 (서버 → 소유 클라)
+    UFUNCTION(Client, Reliable)
+    void ClientApplyTomatoScreenBlock(float Duration);
+
+    //카메라 셰이크를 이 카트 소유 클라 화면에 재생 (서버에서 호출 → 소유 클라 실행).
+    //범프 충돌 외에도 거대 카트 충돌·아이템 드롭 등 다른 시스템이 공용으로 호출. ShakeClass가 비면 카트 기본(BumpCameraShakeClass) 사용
+    UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Cart|Camera")
+    void ClientPlayCameraShake(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale);
 
 protected:
 	virtual void BeginPlay() override;
@@ -137,9 +148,9 @@ protected:
 	float RemoteYawInterpSpeed = 15.f;
 
 	//---------- 브레이크 ----------
-	//브레이크 시 감속도 (낮을수록 제동거리가 길다 — 즉시 멈춤 방지, 스파크 연출 시간 확보)
+	//브레이크 시 감속도 (낮을수록 제동거리가 길다 — 일부러 무겁게: 확 끌려가다 멈추는 불편한 조작감 의도)
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
-	float BrakeDeceleration = 1000.f;
+	float BrakeDeceleration = 150.f;
 
 	//이 속도(cm/s) 이하로 느려지면 브레이크 키를 눌러도 브레이크가 비활성(정지 상태에선 브레이크 안 걸림)
 	UPROPERTY(EditAnywhere, Category = "Cart|Brake", meta = (ClampMin = "0"))
@@ -153,8 +164,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "1"))
 	float BoostSpeedMultiplier = 1.8f;
 
+	//부스트 지속 시간(초). 아이템화로 사용 기회가 줄어드는 만큼 길게 (B13 밸런싱)
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
-	float BoostDuration = 0.6f;
+	float BoostDuration = 2.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
 	float BoostCooldown = 1.0f;
@@ -175,17 +187,35 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
     float CameraFovMin = 90.f;
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
-    float CameraFovMax = 95.f;
+    float CameraFovMax = 105.f;
 
     //부스트 시 추가 빼기/넓히기
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
     float BoostExtraArm = 20.f;
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float BoostExtraFov = 7.f;
+    float BoostExtraFov = 10.f;
 
     //FOV/줌 보간 속도 (낮을수록 부드럽게 — 가감속 시 FOV가 천천히 반응해 멀미 완화)
     UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
     float CameraZoomInterpSpeed = 3.f;
+
+    //---------- 카메라 충돌(벽/진열대 관통 방지) ----------
+    //직접 스윕으로 카메라 암을 당긴다 — 스프링암 기본 충돌은 즉시 스냅이라 가판대 스칠 때 시점이 튀어서 커스텀 스무딩 사용
+    //충돌 탐지 구 반경 (클수록 벽에서 더 여유 두고 당김)
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
+    float CameraCollisionProbeSize = 12.f;
+
+    //당겨올 때(장애물 감지) 보간 속도 — 빠르게(관통 최소화). 스냅은 아니라 어지럼 방지
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
+    float CameraCollisionPullInSpeed = 12.f;
+
+    //카메라가 당겨질 수 있는 최소 암 길이 — 이 이하로는 안 당기고 차라리 살짝 걸치게 둠 (극단적 클로즈업으로 시점 망침 방지)
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
+    float CameraCollisionMinArm = 400.f;
+
+    //풀어줄 때(장애물 벗어남) 보간 속도 — 천천히(가판대 사이 스칠 때 출렁임 방지)
+    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
+    float CameraCollisionPullOutSpeed = 4.f;
 
 
     //---------- 연출 (FX) ----------
@@ -197,6 +227,11 @@ protected:
     // 생성자에서 생성하고, SetupPlayerInputComponent에서 IMC 바인딩
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Grab")
     UCartGrabComponent* GrabComponent;
+
+    //---------- 아이템 인벤토리 컴포넌트 ----------
+    // 생성자에서 생성, SetupPlayerInputComponent에서 아이템 사용 입력(Shift) 바인딩
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Inventory")
+    UCartItemInventoryComponent* ItemInventoryComponent;
 
 	//---------- 적재 (C 상품 시스템 연동) ----------
 	//C가 만든 적재 컴포넌트. 생성자에서 부착, BeginPlay에서 적재 변경 이벤트에 바인딩
@@ -237,14 +272,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BumpDropCooldown = 0.5f;
 
-	//B5 : 부스터 오용(브레이크/급회전)으로 쏟을 때의 충격량
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BoostMisuseImpulse = 800.f;
-
-	//B5 : 부스터 중 누적 회전각(도)이 이 값을 넘으면 쏟음
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BoostTurnSpillAngle = 60.f;
-
 	//충돌 시 재생할 카메라 쉐이크 (BP_CartPawn에 BP_CartBumpShake 지정). 비어있으면 흔들지 않음
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump")
 	TSubclassOf<UCameraShakeBase> BumpCameraShakeClass;
@@ -270,9 +297,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
 	float SlipBrakingDeceleration = 0.f;
 
-	//미끄럼 시작 시 강제 스핀이 풀리는 속도(도/초)
+	//미끄럼 지속시간 클램프(초) — 기믹이 주는 값이 짧거나 길어도 이 범위로 보정 (조작 불능 시간)
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
-	float SlipSpinSpeedDeg = 240.f;
+	float SlipMinDuration = 1.5f;
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
+	float SlipMaxDuration = 2.f;
+
+	//미끄럼 동안 카트 메시가 도는 바퀴 수 — 정수 바퀴라 끝나면 원래 방향으로 복귀
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "1"))
+	int32 SlipSpinTurns = 2;
+
+	//빙글 돌릴 카트 메시 컴포넌트 이름 (BP_CartPawn의 카트 스태틱 메시)
+	UPROPERTY(EditAnywhere, Category = "Cart|Slip")
+	FName SlipSpinMeshName = TEXT("Cart");
 
 	//---------- 효과음 (SFX) — BP_CartPawn에서 사운드 지정. 비어있으면 무음 ----------
 	//충돌(범프) 시 효과음
@@ -286,6 +323,10 @@ protected:
 	//브레이크 시 효과음
 	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
 	USoundBase* BrakeSound;
+
+	//미끄럼(물웅덩이) 시작 시 효과음 — 내 카트는 2D, 상대 카트는 3D로 재생 (StartSlip은 전 클라 실행)
+	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
+	USoundBase* SlipSound;
 
 protected:
 	//---------- 입력 핸들러 ----------
@@ -353,12 +394,15 @@ private:
     //소유 클라가 전담하는 절대 회전값(도). 매 프레임 SetActorRotation으로 재확정해 서버 보정 롤백에 면역
     float ControlledYaw = 0.f;
 
-	//부스터 중 누적 회전각(도). 부스터 시작 시 0으로 리셋
-	float BoostTurnAccumDeg = 0.f;
-
-	//미끄럼(슬립) 상태
+	//미끄럼(슬립) 상태 — 액터 yaw는 건드리지 않고(카메라 정면 유지) 카트 메시만 제자리 스핀
 	bool bIsSlipping = false;
 	float SlipTimeRemaining = 0.f;     //남은 미끄럼 시간(초)
-	float SlipSpinRemainingDeg = 0.f;  //남은 강제 스핀 각(도)
+	float SlipDurationTotal = 0.f;     //이번 미끄럼 총 시간(초) — 스핀 진행도 계산용
+	float SlipSpinDir = 1.f;           //스핀 방향(+1/-1) — 기믹이 준 SpinAngleDeg의 부호
 	float DefaultGroundFriction = 0.f; //미끄럼 후 마찰 복구용 백업
+
+	//빙글 돌릴 카트 메시 (SlipSpinMeshName으로 최초 1회 탐색·캐시) + 원래 상대 회전(복구용)
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> SlipSpinMesh;
+	FRotator SlipSpinMeshBaseRelRot = FRotator::ZeroRotator;
 };

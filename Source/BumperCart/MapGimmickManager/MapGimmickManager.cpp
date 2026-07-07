@@ -45,16 +45,17 @@ void AMapGimmickManager::BeginPlay()
         }
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[MapGimmickManager] 총 타겟 포인트 갯수 : %d "), GimmickSpawnPointList.Num());
+    UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] 총 타겟 포인트 갯수 : %d "), GimmickSpawnPointList.Num());
 
 
     // 테스트용 - 게임 모드에서 호출시 삭제 예정
-    //StartGimmickSpawning();
-    //StartNPCRush();
+    StartGimmickSpawning();
 }
 
 void AMapGimmickManager::StartGimmickSpawning()
 {
+    if (!HasAuthority()) return;
+
     RespawnObstacles();
 
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnObstacles, ObstacleRespawnInterval, true);
@@ -105,7 +106,7 @@ void AMapGimmickManager::SpawnObstacles()
             }
         }
 
-        UE_LOG(LogTemp, Log, TEXT("[MapGimmickManager] %s %d개 스폰 완료"), *Info.ObstacleName.ToString(), Info.SpawnCount);
+        UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] %s %d개 스폰 완료"), *Info.ObstacleName.ToString(), Info.SpawnCount);
     }
 }
 
@@ -113,17 +114,18 @@ void AMapGimmickManager::ClearAllObstacles()
 {
     if (!HasAuthority()) return;
 
-    for (AActor* Obstacle : SpawnedObstacleList)
+    for (int32 i = SpawnedObstacleList.Num() - 1; i >=0; --i)
     {
-        if (IsValid(Obstacle))
+        if (SpawnedObstacleList[i].IsValid())
         {
+            AActor* Obstacle = SpawnedObstacleList[i].Get();
             Obstacle->Destroy();
         }
     }
 
     SpawnedObstacleList.Empty();
 
-    UE_LOG(LogTemp, Warning, TEXT("[GimmickManager] 기존 장애물들 정리완료"));
+    UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] 기존 장애물들 정리완료"));
 }
 
 void AMapGimmickManager::RespawnObstacles()
@@ -140,11 +142,15 @@ void AMapGimmickManager::RespawnObstacles()
 
 void AMapGimmickManager::EndSpawnObstacle()
 {
+    if (!HasAuthority()) return;
+
     ClearAllObstacles();
 }
 
 void AMapGimmickManager::StartNPCRush()
 {
+    if (!HasAuthority()) return;
+
     if (NPCRushStartPointList.Num() == 0)
     {
         UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 포인트가 없습니다."));

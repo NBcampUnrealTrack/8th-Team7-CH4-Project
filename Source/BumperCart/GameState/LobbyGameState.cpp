@@ -1,6 +1,9 @@
 #include "GameState/LobbyGameState.h"
 
+#include "VectorUtil.h"
+#include "DataAsset/CharacterSelectionConfig.h"
 #include "GameFramework/PlayerState.h"
+#include "GameInstance/MainGameInstance.h"
 #include "Net/UnrealNetwork.h"
 #include "PlayerState/LobbyPlayerState.h"
 
@@ -12,8 +15,8 @@ void ALobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
     DOREPLIFETIME(ThisClass, ReplicatedPlayerInfos);
 }
 
-//플레이어 정보 갱신
-void ALobbyGameState::RefreshPlayerInfos()
+// 플레이어 정보 갱신
+void ALobbyGameState::RefreshPlayerInfos(APlayerState* ExcludedPlayerState)
 {
     if (!HasAuthority()) return;
 
@@ -21,7 +24,8 @@ void ALobbyGameState::RefreshPlayerInfos()
 
     for (APlayerState* PS : PlayerArray)
     {
-        if (!PS)
+        // 갱신 제외할 플레이어 정보가 있을 경우 패스
+        if (!PS || PS == ExcludedPlayerState)
         {
             continue;
         }
@@ -45,7 +49,7 @@ void ALobbyGameState::RefreshPlayerInfos()
     OnLobbyPlayersChanged.Broadcast();
 }
 
-//모든 플레이어 준비 완료했는지 확인
+// 모든 플레이어 준비 완료했는지 확인
 bool ALobbyGameState::bIsAllPlayersReady() const
 {
     for (APlayerState* PS : PlayerArray)
@@ -60,21 +64,54 @@ bool ALobbyGameState::bIsAllPlayersReady() const
     return true;
 }
 
-//플레이어의 정보가 바뀔 시 호출
+// 플레이어의 정보가 바뀔 시 호출
 void ALobbyGameState::OnRep_PlayerInfos()
 {
     OnLobbyPlayersChanged.Broadcast();
 }
 
-//플레이어 정보 제공(
+// 플레이어 정보 제공
 const TArray<FLobbyPlayerInfo>& ALobbyGameState::GetReplicatedPlayerInfos() const
 { return ReplicatedPlayerInfos; }
 
-//호스트인지 확인
+// 호스트인지 확인
 bool ALobbyGameState::IsHostPlayerState(const APlayerState* PS) const
 {
     if (!PS) return false;
 
     const APlayerController* PC = Cast<APlayerController>(PS->GetOwner());
-    return PC && PC->GetNetConnection() == nullptr;
+    return PC && PC->GetLocalPlayer() != nullptr;
+}
+
+const TArray<FCharacterData>& ALobbyGameState::GetAvailableCharacters() const
+{
+    const TArray<FCharacterData> Empty;
+    if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+    {
+        if (GI->CharacterSelectionConfig)
+        {
+            return GI->CharacterSelectionConfig->CharacterDatas;
+        }
+    }
+    return Empty;
+}
+
+// 플레이어가 선택한 캐릭터가 이미 다른 플레이어가 선택한 캐릭터인지 확인
+bool ALobbyGameState::IsCharacterIndexSelectedByOtherPlayer(int32 CharacterIndex, const APlayerState* ReqeustPS) const
+{
+    if (CharacterIndex == INDEX_NONE) return false;
+
+    for (APlayerState* PS : PlayerArray)
+    {
+        if (!PS || PS == ReqeustPS) continue;
+
+        if (ALobbyPlayerState* LPS = Cast<ALobbyPlayerState>(PS))
+        {
+            if (LPS->IsReady() && LPS->GetSelectedCharacterIndex() == CharacterIndex)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
 }
