@@ -121,9 +121,12 @@ public:
     void SpawnNPCRush();
 
     // NPCRush 대기 시간 - 경고음과 예상경로 표시
-    void WaitingNpcRush(FVector CenterPoint, float Distance);
+    void WaitingNpcRush();
 
     void CalculateTraceDimensionsFromTarget(ATargetPoint* TargetPoint, float MaxTraceDistance);
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_SpawnWarningDecal(FVector CenterPoint, float Radius);
 
 #pragma endregion
 

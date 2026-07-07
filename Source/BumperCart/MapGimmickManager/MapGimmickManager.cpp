@@ -15,6 +15,8 @@ AMapGimmickManager::AMapGimmickManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
+    bReplicates = true;
+
     bNetLoadOnClient = false;
 }
 
@@ -179,6 +181,8 @@ void AMapGimmickManager::StartNPCRush()
 
 void AMapGimmickManager::SpawnNPCRush()
 {
+    if (!HasAuthority())   return;
+
     FActorSpawnParameters SpawnParams;
     SpawnParams.Owner = this;
     SpawnParams.Instigator = GetInstigator();
@@ -201,41 +205,9 @@ void AMapGimmickManager::SpawnNPCRush()
     }
 }
 
-void AMapGimmickManager::WaitingNpcRush(FVector CenterPoint, float Distance)
+void AMapGimmickManager::WaitingNpcRush()
 {
-    if (WarningSound)
-    {
-        UGameplayStatics::PlaySound2D(GetWorld(), WarningSound);
-    }
-
-    // 데칼 스폰
-    if (NPCRushWarningArea)
-    {
-        FRotator DecalRotation = FRotationMatrix::MakeFromXZ(CenterPoint.ForwardVector, FVector::UpVector).Rotator();
-
-        SpawnNPCRushWarningArea = GetWorld()->SpawnActor<ANPCRushWarningArea>(
-            NPCRushWarningArea,
-            CenterPoint,
-            DecalRotation
-        );
-    }
-
-    // 스폰된 데칼 사이즈 변경
-    if (SpawnNPCRushWarningArea)
-    {
-        FVector TargetExtent = FVector(20.f, 100.0f, Distance);
-        FVector DefaultDecalSize = FVector(128.f, 128.f, 128.f); // 엔진 기본값
-
-        FVector NewScale = FVector(
-            TargetExtent.X / DefaultDecalSize.X,
-            TargetExtent.Y / DefaultDecalSize.Y,
-            TargetExtent.Z / DefaultDecalSize.Z
-        );
-
-        SpawnNPCRushWarningArea->SetActorScale3D(NewScale);
-
-        SpawnNPCRushWarningArea->InitWarningDecal(5.0f);
-    }
+    if (!HasAuthority())   return;
 
     // 경고 시간 뒤 거대 카트 돌진
     FTimerHandle SpawnTimerHandle;
@@ -244,6 +216,8 @@ void AMapGimmickManager::WaitingNpcRush(FVector CenterPoint, float Distance)
 
 void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* TargetPoint, float MaxTraceDistance)
 {
+    if (!HasAuthority())   return;
+
     if (!TargetPoint || !GetWorld()) return;
 
     // 라인 트레이스 시작점과 정면 방향 설정
@@ -283,5 +257,44 @@ void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* Target
     float TotalDistance = FVector::Dist(StartPos, EndPos);
     float Radius = TotalDistance * 0.5f;
 
-    WaitingNpcRush(CenterVector, Radius);
+    Multicast_SpawnWarningDecal(CenterVector, Radius);
+}
+
+void AMapGimmickManager::Multicast_SpawnWarningDecal_Implementation(FVector CenterPoint, float Radius)
+{
+    if (WarningSound)
+    {
+        UGameplayStatics::PlaySound2D(GetWorld(), WarningSound);
+    }
+
+    // 데칼 스폰
+    if (NPCRushWarningArea)
+    {
+        FRotator DecalRotation = FRotationMatrix::MakeFromXZ(CenterPoint.ForwardVector, FVector::UpVector).Rotator();
+
+        SpawnNPCRushWarningArea = GetWorld()->SpawnActor<ANPCRushWarningArea>(
+            NPCRushWarningArea,
+            CenterPoint,
+            DecalRotation
+        );
+    }
+
+    // 스폰된 데칼 사이즈 변경
+    if (SpawnNPCRushWarningArea)
+    {
+        FVector TargetExtent = FVector(20.f, 100.0f, Radius);
+        FVector DefaultDecalSize = FVector(128.f, 128.f, 128.f); // 엔진 기본값
+
+        FVector NewScale = FVector(
+            TargetExtent.X / DefaultDecalSize.X,
+            TargetExtent.Y / DefaultDecalSize.Y,
+            TargetExtent.Z / DefaultDecalSize.Z
+        );
+
+        SpawnNPCRushWarningArea->SetActorScale3D(NewScale);
+
+        SpawnNPCRushWarningArea->InitWarningDecal(5.0f);
+    }
+
+    WaitingNpcRush();
 }

@@ -7,7 +7,6 @@ void ANPCRushWarningArea::InitWarningDecal(float Duration)
     UDecalComponent* TargetDecal = GetDecal();
     if (TargetDecal)
     {
-
         SetLifeSpan(Duration);
     }
 }
