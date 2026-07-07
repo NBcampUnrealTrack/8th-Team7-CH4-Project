@@ -7,6 +7,7 @@
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Components/BoxComponent.h"
 
 AProductShelf::AProductShelf()
 {
@@ -17,6 +18,9 @@ AProductShelf::AProductShelf()
 
     LaunchPoints = CreateDefaultSubobject<USceneComponent>(TEXT("LaunchPoint"));
     LaunchPoints->SetupAttachment(RootComponent);
+
+    SpawnAreaBox = CreateDefaultSubobject<UBoxComponent>(TEXT("SpawnArea"));
+    SpawnAreaBox->SetupAttachment(RootComponent);
 
 }
 
@@ -83,44 +87,27 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
     //SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, SpawnLocation, SpawnRotation, SpawnParams);
+    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, GetRandomPointInVolume(), FRotator::ZeroRotator, SpawnParams);
 
     if (SpawnedProduct)
     {
-        UPrimitiveComponent* PhysComp = Cast<UPrimitiveComponent>(SpawnedProduct->GetRootComponent());
-        if (PhysComp)
+        if (UWorld* World = GetWorld())
         {
-            // 가판대 정면 방향을 기준으로 좌우/상하로 퍼지는 무작위 벡터 계산
-            FVector ForwardDir = LaunchPoints->GetForwardVector();
-            FVector RandomDir = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ForwardDir, 45.0f); // 45도 원뿔 범위로 퍼짐
-
-            // 위쪽으로 살짝 뜨게 만들기 위해 Z축 힘 추가
-            RandomDir.Z += 0.5f;
-            RandomDir.Normalize();
-
-            // 힘을 가해 튕겨내기
-            PhysComp->AddImpulse(RandomDir * LaunchForce, NAME_None, true);
-
-            //SpawnedProduct->SetLifeSpan(30.0f);
-
-            if (UWorld* World = GetWorld())
+            if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
             {
-                if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
-                {
-                    UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
+                UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
 
-                    if (IsValid(SpawnFX))
-                    {
-                        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-                            World,
-                            SpawnFX,
-                            SpawnLocation,
-                            SpawnRotation,
-                            FVector(1.0f),
-                            true,
-                            true
-                        );
-                    }
+                if (IsValid(SpawnFX))
+                {
+                    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+                        World,
+                        SpawnFX,
+                        SpawnLocation,
+                        SpawnRotation,
+                        FVector(1.0f),
+                        true,
+                        true
+                    );
                 }
             }
         }
@@ -130,6 +117,62 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
         return SpawnedProduct;
     }
 
+    //if (SpawnedProduct)
+    //{
+    //    UPrimitiveComponent* PhysComp = Cast<UPrimitiveComponent>(SpawnedProduct->GetRootComponent());
+    //    if (PhysComp)
+    //    {
+    //        // 가판대 정면 방향을 기준으로 좌우/상하로 퍼지는 무작위 벡터 계산
+    //        FVector ForwardDir = LaunchPoints->GetForwardVector();
+    //        FVector RandomDir = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ForwardDir, 45.0f); // 45도 원뿔 범위로 퍼짐
+
+    //        // 위쪽으로 살짝 뜨게 만들기 위해 Z축 힘 추가
+    //        RandomDir.Z += 0.5f;
+    //        RandomDir.Normalize();
+
+    //        // 힘을 가해 튕겨내기
+    //        PhysComp->AddImpulse(RandomDir * LaunchForce, NAME_None, true);
+
+    //        if (UWorld* World = GetWorld())
+    //        {
+    //            if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
+    //            {
+    //                UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
+
+    //                if (IsValid(SpawnFX))
+    //                {
+    //                    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+    //                        World,
+    //                        SpawnFX,
+    //                        SpawnLocation,
+    //                        SpawnRotation,
+    //                        FVector(1.0f),
+    //                        true,
+    //                        true
+    //                    );
+    //                }
+    //            }
+    //        }
+    //    }
+
+    //    UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());
+
+    //    return SpawnedProduct;
+    //}
+
     return nullptr;
+}
+
+FVector AProductShelf::GetRandomPointInVolume() const
+{
+    // 박스 x/y/z 의 반지름
+    FVector BoxExtent = SpawnAreaBox->GetScaledBoxExtent();
+    // 박스 중심
+    FVector BoxOrigin = SpawnAreaBox->GetComponentLocation();
+
+    return BoxOrigin + FVector(
+        FMath::FRandRange(-BoxExtent.X, BoxExtent.X),
+        FMath::FRandRange(-BoxExtent.Y, BoxExtent.Y),
+        FMath::FRandRange(-BoxExtent.Z, BoxExtent.Z));
 }
 

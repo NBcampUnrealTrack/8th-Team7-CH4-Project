@@ -7,6 +7,7 @@
 #include "ProductShelf.generated.h"
 
 class AProductBase;
+class UBoxComponent;
 
 UCLASS()
 class BUMPERCART_API AProductShelf : public AActor
@@ -25,6 +26,10 @@ protected:
     // 제품 발사 포인트
     UPROPERTY(EditAnywhere, Category = "Component")
     TObjectPtr<USceneComponent> LaunchPoints;
+
+    // 스폰 영역 설정
+    UPROPERTY(VisibleAnywhere, Category = "Component")
+    TObjectPtr<UBoxComponent> SpawnAreaBox;
 
 #pragma endregion
 
@@ -61,6 +66,8 @@ public:
 
     // 제품 스폰
     AProductBase* SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass);
+
+    FVector GetRandomPointInVolume() const;
 
 #pragma endregion
 
