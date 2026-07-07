@@ -77,6 +77,31 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|WheelFX", meta = (ClampMin = "0.1"))
 	float BrakeHeatRampTime = 1.5f;
 
+	//---------- 브레이크 스키드 마크 (바닥 데칼) ----------
+	//타이어 자국 데칼 머티리얼 (Material Domain = Deferred Decal). 비어있으면 무동작
+	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal")
+	TObjectPtr<UMaterialInterface> SkidDecalMaterial;
+
+	//브레이크 중 이 전진 속도(cm/s) 이상이면 자국을 남김 (저속 브레이크는 자국 없음)
+	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal", meta = (ClampMin = "0"))
+	float SkidDecalMinSpeed = 50.f;
+
+	//데칼 크기 (X=바닥 투영 깊이, Y=폭 절반, Z=길이 절반)
+	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal")
+	FVector SkidDecalSize = FVector(16.f, 6.f, 10.f);
+
+	//뒷바퀴가 이 거리(cm) 이동할 때마다 자국 하나 (작을수록 촘촘)
+	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal", meta = (ClampMin = "1"))
+	float SkidDecalSpacing = 15.f;
+
+	//자국 지속 시간(초)
+	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal", meta = (ClampMin = "0.1"))
+	float SkidDecalLifetime = 8.f;
+
+	//사라지기 전 페이드아웃 시간(초)
+	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal", meta = (ClampMin = "0"))
+	float SkidDecalFadeDuration = 2.f;
+
 private:
 	//로컬 카메라를 찾아 MID를 PostProcess 블렌더블로 얹는다 (최초 1회). 성공 시 true
 	bool EnsureSpeedLineMID();
@@ -89,6 +114,18 @@ private:
 
 	//리본 파라미터 갱신 + 브레이크 스파크 on/off·히트 누적 (매 프레임)
 	void DriveWheelFX(float ForwardSpeed, float DeltaTime);
+
+	//브레이크 스키드 데칼 갱신 — 브레이크 중 뒷바퀴가 일정 거리 이동할 때마다 바닥에 자국 데칼 스폰 (매 프레임)
+	void DriveSkidDecals(float ForwardSpeed);
+
+	//한쪽 뒷바퀴: 마지막 자국 위치에서 SkidDecalSpacing 이상 벌어지면 데칼 스폰
+	void TrySpawnSkidDecal(const FVector& WheelPos, FVector& LastPos, bool& bHasLast);
+
+	//지정 월드 위치 바닥에 자국 데칼 하나 스폰 (수명·페이드 적용)
+	void SpawnSkidDecalAt(const FVector& WorldPos);
+
+	//뒷바퀴 월드 위치 (소켓이 있으면 소켓, 없으면 fallback 오프셋). 데칼 스폰 위치용
+	FVector GetRearWheelWorldPos(bool bLeft) const;
 
 	//소유 카트 (부스트·브레이크·적재율 참조용). BeginPlay에서 캐시
 	UPROPERTY(Transient)
@@ -116,6 +153,23 @@ private:
 
 	//브레이크 히트 누적(0~1). 밟는 동안 차오르고, 떼면 2배 속도로 식음
 	float BrakeHeat = 0.f;
+
+	//---------- 스키드 데칼 위치 추적 (SetupWheelFX에서 캐시) ----------
+	//뒷바퀴 위치 조회 기준 컴포넌트 (소켓 가진 카트 메시, 없으면 루트)
+	UPROPERTY(Transient)
+	TObjectPtr<USceneComponent> WheelAttach;
+	//해결된 소켓 이름 (NAME_None이면 fallback 오프셋 사용)
+	FName WheelSocketLeftResolved = NAME_None;
+	FName WheelSocketRightResolved = NAME_None;
+	//소켓이 없을 때 WheelAttach 기준 오프셋
+	FVector WheelFallbackLeft = FVector::ZeroVector;
+	FVector WheelFallbackRight = FVector::ZeroVector;
+
+	//마지막으로 자국을 찍은 뒷바퀴 위치 (거리 기반 스폰용). 브레이크 시작 시 리셋
+	FVector LastSkidPosLeft = FVector::ZeroVector;
+	FVector LastSkidPosRight = FVector::ZeroVector;
+	bool bHasLastSkidLeft = false;
+	bool bHasLastSkidRight = false;
 
 	//---------- 토마토 화면 가림 위젯 ----------
 	//토마토 위젯 클래스 (BP에서 지정)

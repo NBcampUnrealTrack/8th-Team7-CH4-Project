@@ -13,6 +13,8 @@
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
+#include "Components/DecalComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 UCartScreenFXComponent::UCartScreenFXComponent()
 {
@@ -131,6 +133,13 @@ void UCartScreenFXComponent::SetupWheelFX()
 	RibbonFXRight = SpawnWheelFX(GroundRibbonSystem, AttachTarget, RightSocket, FallbackRight, true);
 	SparkFXLeft = SpawnWheelFX(BrakeSparkSystem, AttachTarget, LeftSocket, FallbackLeft, false);
 	SparkFXRight = SpawnWheelFX(BrakeSparkSystem, AttachTarget, RightSocket, FallbackRight, false);
+
+	//스키드 데칼용 뒷바퀴 위치 조회 정보 캐시 (소켓 or 폴백 오프셋)
+	WheelAttach = AttachTarget;
+	WheelSocketLeftResolved = LeftSocket;
+	WheelSocketRightResolved = RightSocket;
+	WheelFallbackLeft = FallbackLeft;
+	WheelFallbackRight = FallbackRight;
 }
 
 //나이아가라 컴포넌트 하나를 생성해 부착. 소켓이 NAME_None이면 FallbackOffset 위치 사용
@@ -187,6 +196,9 @@ void UCartScreenFXComponent::DriveWheelFX(float ForwardSpeed, float DeltaTime)
 		ToggleSpark(SparkFXRight);
 	}
 
+	//--- 스키드 마크(바닥 데칼): 브레이크 중 뒷바퀴가 일정 거리 이동할 때마다 자국을 찍는다 ---
+	DriveSkidDecals(ForwardSpeed);
+
 	//--- 브레이크 히트: 밟는 동안 차오르고(램프 시간), 떼면 2배 속도로 식는다 ---
 	//Niagara에서 User.BrakeHeat로 스파크 색 보간 (0=주황 -> 1=백황, 달아오르는 연출)
 	if (bWantSparks)
@@ -199,6 +211,79 @@ void UCartScreenFXComponent::DriveWheelFX(float ForwardSpeed, float DeltaTime)
 	}
 	if (SparkFXLeft) { SparkFXLeft->SetVariableFloat(FName("BrakeHeat"), BrakeHeat); }
 	if (SparkFXRight) { SparkFXRight->SetVariableFloat(FName("BrakeHeat"), BrakeHeat); }
+}
+
+//브레이크 스키드 데칼 갱신 — 브레이크 중 + 충분히 빠를 때, 양쪽 뒷바퀴 위치에 거리 기반으로 자국을 찍는다
+void UCartScreenFXComponent::DriveSkidDecals(float ForwardSpeed)
+{
+	const bool bWantSkid = OwnerCart && OwnerCart->IsBraking() && ForwardSpeed > SkidDecalMinSpeed;
+	if (!bWantSkid || !SkidDecalMaterial)
+	{
+		//브레이크를 뗐거나 조건 미달 → 다음 자국은 새 라인으로 시작(연속선 끊기)
+		bHasLastSkidLeft = false;
+		bHasLastSkidRight = false;
+		return;
+	}
+
+	TrySpawnSkidDecal(GetRearWheelWorldPos(true), LastSkidPosLeft, bHasLastSkidLeft);
+	TrySpawnSkidDecal(GetRearWheelWorldPos(false), LastSkidPosRight, bHasLastSkidRight);
+}
+
+//한쪽 뒷바퀴: 이전 자국에서 SkidDecalSpacing 이상 벌어졌을 때만 새 데칼 (자국 간격 일정 유지)
+void UCartScreenFXComponent::TrySpawnSkidDecal(const FVector& WheelPos, FVector& LastPos, bool& bHasLast)
+{
+	if (bHasLast && FVector::DistSquared2D(WheelPos, LastPos) < FMath::Square(SkidDecalSpacing))
+	{
+		return; //아직 충분히 안 움직임 — 자국 안 찍음
+	}
+	LastPos = WheelPos;
+	bHasLast = true;
+	SpawnSkidDecalAt(WheelPos);
+}
+
+//지정 위치 바닥에 자국 데칼 하나 스폰 (수명 후 자동 소멸 + 마지막에 페이드아웃)
+void UCartScreenFXComponent::SpawnSkidDecalAt(const FVector& WorldPos)
+{
+	UWorld* World = GetWorld();
+	if (!World || !SkidDecalMaterial)
+	{
+		return;
+	}
+
+	//데칼은 로컬 X축으로 바닥에 투영된다 → X를 아래로, 길이축(DecalSize.Z)을 '실제 이동 방향'에 정렬
+	//미끄러질 땐 카트가 바라보는 방향(yaw)과 실제 진행 방향(속도)이 달라서, 속도 방향을 써야 자국이 경로를 따라 눕는다
+	FVector MoveDir = OwnerCart ? OwnerCart->GetVelocity() : FVector::ZeroVector;
+	MoveDir.Z = 0.f;
+	MoveDir = MoveDir.GetSafeNormal();
+	if (MoveDir.IsNearlyZero())
+	{
+		MoveDir = OwnerCart ? OwnerCart->GetActorForwardVector() : FVector::ForwardVector;
+	}
+	//X=아래(-Z) 투영, Z=이동 방향(길이축), Y=좌우 폭
+	const FRotator DecalRot = FRotationMatrix::MakeFromXZ(FVector(0.f, 0.f, -1.f), MoveDir).Rotator();
+
+	UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(World, SkidDecalMaterial, SkidDecalSize, WorldPos, DecalRot, SkidDecalLifetime);
+	if (Decal)
+	{
+		//수명 끝나기 직전부터 페이드아웃 시작
+		const float FadeStart = FMath::Max(0.f, SkidDecalLifetime - SkidDecalFadeDuration);
+		Decal->SetFadeOut(FadeStart, SkidDecalFadeDuration, false);
+	}
+}
+
+//뒷바퀴 월드 위치 — 소켓이 있으면 소켓 위치, 없으면 WheelAttach 기준 fallback 오프셋
+FVector UCartScreenFXComponent::GetRearWheelWorldPos(bool bLeft) const
+{
+	if (!WheelAttach)
+	{
+		return OwnerCart ? OwnerCart->GetActorLocation() : FVector::ZeroVector;
+	}
+	const FName Socket = bLeft ? WheelSocketLeftResolved : WheelSocketRightResolved;
+	if (Socket != NAME_None)
+	{
+		return WheelAttach->GetSocketLocation(Socket);
+	}
+	return WheelAttach->GetComponentTransform().TransformPosition(bLeft ? WheelFallbackLeft : WheelFallbackRight);
 }
 
 //컴포넌트 종료 시 남아있는 토마토 위젯 정리
