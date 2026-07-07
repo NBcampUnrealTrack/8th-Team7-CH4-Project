@@ -40,6 +40,7 @@ UENUM(BlueprintType)
 enum class EProductState : uint8
 {
     None,
+    Spawning,
     Display,
     Grabbed,
     Loaded,
@@ -57,13 +58,13 @@ public:
     UPROPERTY(BlueprintReadOnly)
     EProductState State = EProductState::None;
 
-    // 서버가 계산한 Falling 시작 지점
+    // 서버가 계산한 포물선 운동 시작 지점
     UPROPERTY(BlueprintReadOnly)
-    FVector_NetQuantize10 FallingStartLocation = FVector::ZeroVector;
+    FVector_NetQuantize10 LaunchStartLocation = FVector::ZeroVector;
 
-    // 서버가 계산한 Falling 도착 지점
+    // 서버가 계산한 포물선 운동 도착 지점
     UPROPERTY(BlueprintReadOnly)
-    FVector_NetQuantize10 FallingEndLocation = FVector::ZeroVector;
+    FVector_NetQuantize10 LaunchEndLocation = FVector::ZeroVector;
 
     // 서버가 계산한 실제 보여지는 위치
     UPROPERTY(BlueprintReadOnly)
@@ -71,9 +72,13 @@ public:
 
     // 서버가 계산한 튀어오르는 높이
     UPROPERTY(BlueprintReadOnly)
-    float FallingHeight = 0.f;
+    float LaunchHeight = 0.f;
 
-    // Falling 상태로 전환됐었는지 확인
+    // 포물선 운동을 하는 지속시간
     UPROPERTY(BlueprintReadOnly)
-    bool bIsFell = false;
+    float LaunchDuration = 1.f;
+
+    // 서버에서 연출을 시작한 시간
+    UPROPERTY(BlueprintReadOnly)
+    float LaunchServerStartTime = 0.f;
 };
