@@ -239,13 +239,30 @@ void UCartScreenFXComponent::DriveSkidDecals(float ForwardSpeed)
 //한쪽 뒷바퀴: 이전 자국에서 SkidDecalSpacing 이상 벌어졌을 때만 새 데칼 (자국 간격 일정 유지)
 void UCartScreenFXComponent::TrySpawnSkidDecal(const FVector& WheelPos, FVector& LastPos, bool& bHasLast)
 {
-	if (bHasLast && FVector::DistSquared2D(WheelPos, LastPos) < FMath::Square(SkidDecalSpacing))
+	if (!bHasLast)
+	{
+		LastPos = WheelPos;
+		bHasLast = true;
+		SpawnSkidDecalAt(WheelPos);
+		return;
+	}
+
+	//고속(부스트 직후 등)에선 한 프레임에 간격의 몇 배를 이동해 자국 사이가 점점이 비므로,
+	//마지막 자국에서 현재 위치까지 간격 단위로 걸어가며 빈 구간을 전부 채운다
+	float Dist = FVector::Dist2D(WheelPos, LastPos);
+	if (Dist < SkidDecalSpacing)
 	{
 		return; //아직 충분히 안 움직임 — 자국 안 찍음
 	}
-	LastPos = WheelPos;
-	bHasLast = true;
-	SpawnSkidDecalAt(WheelPos);
+
+	const FVector Dir = (WheelPos - LastPos).GetSafeNormal2D();
+	int32 Guard = 0; //순간이동 등 비정상 거리 폭주 방지
+	while (Dist >= SkidDecalSpacing && Guard++ < 32)
+	{
+		LastPos += Dir * SkidDecalSpacing;
+		Dist -= SkidDecalSpacing;
+		SpawnSkidDecalAt(LastPos);
+	}
 }
 
 //지정 위치 바닥에 자국 데칼 하나 스폰 (수명 후 자동 소멸 + 마지막에 페이드아웃)
