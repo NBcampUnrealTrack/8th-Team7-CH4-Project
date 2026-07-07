@@ -89,6 +89,16 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
     TObjectPtr<UStaticMeshComponent> Mesh;
 
+
+    /* 오버레이 머티리얼 */
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Visual")
+    TObjectPtr<UMaterialInterface> ValueOverlayMaterial;
+
+    UPROPERTY()
+    TObjectPtr<UMaterialInstanceDynamic> ValueOverlayMID;
+
+
     /* Product 기본 변수 */
 
     // 사용할 데이터 에셋
@@ -203,4 +213,13 @@ private:
 
     // 포물선 운동 중 현재 진행도에 맞는 위치를 구하는 함수
     FVector GetLaunchLocation(float Alpha) const;
+
+    // 오버레이 머티리얼 적용하는 함수
+    void ApplyValueOverlay();
+
+    // 현재 가치에 따라 오버레이 수치들을 가져오는 함수
+    FLinearColor GetValueOverlayColor() const;
+    float GetValueOverlayIntensity() const;
+    float GetValueOverlayOpacity() const;
+    float GetValueOverlayExpandAmount() const;
 };
