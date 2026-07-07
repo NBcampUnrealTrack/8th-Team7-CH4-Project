@@ -7,6 +7,7 @@
 #include "Kismet/KismetStringLibrary.h"
 #include "Cart/CartPawn.h"
 #include "Cart/CartLoadTypes.h"
+#include "Cart/Component/CartLoadComponent.h"
 
 ANPCRushGimmick::ANPCRushGimmick()
 {
@@ -98,9 +99,17 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
 
     EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 
-    // 아이템 드롭 protected로 막혀있음
-    //PlayerCart->RequestSpill(FinalKnockbackDir.Size2D(), DropRole);
+    UCartLoadComponent* CartLoadComp = PlayerCart->FindComponentByClass<UCartLoadComponent>();
 
-    PlayerCart->ApplyExternalKnockback(FinalKnockbackDir, Strength);
+    if (IsValid(CartLoadComp))
+    {
+        float ClosingSpeed = FinalKnockbackDir.Size2D();
+
+        CartLoadComp->DropProducts(ClosingSpeed * 3000.0f, DropRole);
+
+        PlayerCart->ApplyExternalKnockback(FinalKnockbackDir, Strength);
+
+        UE_LOG(LogTemp, Log, TEXT("[거대 카트] 아이템 드롭, 밀치기 완료"));
+    }
 }
 
