@@ -189,7 +189,7 @@ void UMainGameInstanceSubsystem::OnCreateSessionComplete(FName SessionName, bool
     {
         return;
     }
-
+    UE_LOG(LogTemp, Warning, TEXT("주소: %s"), *LobbyPath)
    //?listen이 핵심 해당 클라이언트가 서버가 되는 부분
     GetWorld()->ServerTravel(LobbyPath+TEXT("?listen"));
 }

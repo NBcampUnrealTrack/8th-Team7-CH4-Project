@@ -40,6 +40,7 @@ void ALobbyGameState::RefreshPlayerInfos(APlayerState* ExcludedPlayerState)
         if (const ALobbyPlayerState* LPS = Cast<ALobbyPlayerState>(PS))
         {
             Info.bIsReady = LPS->IsReady();
+            Info.SelectedCharacterIndex = LPS->GetSelectedCharacterIndex();
         }
 
 
@@ -55,8 +56,6 @@ bool ALobbyGameState::bIsAllPlayersReady() const
     for (APlayerState* PS : PlayerArray)
     {
         if (!PS) continue;
-
-        if (IsHostPlayerState(PS)) continue;
 
         const ALobbyPlayerState* LPS = Cast<ALobbyPlayerState>(PS);
         if (!LPS || !LPS->IsReady()) return false;
