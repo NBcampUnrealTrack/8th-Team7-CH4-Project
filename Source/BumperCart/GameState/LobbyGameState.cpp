@@ -16,7 +16,7 @@ void ALobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 }
 
 // 플레이어 정보 갱신
-void ALobbyGameState::RefreshPlayerInfos()
+void ALobbyGameState::RefreshPlayerInfos(APlayerState* ExcludedPlayerState)
 {
     if (!HasAuthority()) return;
 
@@ -24,7 +24,8 @@ void ALobbyGameState::RefreshPlayerInfos()
 
     for (APlayerState* PS : PlayerArray)
     {
-        if (!PS)
+        // 갱신 제외할 플레이어 정보가 있을 경우 패스
+        if (!PS || PS == ExcludedPlayerState)
         {
             continue;
         }
@@ -79,7 +80,7 @@ bool ALobbyGameState::IsHostPlayerState(const APlayerState* PS) const
     if (!PS) return false;
 
     const APlayerController* PC = Cast<APlayerController>(PS->GetOwner());
-    return PC && PC->GetNetConnection() == nullptr;
+    return PC && PC->GetLocalPlayer() != nullptr;
 }
 
 const TArray<FCharacterData>& ALobbyGameState::GetAvailableCharacters() const

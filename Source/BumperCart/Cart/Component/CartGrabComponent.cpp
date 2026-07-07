@@ -58,7 +58,7 @@ UCartGrabComponent::UCartGrabComponent()
     ProductPopIncreaseDuration = 0.35f;
 
     // 실패 연출 변수
-    GrabFailEffectOffset = 20.f;
+    GrabMissEffectOffset = 20.f;
 
     // 조준선 갱신 관련
     CachedAimDirection = FVector::ZeroVector;
@@ -76,7 +76,7 @@ UCartGrabComponent::UCartGrabComponent()
     ServerGrabDirection = FVector::ZeroVector;
     ServerGrabMaxDistance = 0.f;
     ServerGrabCurrentDistance = 0.f;
-    AimPlaneZ = 20.f;
+    AimPlaneZ = 120.f;
 
     // 로봇손 관련
     GrabSpeed = 1400.f;
@@ -93,12 +93,12 @@ UCartGrabComponent::UCartGrabComponent()
         GrabSuccessSound = GrabSuccessSoundFinder.Object;
     }
 
-    static ConstructorHelpers::FObjectFinder<USoundBase> GrabFailSoundFinder(
-        TEXT("/Game/Developers/dongh/Audio/GrabFail.GrabFail")
+    static ConstructorHelpers::FObjectFinder<USoundBase> GrabMissSoundFinder(
+        TEXT("/Game/Developers/dongh/Audio/GrabMiss.GrabMiss")
     );
-    if (GrabFailSoundFinder.Succeeded())
+    if (GrabMissSoundFinder.Succeeded())
     {
-        GrabFailSound = GrabFailSoundFinder.Object;
+        GrabMissSound = GrabMissSoundFinder.Object;
     }
 
     static ConstructorHelpers::FObjectFinder<USoundBase> GrabLaunchSoundFinder(
@@ -107,6 +107,14 @@ UCartGrabComponent::UCartGrabComponent()
     if (GrabLaunchSoundFinder.Succeeded())
     {
         GrabLaunchSound = GrabLaunchSoundFinder.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<USoundBase> GrabBlockedSoundFinder(
+        TEXT("/Game/Developers/dongh/Audio/GrabBlocked.GrabBlocked")
+    );
+    if (GrabBlockedSoundFinder.Succeeded())
+    {
+        GrabBlockedSound = GrabBlockedSoundFinder.Object;
     }
 }
 
@@ -474,7 +482,8 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
     ServerGrabCurrentDistance = FMath::Min(ServerGrabCurrentDistance + GrabSpeed * DeltaTime, ServerGrabMaxDistance);
 
     float ActualDistance = 0.f;
-    EGrabResult Result = TrySweepGrab(PreviousDistance, ServerGrabCurrentDistance, ActualDistance);
+    FVector HitLocation, HitNormal;
+    EGrabResult Result = TrySweepGrab(PreviousDistance, ServerGrabCurrentDistance, ActualDistance, HitLocation, HitNormal);
 
     if (Result == EGrabResult::ProductGrabbed)
     {
@@ -498,11 +507,7 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
 
         float ReturnDuration = ActualDistance / FMath::Max(GrabSpeed, 1.f);
 
-        // 실패 나이아가라 이펙트 Multicast
-        FVector HitLocation = ServerGrabStartLocation + ServerGrabDirection * ActualDistance;
-        HitLocation.Z = ServerGrabStartLocation.Z + GrabFailEffectOffset;
-
-        Multicast_PlayGrabFailEffect(HitLocation);
+        Multicast_PlayGrabBlockedEffect(HitLocation, HitNormal);
 
         Multicast_StartGrabReturn(ReturnDuration, nullptr);
         StartGrabReturn(ReturnDuration);
@@ -518,8 +523,8 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
 
         // 실패시 나이아가라 이펙트 Multicast
         FVector FailLocation = ServerGrabStartLocation + ServerGrabDirection * ServerGrabMaxDistance;
-        FailLocation.Z = ServerGrabStartLocation.Z + GrabFailEffectOffset;
-        Multicast_PlayGrabFailEffect(FailLocation);
+        FailLocation.Z = ServerGrabStartLocation.Z + GrabMissEffectOffset;
+        Multicast_PlayGrabMissEffect(FailLocation);
 
         // 서버에서 회수 처리
         float ReturnDuration = ServerGrabMaxDistance / FMath::Max(GrabSpeed, 1.f);
@@ -529,7 +534,7 @@ void UCartGrabComponent::TickGrabSweep(float DeltaTime)
     }
 }
 
-EGrabResult UCartGrabComponent::TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance)
+EGrabResult UCartGrabComponent::TrySweepGrab(float FromDistance, float ToDistance, float& OutDistance, FVector& OutHitLocation, FVector& OutHitNormal)
 {
     UWorld* World = GetWorld();
     if (!IsValid(World)) return EGrabResult::None;
@@ -564,6 +569,8 @@ EGrabResult UCartGrabComponent::TrySweepGrab(float FromDistance, float ToDistanc
     {
         float HitDistance = FVector::DotProduct(Hit.Location - ServerGrabStartLocation, ServerGrabDirection);
         OutDistance = FMath::Clamp(HitDistance, FromDistance, ToDistance);
+        OutHitLocation = Hit.ImpactPoint;
+        OutHitNormal = Hit.ImpactNormal;
 
         AProductBase* Product = Cast<AProductBase>(HitActor);
         // 충돌한게 상품이면
@@ -1000,29 +1007,50 @@ void UCartGrabComponent::UpdateAimDecal(const FVector& Target)
     AimDecal->SetWorldLocation(Target);
 }
 
-void UCartGrabComponent::Multicast_PlayGrabFailEffect_Implementation(FVector_NetQuantize EffectLocation)
+void UCartGrabComponent::Multicast_PlayGrabMissEffect_Implementation(FVector_NetQuantize EffectLocation)
 {
     if (GetNetMode() == NM_DedicatedServer) return;
-    if (!GrabFailDustEffect) return;
+    if (!GrabMissEffect) return;
 
     UWorld* World = GetWorld();
     if (!IsValid(World)) return;
 
     UNiagaraFunctionLibrary::SpawnSystemAtLocation(
         World,
-        GrabFailDustEffect,
+        GrabMissEffect,
         EffectLocation,
         FRotator::ZeroRotator,
         FVector::OneVector,
         true
     );
 
-    if (IsLocallyControlled())
+    if (IsLocallyControlled() && GrabMissSound)
     {
-        if (GrabFailSound)
-        {
-            UGameplayStatics::PlaySound2D(this, GrabFailSound);
-        }
+        UGameplayStatics::PlaySound2D(this, GrabMissSound);
+    }
+}
+
+void UCartGrabComponent::Multicast_PlayGrabBlockedEffect_Implementation(FVector_NetQuantize EffectLocation,
+    FVector_NetQuantizeNormal EffectNormal)
+{
+    if (GetNetMode() == NM_DedicatedServer) return;
+    if (!GrabBlockedEffect) return;
+
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return;
+
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        World,
+        GrabBlockedEffect,
+        EffectLocation,
+        EffectNormal.Rotation(),
+        FVector::OneVector,
+        true
+    );
+
+    if (IsLocallyControlled() && GrabBlockedSound)
+    {
+        UGameplayStatics::PlaySound2D(this, GrabBlockedSound);
     }
 }
 

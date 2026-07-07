@@ -25,9 +25,6 @@ public:
 
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-    // 스폰할 때 위치 설정 및 상태를 초기화하는 함수
-    void Initialize(const FVector& SpawnLocation);
-
     // 상품의 상태를 설정하는 함수, 서버에서 처리함
     void SetProductState(EProductState NewState);
 
@@ -63,6 +60,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+    virtual void Tick(float DeltaTime) override;
+
     virtual void OnConstruction(const FTransform& Transform) override;
 
     void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
@@ -78,12 +77,12 @@ protected:
 
 protected:
     /* 컴포넌트 */
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
+    TObjectPtr<USphereComponent> ProductCollision;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
     TObjectPtr<UStaticMeshComponent> Mesh;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
-    TObjectPtr<USphereComponent> GrabCollision;
-
 
     /* Product 기본 변수 */
 
@@ -103,14 +102,60 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     bool bOnSale;
 
-private:
-    UFUNCTION()
-    void HandleReturnDisplay();
+    // 메시의 기본 상대 위치값
+    UPROPERTY()
+    FVector BaseMeshLocation;
 
+    // 메시의 기본 상대 회전값
+    UPROPERTY()
+    FRotator BaseMeshRotation;
+
+    // 회전한지 얼마나 지났는지 누적용
+    UPROPERTY()
+    float ElapsedTime;
+
+    // 배치할 높이 오프셋
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
+    float HeightOffset;
+
+    // 위아래 진폭
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
+    float BobbingAmplitude;
+
+    // 공중에서 위아래로 움직이는 속도
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
+    float BobbingSpeed;
+
+    // 공중에서 좌우로 회전하는 속도
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
+    float RotationSpeed;
+
+    FVector FallingStartLocation;
+
+    FVector FallingEndLocation;
+
+    float FallingElapsedTime;
+
+    // Falling 시 최소 높이
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
+    float FallingMinHeight;
+
+    // Falling 시 최대 높이
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
+    float FallingMaxHeight;
+
+    UPROPERTY()
+    float FallingHeight;
+
+private:
     bool CanLoad() const;
 
     bool CanGrab() const;
 
-private:
-    FTimerHandle ReturnDisplayTimer;
+    void TickDisplay(float DeltaTime);
+
+    void TickFalling(float DeltaTime);
+
+    // 가판대 안쪽이 DropEnd가 되지 않게 바깥쪽 위치를 구해주는 함수
+    FVector GetSafeLocation(const FVector& Start, const FVector& End, AActor* IgnoreActor);
 };
