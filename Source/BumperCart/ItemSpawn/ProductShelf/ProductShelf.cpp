@@ -40,20 +40,6 @@ void AProductShelf::BeginPlay()
             UE_LOG(LogTemp, Error, TEXT("[선반] 선반 서브시스템을 찾지 못했습니다."));
         }
     }
-
-    // 제품선반 매니저일 경우 (Actor)
-    //AActor* FoundProductShelfManager = UGameplayStatics::GetActorOfClass(GetWorld(), AProductShelfManager::StaticClass());
-    //AProductShelfManager* ProductShelfManager = Cast<AProductShelfManager>(FoundProductShelfManager);
-
-    //if (IsValid(ProductShelfManager))
-    //{
-    //    // 매니저에 등록
-    //    ProductShelfManager->RegisterShelf(this, ShelfType);
-    //}
-    //else
-    //{
-    //    UE_LOG(LogTemp, Error, TEXT("[선반] 선반매니저를 찾지 못했습니다."));
-    //}
 }
 
 AProductBase* AProductShelf::SpawnRandomProduct()
@@ -77,20 +63,37 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
 {
     if (!HasAuthority() || !ItemClass) return nullptr;
 
-    FVector SpawnLocation = LaunchPoints->GetComponentLocation();
-    FRotator SpawnRotation = UKismetMathLibrary::RandomRotator();
+    // 처음 스폰되는 곳 (선반의 중심)
+    FVector SpawnStartLocation = FVector::ZeroVector;
+
+    if (ShelfMesh)
+    {
+        // 선반 메쉬의 진짜 3D 바운딩 박스(크기) 정보를 가져옵니다.
+        FBoxSphereBounds MeshBounds = ShelfMesh->Bounds;
+
+        // 피벗 위치와 상관없는 '진짜 기하학적 중심점'
+        SpawnStartLocation = MeshBounds.Origin;
+    }
 
     // 스폰시 충돌 처리 규칙
-    // 가능하면 위치를 조정하고, 계속 부딪치면 스폰x
     // 강제 스폰
     FActorSpawnParameters SpawnParams;
-    //SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, GetRandomPointInVolume(), FRotator::ZeroRotator, SpawnParams);
+    // 제품 스폰
+    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, SpawnStartLocation, FRotator::ZeroRotator, SpawnParams);
 
+    // 제품 스폰 성공
     if (SpawnedProduct)
     {
+        // 스폰 후 날아가는 위치
+        FVector SpawnLocation = GetRandomPointInVolume();
+        FRotator SpawnRotation = UKismetMathLibrary::RandomRotator();
+
+        // 제품 베이스의 StartSpawn()으로 날아가는 느낌 표현
+        SpawnedProduct->StartSpawn(SpawnStartLocation, SpawnLocation, this);
+
+        // 나이아가라
         if (UWorld* World = GetWorld())
         {
             if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
@@ -102,7 +105,7 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
                     UNiagaraFunctionLibrary::SpawnSystemAtLocation(
                         World,
                         SpawnFX,
-                        SpawnLocation,
+                        SpawnStartLocation,
                         SpawnRotation,
                         FVector(1.0f),
                         true,
@@ -116,49 +119,6 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
 
         return SpawnedProduct;
     }
-
-    //if (SpawnedProduct)
-    //{
-    //    UPrimitiveComponent* PhysComp = Cast<UPrimitiveComponent>(SpawnedProduct->GetRootComponent());
-    //    if (PhysComp)
-    //    {
-    //        // 가판대 정면 방향을 기준으로 좌우/상하로 퍼지는 무작위 벡터 계산
-    //        FVector ForwardDir = LaunchPoints->GetForwardVector();
-    //        FVector RandomDir = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(ForwardDir, 45.0f); // 45도 원뿔 범위로 퍼짐
-
-    //        // 위쪽으로 살짝 뜨게 만들기 위해 Z축 힘 추가
-    //        RandomDir.Z += 0.5f;
-    //        RandomDir.Normalize();
-
-    //        // 힘을 가해 튕겨내기
-    //        PhysComp->AddImpulse(RandomDir * LaunchForce, NAME_None, true);
-
-    //        if (UWorld* World = GetWorld())
-    //        {
-    //            if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
-    //            {
-    //                UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
-
-    //                if (IsValid(SpawnFX))
-    //                {
-    //                    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-    //                        World,
-    //                        SpawnFX,
-    //                        SpawnLocation,
-    //                        SpawnRotation,
-    //                        FVector(1.0f),
-    //                        true,
-    //                        true
-    //                    );
-    //                }
-    //            }
-    //        }
-    //    }
-
-    //    UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());
-
-    //    return SpawnedProduct;
-    //}
 
     return nullptr;
 }
