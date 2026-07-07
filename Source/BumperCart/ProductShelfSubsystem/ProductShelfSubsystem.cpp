@@ -56,6 +56,7 @@ void UProductShelfSubsystem::InitializeConfig(UProductShelfManagerConfig* InConf
         {
             // 게임 모드에서 호출시 삭제 예정 - 테스트용
             GetWorld()->GetTimerManager().SetTimer(GameStartTimerHandle, this, &UProductShelfSubsystem::StartProductSpawning, RespawnDelay, false);
+            UE_LOG(LogTemp, Log, TEXT("[선반매니저] 아이템 스폰"));
         }
     }
 }
