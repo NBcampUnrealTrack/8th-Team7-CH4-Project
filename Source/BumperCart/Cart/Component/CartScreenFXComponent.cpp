@@ -15,12 +15,19 @@
 #include "TimerManager.h"
 #include "Components/DecalComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "UObject/ConstructorHelpers.h"
 
 UCartScreenFXComponent::UCartScreenFXComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 
-	//에셋(PP 머티리얼·나이아가라)은 BP_CartPawn의 이 컴포넌트에서 지정. 비어있으면 해당 연출만 무동작
+	//대부분 에셋(PP 머티리얼·나이아가라)은 BP_CartPawn의 이 컴포넌트에서 지정. 비어있으면 해당 연출만 무동작
+	//스키드 데칼 머티리얼만 C++에서 자동 로드 — BP 오버라이드는 main 병합 시 날아가기 쉬워 코드에 고정
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SkidDecalFinder(TEXT("/Game/Developers/dbals/FX/M_SkidDecal.M_SkidDecal"));
+	if (SkidDecalFinder.Succeeded())
+	{
+		SkidDecalMaterial = SkidDecalFinder.Object;
+	}
 }
 
 void UCartScreenFXComponent::BeginPlay()

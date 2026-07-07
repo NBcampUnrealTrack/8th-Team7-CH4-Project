@@ -86,13 +86,13 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal", meta = (ClampMin = "0"))
 	float SkidDecalMinSpeed = 50.f;
 
-	//데칼 크기 (X=바닥 투영 깊이, Y=폭 절반, Z=길이 절반)
+	//데칼 크기 (X=바닥 투영 깊이, Y=폭 절반, Z=진행 방향 길이 절반) — 폭 좁고 길이 길게 해야 이동 방향으로 이어진 선이 됨
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal")
-	FVector SkidDecalSize = FVector(16.f, 6.f, 10.f);
+	FVector SkidDecalSize = FVector(16.f, 5.f, 18.f);
 
-	//뒷바퀴가 이 거리(cm) 이동할 때마다 자국 하나 (작을수록 촘촘)
+	//뒷바퀴가 이 거리(cm) 이동할 때마다 자국 하나 (길이보다 작아야 겹쳐서 연속선이 됨)
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal", meta = (ClampMin = "1"))
-	float SkidDecalSpacing = 15.f;
+	float SkidDecalSpacing = 12.f;
 
 	//자국 지속 시간(초)
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal", meta = (ClampMin = "0.1"))
