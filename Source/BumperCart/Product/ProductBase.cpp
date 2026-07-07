@@ -4,7 +4,6 @@
 #include "Product/ProductBase.h"
 
 #include "ProductDataAsset.h"
-#include "TimerManager.h"
 #include "Product/DataAsset/ProductDropConfig.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -230,16 +229,21 @@ void AProductBase::DropFromCart(AActor* CartActor)
     FallingEndLocation = GetSafeLocation(FallingStartLocation, FallingStartLocation + Offset, CartActor);
     FallingElapsedTime = 0.f;
 
-    ProductState.FallingStartLocation = FallingStartLocation;
-    ProductState.FallingEndLocation = FallingEndLocation;
-    ProductState.FallingHeight = FallingHeight;
-    ProductState.bIsFell = false;
+    // 묶여있는 변수들을 한번에 설정
+    FProductRepState NewRepState;
+    NewRepState.State = EProductState::Falling;
+    NewRepState.FallingStartLocation = FallingStartLocation;
+    NewRepState.FallingEndLocation = FallingEndLocation;
+    NewRepState.FallingHeight = FallingHeight;
+    NewRepState.bIsFell = false;
+
+    ProductState = NewRepState;
 
     // Falling 시작 위치로 일단 이동
     SetActorLocation(FallingStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
 
-    // Falling 상태로 변환
-    SetProductState(EProductState::Falling);
+    // 서버에서도 Falling 상태 적용
+    ApplyProductState();
 
     // 강제로 위치 업데이트
     ForceNetUpdate();
@@ -259,8 +263,6 @@ void AProductBase::OnRep_ProductState()
     }
     else if (ProductState.State == EProductState::Display && ProductState.bIsFell)
     {
-        ProductState.bIsFell = false;
-
         FVector ServerLocation = ProductState.DisplayLocation;
         ServerLocation.Z = HeightOffset;
 
@@ -278,11 +280,15 @@ void AProductBase::OnRep_ProductState()
 
 int32 AProductBase::GetWeight() const
 {
+    if (!ProductDataAsset) return 0;
+
     return ProductDataAsset->ProductData.Weight;
 }
 
 int32 AProductBase::GetValue() const
 {
+    if (!ProductDataAsset) return 0;
+
     return ProductDataAsset->ProductData.Value;
 }
 
@@ -361,7 +367,16 @@ void AProductBase::TickFalling(float DeltaTime)
     // 실제 움직임은 XY만
     FVector BaseLocation = FMath::Lerp(FallingStartLocation, FallingEndLocation, Alpha);
     BaseLocation.Z = HeightOffset;
-    SetActorLocation(BaseLocation, true);
+
+    if (HasAuthority())
+    {
+        SetActorLocation(BaseLocation, true);
+    }
+    else
+    {
+        SetActorLocation(BaseLocation, false);
+    }
+    
 
     if (IsValid(Mesh))
     {

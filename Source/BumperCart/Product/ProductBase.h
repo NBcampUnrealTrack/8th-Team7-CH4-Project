@@ -136,11 +136,11 @@ protected:
 
     float FallingElapsedTime;
 
-    // Falling 시 최대 높이
+    // Falling 시 최소 높이
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
     float FallingMinHeight;
 
-    // Falling 시 최소 높이
+    // Falling 시 최대 높이
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
     float FallingMaxHeight;
 
@@ -158,7 +158,4 @@ private:
 
     // 가판대 안쪽이 DropEnd가 되지 않게 바깥쪽 위치를 구해주는 함수
     FVector GetSafeLocation(const FVector& Start, const FVector& End, AActor* IgnoreActor);
-
-private:
-    FTimerHandle ReturnDisplayTimer;
 };
