@@ -111,5 +111,7 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
 
         UE_LOG(LogTemp, Log, TEXT("[거대 카트] 아이템 드롭, 밀치기 완료"));
     }
+
+    PlayerCart->ClientPlayCameraShake(nullptr, 1.0f);
 }
 
