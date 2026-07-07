@@ -47,7 +47,7 @@ void ALobbyPlayerState::ApplyReady(bool IsReady)
 
     ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
 
-    /*
+
     //캐릭터 선택한 내용 저장
     if (IsReady)
     {
@@ -60,7 +60,7 @@ void ALobbyPlayerState::ApplyReady(bool IsReady)
             MainGI->SetPlayerCharacter(GetUniqueId(), SelectedCharacterIndex);
         }
      }
-    */
+
     bIsReady = IsReady;
     UE_LOG(LogTemp, Warning, TEXT("플레이어 준비 완료"))
 

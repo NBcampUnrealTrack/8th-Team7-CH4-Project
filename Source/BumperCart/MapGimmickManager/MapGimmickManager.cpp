@@ -6,10 +6,16 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "MapGimmickManager/NPCRushGimmick/NPCRushGimmick.h"
+#include "Sound/SoundBase.h"
+#include "Components/DecalComponent.h"
+#include "MapGimmickManager/NPCRushGimmick/NPCRushWarningArea.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 AMapGimmickManager::AMapGimmickManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+    bReplicates = true;
 
     bNetLoadOnClient = false;
 }
@@ -157,6 +163,7 @@ void AMapGimmickManager::StartNPCRush()
         return;
     }
 
+    // 타겟 포인트 목록 섞고 하나 랜덤 선택
     for (int32 i = NPCRushStartPointList.Num() - 1; i > 0; --i)
     {
         int32 RandomIndex = FMath::RandRange(0, i);
@@ -167,19 +174,26 @@ void AMapGimmickManager::StartNPCRush()
     }
 
     int32 RandomPoint = FMath::RandRange(0, NPCRushStartPointList.Num() - 1);
-    ATargetPoint* TargetPoint = NPCRushStartPointList[RandomPoint];
+    CurrentTargetPoint = NPCRushStartPointList[RandomPoint];
+
+    CalculateTraceDimensionsFromTarget(CurrentTargetPoint, 5000.0f);
+}
+
+void AMapGimmickManager::SpawnNPCRush()
+{
+    if (!HasAuthority())   return;
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.Owner = this;
     SpawnParams.Instigator = GetInstigator();
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-    if (IsValid(TargetPoint))
+    if (IsValid(CurrentTargetPoint))
     {
         if (UWorld* World = GetWorld())
         {
-            FVector SpawnLocation = TargetPoint->GetActorLocation();
-            FRotator SpawnRotation = TargetPoint->GetActorRotation();
+            FVector SpawnLocation = CurrentTargetPoint->GetActorLocation();
+            FRotator SpawnRotation = CurrentTargetPoint->GetActorRotation();
 
             ANPCRushGimmick* SpawnedGimmick = GetWorld()->SpawnActor<ANPCRushGimmick>(NPCRushGimmick, SpawnLocation, SpawnRotation, SpawnParams);
 
@@ -189,4 +203,98 @@ void AMapGimmickManager::StartNPCRush()
             }
         }
     }
+}
+
+void AMapGimmickManager::WaitingNpcRush()
+{
+    if (!HasAuthority())   return;
+
+    // 경고 시간 뒤 거대 카트 돌진
+    FTimerHandle SpawnTimerHandle;
+    GetWorldTimerManager().SetTimer(SpawnTimerHandle, this, &AMapGimmickManager::SpawnNPCRush, 5.0f, false);
+}
+
+void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* TargetPoint, float MaxTraceDistance)
+{
+    if (!HasAuthority())   return;
+
+    if (!TargetPoint || !GetWorld()) return;
+
+    // 라인 트레이스 시작점과 정면 방향 설정
+    FVector StartPos = TargetPoint->GetActorLocation();
+    StartPos.Z += 100.0f;
+    FVector ForwardDir = TargetPoint->GetActorForwardVector();
+
+    // 기본적으로 벽에 안 부딪혔을 때를 대비한 가상의 끝점
+    FVector EndPos = StartPos + (ForwardDir * MaxTraceDistance);
+    EndPos.Z += 100.0f;
+
+    // 라인 트레이스
+    FHitResult HitResult;
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(TargetPoint); // 타겟 포인트 자신은 무시
+
+    bool bHit = GetWorld()->LineTraceSingleByChannel(
+        HitResult,
+        StartPos,
+        EndPos,
+        ECC_Visibility,
+        QueryParams
+    );
+
+    // 벽에 부딪혔다면 실제 충돌 지점을 끝점으로 갱신
+    if (bHit)
+    {
+        EndPos = HitResult.ImpactPoint;
+    }
+
+    // 중심점(Center) 벡터 구하기
+    FVector CenterVector = (StartPos + EndPos) * 0.5f;
+    CenterVector.Z = 10.0f;
+
+    // 반지름(Radius) 구하기
+    // 시작점과 끝점 사이의 총 거리를 구한 뒤 반으로 나누기
+    float TotalDistance = FVector::Dist(StartPos, EndPos);
+    float Radius = TotalDistance * 0.5f;
+
+    Multicast_SpawnWarningDecal(CenterVector, Radius);
+}
+
+void AMapGimmickManager::Multicast_SpawnWarningDecal_Implementation(FVector CenterPoint, float Radius)
+{
+    if (WarningSound)
+    {
+        UGameplayStatics::PlaySound2D(GetWorld(), WarningSound);
+    }
+
+    // 데칼 스폰
+    if (NPCRushWarningArea)
+    {
+        FRotator DecalRotation = FRotationMatrix::MakeFromXZ(CenterPoint.ForwardVector, FVector::UpVector).Rotator();
+
+        SpawnNPCRushWarningArea = GetWorld()->SpawnActor<ANPCRushWarningArea>(
+            NPCRushWarningArea,
+            CenterPoint,
+            DecalRotation
+        );
+    }
+
+    // 스폰된 데칼 사이즈 변경
+    if (SpawnNPCRushWarningArea)
+    {
+        FVector TargetExtent = FVector(20.f, 100.0f, Radius);
+        FVector DefaultDecalSize = FVector(128.f, 128.f, 128.f); // 엔진 기본값
+
+        FVector NewScale = FVector(
+            TargetExtent.X / DefaultDecalSize.X,
+            TargetExtent.Y / DefaultDecalSize.Y,
+            TargetExtent.Z / DefaultDecalSize.Z
+        );
+
+        SpawnNPCRushWarningArea->SetActorScale3D(NewScale);
+
+        SpawnNPCRushWarningArea->InitWarningDecal(5.0f);
+    }
+
+    WaitingNpcRush();
 }
