@@ -4,7 +4,6 @@
 #include "Product/ProductBase.h"
 
 #include "ProductDataAsset.h"
-#include "Product/DataAsset/ProductDropConfig.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -43,11 +42,14 @@ AProductBase::AProductBase()
     BobbingSpeed = 1.5f;
     RotationSpeed = 60.f;
 
-    FallingStartLocation = FVector::ZeroVector;
-    FallingEndLocation = FVector::ZeroVector;
-    FallingElapsedTime = 0.f;
+    LaunchElapsedTime = 0.f;
     FallingMinHeight = 120.f;
     FallingMaxHeight = 200.f;
+    FallingHorizontalOffset = 200.f;
+    FallingDuration = 1.f;
+
+    SpawningDuration = 0.7f;
+    SpawningHeight = 160.f;
 }
 
 void AProductBase::Destroyed()
@@ -98,7 +100,7 @@ void AProductBase::BeginPlay()
     BaseMeshLocation = Mesh->GetRelativeLocation();
     BaseMeshRotation = Mesh->GetRelativeRotation();
 
-    SetProductState(EProductState::Display);
+    SetProductState(EProductState::None);
 }
 
 void AProductBase::Tick(float DeltaTime)
@@ -109,9 +111,9 @@ void AProductBase::Tick(float DeltaTime)
     {
         TickDisplay(DeltaTime);
     }
-    else if (ProductState.State == EProductState::Falling)
+    else if (IsLaunchState())
     {
-        TickFalling(DeltaTime);
+        TickLaunch(DeltaTime);
     }
 }
 
@@ -152,6 +154,7 @@ void AProductBase::ApplyProductState()
         SetActorTickEnabled(GetNetMode() != NM_DedicatedServer);
         break;
 
+    case EProductState::Spawning:   // Fall Through
     case EProductState::Falling:
         SetActorHiddenInGame(false);
 
@@ -172,6 +175,19 @@ void AProductBase::ApplyProductState()
         SetActorTickEnabled(false);
         break;
     }
+}
+
+void AProductBase::StartSpawn(const FVector& StartLocation, const FVector& EndLocation, AActor* IgnoreActor)
+{
+    if (!HasAuthority()) return;
+    StartLaunch(
+        EProductState::Spawning,
+        StartLocation,
+        EndLocation,
+        SpawningHeight,
+        SpawningDuration,
+        IgnoreActor
+    );
 }
 
 void AProductBase::SetProductState(EProductState NewState)
@@ -211,58 +227,46 @@ bool AProductBase::TrySetGrabbed()
 void AProductBase::DropFromCart(AActor* CartActor)
 {
     if (!HasAuthority()) return;
-    if (!IsValid(CartActor) || !IsValid(DropConfig)) return;
+    if (!IsValid(CartActor)) return;
 
-    // Faling 오프셋 결정
+    // Falling 오프셋 결정
     FVector Offset = FVector(
-        FMath::RandRange(-DropConfig->HorizontalOffset, DropConfig->HorizontalOffset),
-        FMath::RandRange(-DropConfig->HorizontalOffset, DropConfig->HorizontalOffset),
+        FMath::RandRange(-FallingHorizontalOffset, FallingHorizontalOffset),
+        FMath::RandRange(-FallingHorizontalOffset, FallingHorizontalOffset),
         0.f);
 
-    FallingHeight = FMath::RandRange(FallingMinHeight, FallingMaxHeight);
+    float RandomHeight = FMath::RandRange(FallingMinHeight, FallingMaxHeight);
 
     // Falling 시작 위치 잡기
-    FallingStartLocation = CartActor->GetActorLocation();
-    FallingStartLocation.Z = HeightOffset;
+    FVector StartLocation = CartActor->GetActorLocation();
+    StartLocation.Z = HeightOffset;
 
     // Falling 목표 위치 잡기, 시간 0 으로 설정
-    FallingEndLocation = GetSafeLocation(FallingStartLocation, FallingStartLocation + Offset, CartActor);
-    FallingElapsedTime = 0.f;
+    FVector EndLocation = StartLocation + Offset;
+    LaunchElapsedTime = 0.f;
 
-    // 묶여있는 변수들을 한번에 설정
-    FProductRepState NewRepState;
-    NewRepState.State = EProductState::Falling;
-    NewRepState.FallingStartLocation = FallingStartLocation;
-    NewRepState.FallingEndLocation = FallingEndLocation;
-    NewRepState.FallingHeight = FallingHeight;
-    NewRepState.bIsFell = false;
-
-    ProductState = NewRepState;
-
-    // Falling 시작 위치로 일단 이동
-    SetActorLocation(FallingStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
-
-    // 서버에서도 Falling 상태 적용
-    ApplyProductState();
-
-    // 강제로 위치 업데이트
-    ForceNetUpdate();
+    StartLaunch(
+        EProductState::Falling,
+        StartLocation,
+        EndLocation,
+        RandomHeight,
+        FallingDuration,
+        CartActor
+    );
 }
 
 void AProductBase::OnRep_ProductState()
 {
-    // Falling으로 변할땐 위치 지정
-    if (ProductState.State == EProductState::Falling)
+    // Falling or Spawn으로 변할땐 포물선 운동 값 설정
+    if (IsLaunchState())
     {
-        FallingStartLocation = ProductState.FallingStartLocation;
-        FallingEndLocation = ProductState.FallingEndLocation;
-        FallingHeight = ProductState.FallingHeight;
-        FallingElapsedTime = 0.f;
+        LaunchElapsedTime = 0.f;
 
-        SetActorLocation(ProductState.FallingStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
+        SetActorLocation(ProductState.LaunchStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
     }
-    else if (ProductState.State == EProductState::Display && ProductState.bIsFell)
+    else if (ProductState.State == EProductState::Display && ProductState.bHasDisplayLocation)
     {
+        // Falling/Spawning -> Display로 변할땐 위치 지정
         FVector ServerLocation = ProductState.DisplayLocation;
         ServerLocation.Z = HeightOffset;
 
@@ -351,21 +355,64 @@ void AProductBase::TickDisplay(float DeltaTime)
     Mesh->SetRelativeRotation(BaseMeshRotation + Rotation);
 }
 
-void AProductBase::TickFalling(float DeltaTime)
+void AProductBase::StartLaunch(EProductState State, const FVector& StartLocation, const FVector& EndLocation, float InHeight, float InDuration, AActor* IgnoreActor)
 {
-    if (ProductState.State != EProductState::Falling) return;
-    if (!IsValid(DropConfig)) return;
+    if (!HasAuthority()) return;
 
-    FallingElapsedTime += DeltaTime;
+    FVector FixedStart = StartLocation;
+    FixedStart.Z = HeightOffset;
+
+    FVector FixedEnd = EndLocation;
+    FixedEnd.Z = HeightOffset;
+
+    // 목표 지점을 벽/가판대 안으로 들어가지 않게 조정
+    FVector SafeEnd = GetSafeLocation(FixedStart, FixedEnd, IgnoreActor);
+
+    LaunchIgnoredActor = IgnoreActor;
+
+    // 충돌체와 무시할 액터가 유효하면 해당 액터는 무시하고 이동하게 함
+    //  -> 가판대 or 카트에 껴서 못나오는 문제 해결하기 위함
+    if (IsValid(ProductCollision) && IsValid(IgnoreActor))
+    {
+        ProductCollision->IgnoreActorWhenMoving(IgnoreActor, true);
+    }
+
+    // 복제되는 구조체 한번에 설정하고 대입
+    FProductRepState NewRepState;
+    NewRepState.State = State;
+    NewRepState.LaunchStartLocation = FixedStart;
+    NewRepState.LaunchEndLocation = SafeEnd;
+    NewRepState.LaunchHeight = InHeight;
+    NewRepState.LaunchDuration = InDuration;
+    NewRepState.bHasDisplayLocation = false;
+
+    ProductState = NewRepState;
+
+    LaunchElapsedTime = 0.f;
+
+    // 우선 시작지점으로 이동
+    SetActorLocation(ProductState.LaunchStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
+
+    ApplyProductState();
+    ForceNetUpdate();
+}
+
+void AProductBase::TickLaunch(float DeltaTime)
+{
+    LaunchElapsedTime += DeltaTime;
 
     float Alpha = FMath::Clamp(
-        FallingElapsedTime / FMath::Max(DropConfig->FallingDuration, KINDA_SMALL_NUMBER),
+        LaunchElapsedTime / FMath::Max(ProductState.LaunchDuration, KINDA_SMALL_NUMBER),
         0.f,
         1.f
     );
 
     // 실제 움직임은 XY만
-    FVector BaseLocation = FMath::Lerp(FallingStartLocation, FallingEndLocation, Alpha);
+    FVector BaseLocation = FMath::Lerp(
+        FVector(ProductState.LaunchStartLocation),
+        FVector(ProductState.LaunchEndLocation),
+        Alpha
+    );
     BaseLocation.Z = HeightOffset;
 
     if (HasAuthority())
@@ -374,7 +421,7 @@ void AProductBase::TickFalling(float DeltaTime)
     }
     else
     {
-        SetActorLocation(BaseLocation, false);
+        SetActorLocation(BaseLocation, false, nullptr, ETeleportType::TeleportPhysics);
     }
     
 
@@ -382,18 +429,25 @@ void AProductBase::TickFalling(float DeltaTime)
     {
         // 보여지는 메시만 위로 튀는 연출
         // Sin함수 PI까지만하면 0 ~ 1, 1 ~ 0 처리
-        float CurrentZ = FMath::Sin(Alpha * PI) * FallingHeight;
+        float CurrentZ = FMath::Sin(Alpha * PI) * ProductState.LaunchHeight;
         Mesh->SetRelativeLocation(BaseMeshLocation + FVector(0.f, 0.f, CurrentZ));
     }
 
     if (Alpha >= 1.f && HasAuthority())
     {
-        SetActorLocation(FallingEndLocation, true);
+        SetActorLocation(ProductState.LaunchEndLocation, true);
 
         // 서버에서 상품이 실제로 위치한 좌표 저장
         ProductState.DisplayLocation = GetActorLocation();
         ProductState.DisplayLocation.Z = HeightOffset;
-        ProductState.bIsFell = true;
+        ProductState.bHasDisplayLocation = true;
+
+        // 시작할때 무시하도록 설정했던 값 되돌리기
+        if (IsValid(ProductCollision) && LaunchIgnoredActor.IsValid())
+        {
+            ProductCollision->IgnoreActorWhenMoving(LaunchIgnoredActor.Get(), false);
+        }
+        LaunchIgnoredActor.Reset();
 
         if (IsValid(Mesh))
         {
@@ -406,9 +460,18 @@ void AProductBase::TickFalling(float DeltaTime)
     }
 }
 
+bool AProductBase::IsLaunchState() const
+{
+    return ProductState.State == EProductState::Spawning ||
+        ProductState.State == EProductState::Falling;
+}
+
 FVector AProductBase::GetSafeLocation(const FVector& Start, const FVector& End, AActor* IgnoreActor)
 {
     if (!IsValid(ProductCollision)) return End;
+
+    UWorld* World = GetWorld();
+    if (!IsValid(World)) return End;
 
     FVector SafeStart = Start;
     SafeStart.Z = HeightOffset;
@@ -416,34 +479,40 @@ FVector AProductBase::GetSafeLocation(const FVector& Start, const FVector& End, 
     FVector SafeEnd = End;
     SafeEnd.Z = HeightOffset;
 
-    // 이전 콜리전Enabled 저장
-    ECollisionEnabled::Type PrevCollisionEnabled = ProductCollision->GetCollisionEnabled();
-    ProductCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-
-    // 충돌 무시할 액터 설정
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(ProductSafeLocation), false);
+    Params.AddIgnoredActor(this);
     if (IsValid(IgnoreActor))
     {
-        ProductCollision->IgnoreActorWhenMoving(IgnoreActor, true);
+        Params.AddIgnoredActor(IgnoreActor);
     }
 
-    // 시작점으로 이동했다가 목표 지점으로 sweep 을 킨 상태로 이동
-    SetActorLocation(SafeStart, false, nullptr, ETeleportType::TeleportPhysics);
-    SetActorLocation(SafeEnd, true);
+    FCollisionShape Shape = FCollisionShape::MakeSphere(ProductCollision->GetScaledSphereRadius());
 
-    // 안전한 위치 저장
-    FVector SafeLocation = GetActorLocation();
+    FHitResult Hit;
+    bool bHit = World->SweepSingleByProfile(
+        Hit,
+        SafeStart,
+        SafeEnd,
+        FQuat::Identity,
+        ProductCollision->GetCollisionProfileName(),
+        Shape,
+        Params
+    );
+
+    // Sweep 으로 충돌 안했으면 안전한 위치임
+    if (!bHit)
+    {
+        return SafeEnd;
+    }
+
+    // 시작지점부터 겹쳐있었다면 시작지점이 타겟
+    if (Hit.bStartPenetrating)
+    {
+        return SafeStart;
+    }
+
+    // 충돌 지점을 구해서 반환
+    FVector SafeLocation = Hit.Location;
     SafeLocation.Z = HeightOffset;
-
-    // 위치 저장했으니 원래 위치로 복귀
-    SetActorLocation(SafeStart, false, nullptr, ETeleportType::TeleportPhysics);
-
-    // 충돌 무시할 액터 설정 되돌리기
-    if (IsValid(IgnoreActor))
-    {
-        ProductCollision->IgnoreActorWhenMoving(IgnoreActor, false);
-    }
-
-    ProductCollision->SetCollisionEnabled(PrevCollisionEnabled);
-
     return SafeLocation;
 }
