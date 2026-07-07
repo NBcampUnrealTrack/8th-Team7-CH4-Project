@@ -8,6 +8,8 @@ class AWaterHoleGimmick;
 class AObstacleGimmick;
 class UNiagaraSystem;
 class ANPCRushGimmick;
+class USoundBase;
+class ANPCRushWarningArea;
 
 USTRUCT(BlueprintType)
 struct FObstacleSpawnInfo
@@ -91,11 +93,40 @@ public:
 // 맵을 횡단하는 장애물 기믹
 #pragma region NPC Rush
 private:
+    // 스폰할 장애물
     UPROPERTY(EditAnywhere, Category = "Gimmick | NPC Rush")
     TSubclassOf<ANPCRushGimmick> NPCRushGimmick;
 
+    // 선택된 타겟포인트
+    UPROPERTY()
+    ATargetPoint* CurrentTargetPoint;
+
+    // 스폰할 데칼 액터 - 경고 범위
+    UPROPERTY(EditAnywhere, Category = "Gimmick | NPC Rush")
+    TSubclassOf<ANPCRushWarningArea> NPCRushWarningArea;
+
+    // 스폰된 데칼 액터
+    UPROPERTY()
+    ANPCRushWarningArea* SpawnNPCRushWarningArea;
+
+    // 경고음
+    UPROPERTY(EditAnywhere, Category = "Gimmick | NPC Rush")
+    USoundBase* WarningSound;
+
 public:
+    // NPCRush 시작
     void StartNPCRush();
+
+    // NPCRush 스폰
+    void SpawnNPCRush();
+
+    // NPCRush 대기 시간 - 경고음과 예상경로 표시
+    void WaitingNpcRush();
+
+    void CalculateTraceDimensionsFromTarget(ATargetPoint* TargetPoint, float MaxTraceDistance);
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_SpawnWarningDecal(FVector CenterPoint, float Radius);
 
 #pragma endregion
 
