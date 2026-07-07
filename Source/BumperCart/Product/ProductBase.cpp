@@ -143,6 +143,8 @@ void AProductBase::ApplyDataAsset()
     {
         Mesh->SetStaticMesh(ProductDataAsset->ProductMesh);
     }
+
+    ApplyValueOverlay();
 }
 
 void AProductBase::ApplyProductState()
@@ -564,4 +566,35 @@ FVector AProductBase::GetLaunchLocation(float Alpha) const
     Location.Z = HeightOffset;
 
     return Location;
+}
+
+void AProductBase::ApplyValueOverlay()
+{
+    if (!IsValid(Mesh)) return;
+
+    int32 Value = GetValue();
+
+    // 동적 머티리얼 생성
+    ValueOverlayMID = UMaterialInstanceDynamic::Create(ValueOverlayMaterial, this);
+    if (!IsValid(ValueOverlayMID))
+    {
+        Mesh->SetOverlayMaterial(nullptr);
+        return;
+    }
+
+    ValueOverlayMID->SetVectorParameterValue(TEXT("OverlayColor"), GetValueOverlayColor());
+
+    Mesh->SetOverlayMaterial(ValueOverlayMID);
+}
+
+FLinearColor AProductBase::GetValueOverlayColor() const
+{
+    int32 Value = GetValue();
+
+    if (Value >= 80) return FLinearColor(1.f, 0.74f, 0.15f); // 가장 가치 있음, 황금색or빨강
+    if (Value >= 60) return FLinearColor(0.85f, 0.25f, 1.f); // 높은 가치, 보라
+    if (Value >= 40) return FLinearColor(0.2f, 0.55f, 1.f); // 중간 가치, 파랑
+    if (Value >= 20) return FLinearColor(0.25f, 1.f, 0.65f); // 낮은 가치 초록
+
+    return FLinearColor::White; // 제일 저렴함, 흰색
 }
