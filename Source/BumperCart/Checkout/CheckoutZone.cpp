@@ -1,7 +1,8 @@
 ﻿#include "Checkout/CheckoutZone.h"
 
-#include "Cart/Component/CartLoadComponent.h"
 #include "Cart/CartPawn.h"
+#include "Cart/Component/CartLoadComponent.h"
+#include "Cart/Component/CartGrabComponent.h"
 #include "Product/ProductTypes.h"
 #include "Checkout/CheckoutScoreCalculator.h"
 #include "Checkout/CheckoutBarrier.h"
@@ -233,9 +234,23 @@ void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Styl
         CheckoutZoneVisualMID->SetVectorParameterValue(TEXT("BorderColor"), Style.RingColor);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("BorderEmissiveStrength"), Style.RingEmissiveStrength);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("BorderOpacity"), Style.RingOpacity);
+
         CheckoutZoneVisualMID->SetVectorParameterValue(TEXT("FillColor"), Style.FillColor);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillEmissiveStrength"), Style.FillEmissiveStrength);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillOpacity"), Style.FillOpacity);
+
+        // Closing Soon 펄스 적용
+        const bool bShouldPulse = CurrentCheckoutZoneState == ECheckoutZoneState::ClosingSoon;
+
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseEnabled"), bShouldPulse ? 1.0f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseSpeed"), bShouldPulse ? 2.2f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseMin"), bShouldPulse ? 0.25f : 1.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseMax"), bShouldPulse ? 5.0f : 1.0f);
+
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseEnabled"), bShouldPulse ? 1.0f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseSpeed"), bShouldPulse ? 1.1f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMin"), bShouldPulse ? 0.35f : 1.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMax"), bShouldPulse ? 0.85f : 1.0f);
     }
 }
 
@@ -846,6 +861,12 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     CheckoutProgress = 0.0f;
     ElapsedCheckoutTime = 0.0f;
 
+    UCartGrabComponent* GrabComponent = CurrentCheckoutPlayer->FindComponentByClass<UCartGrabComponent>();
+    if (IsValid(GrabComponent))
+    {
+        GrabComponent->SetGrabDisabledByCheckout(true);
+    }
+
     // 기존에 먼저 들어와 있던 비정산 플레이어 배출
     if (bUseCheckoutBarrier)
     {
@@ -1069,6 +1090,15 @@ void ACheckoutZone::ResetCheckout()
 
     // 정산 완료 시 벽 해제
     SetCheckoutBarrierEnabled(false);
+
+    if (IsValid(CurrentCheckoutPlayer))
+    {
+        UCartGrabComponent* GrabComponent = CurrentCheckoutPlayer->FindComponentByClass<UCartGrabComponent>();
+        if (IsValid(GrabComponent))
+        {
+            GrabComponent->SetGrabDisabledByCheckout(false);
+        }
+    }
 
     CurrentCheckoutPlayer = nullptr;
     bIsCheckoutInProgress = false;
