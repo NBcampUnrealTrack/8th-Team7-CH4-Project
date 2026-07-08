@@ -19,9 +19,6 @@ struct FCharacterData
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
     TSubclassOf<APawn> PawnClass;
 
-    // Pawn 이미지
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
-    TSoftObjectPtr<UTexture2D> Thumbnail;
 };
 
 UCLASS()

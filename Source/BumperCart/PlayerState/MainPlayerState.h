@@ -8,6 +8,17 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerStatsChanged);
 
+UENUM(BlueprintType)
+enum class ETitleType : uint8
+{
+    Default UMETA(DisplayName = "오늘도 장봤다"),
+    MartKing UMETA(DisplayName = "마트 지배자"),
+    BumpKing UMETA(DisplayName = "통로의 재앙"),
+    DestroyKing UMETA(DisplayName = "파괴왕"),
+    ReceiptCollector UMETA(DisplayName = "영수증 컬렉터"),
+    SafeCart UMETA(DisplayName = "무사고 카트")
+};
+
 UCLASS()
 class BUMPERCART_API AMainPlayerState : public APlayerState
 {
@@ -45,6 +56,12 @@ public:
     UFUNCTION(BlueprintPure, Category = "PlayerStats")
     int32 GetDroppedItemCount() const;
 
+    // 플레이어 칭호 조회
+    UFUNCTION(BlueprintPure, Category = "PlayerStats")
+    ETitleType GetTitle() const;
+
+    void SetTitle();
+
     //라운드 시작 시 통계 초기화
     void ResetStats();
 
@@ -67,19 +84,27 @@ private:
     UFUNCTION()
     void OnRep_DroppedItemCount();
 
+    UFUNCTION()
+    void OnRep_Title();
+
     UPROPERTY(ReplicatedUsing = OnRep_PlayerScore, VisibleAnywhere,  Category = "PlayerStats")
-    float PlayerScore = 0.f;
+    float PlayerScore;
 
     UPROPERTY(ReplicatedUsing = OnRep_Rank, VisibleAnywhere,  Category = "PlayerStats")
-    int32 Rank = 0;
+    int32 Rank;
 
     UPROPERTY(ReplicatedUsing = OnRep_CheckoutCount, VisibleAnywhere,  Category = "PlayerStats")
-    int32 CheckoutCount = 0;
+    int32 CheckoutCount;
 
     UPROPERTY(ReplicatedUsing = OnRep_CartBumpCount, VisibleAnywhere,  Category = "PlayerStats")
-    int32 BumpCartCount = 0;
+    int32 BumpCartCount;
 
     UPROPERTY(ReplicatedUsing = OnRep_DroppedItemCount, VisibleAnywhere,  Category = "PlayerStats")
-    int32 DroppedItemCount = 0;
+    int32 DroppedItemCount;
+
+    UPROPERTY(ReplicatedUsing = OnRep_Title, VisibleAnywhere, Category = "PlayerStats")
+    ETitleType Title;
+
+    //
 
 };
