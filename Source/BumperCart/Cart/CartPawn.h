@@ -51,11 +51,11 @@ public:
     //외부에서 카트를 강제로 밀어내기
     void ApplyExternalKnockback(const FVector& Direction, float Strength);
 
-    //토마토에 맞은 소유 클라 화면에 가림 위젯 표시 (서버 → 소유 클라)
+    //토마토에 맞은 소유 클라 화면에 가림 위젯 표시 (서버 => 소유 클라)
     UFUNCTION(Client, Reliable)
     void ClientApplyTomatoScreenBlock(float Duration);
 
-    //카메라 셰이크를 이 카트 소유 클라 화면에 재생 (서버에서 호출 → 소유 클라 실행).
+    //카메라 셰이크를 이 카트 소유 클라 화면에 재생 (서버에서 호출 => 소유 클라 실행).
     //범프 충돌 외에도 거대 카트 충돌·아이템 드롭 등 다른 시스템이 공용으로 호출. ShakeClass가 비면 카트 기본(BumpCameraShakeClass) 사용
     UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Cart|Camera")
     void ClientPlayCameraShake(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale);
@@ -84,6 +84,10 @@ protected:
 	//충돌음을 소유 클라에서 재생 (서버 NotifyHit에서 호출 — 쉐이크와 동일 패턴, 멀티캐스트 중복재생 회피)
 	UFUNCTION(Client, Unreliable)
 	void ClientPlayBumpSound();
+
+	//충돌 리액션(몸통 들썩·기울임)을 모든 클라에 재생. 서버에서만 호출
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayBumpReaction(FVector WorldPushDir, float Intensity);
 
     //Yaw 서버에 전달
     UFUNCTION(Server, Unreliable)
@@ -288,6 +292,47 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float BumpShakeFullSpeed = 1200.f;
 
+	//---------- 충돌 넉백 + 리액션(몸통 들썩·기울임) ----------
+	//부스트로 상대 카트를 박았을 때 상대를 밀어내는 세기 (B: 부스트 비비기 방지). LaunchCharacter 속도
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BoostKnockbackStrength = 900.f;
+
+	//일반 충돌(부스트 아님) 시 상대를 밀어내는 세기 = 접근속도 × 이 배율 (살짝만)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float NormalKnockbackScale = 0.4f;
+
+	//일반 충돌 넉백 상한 (접근속도가 커도 이 이상은 안 밀림)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float NormalKnockbackMax = 500.f;
+
+	//리액션 스프링 강성(높을수록 빨리 제자리로). 감쇠와 함께 '덜컹' 리듬 결정
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "1"))
+	float BumpReactionStiffness = 220.f;
+
+	//리액션 스프링 감쇠(낮을수록 여러 번 덜컹거림)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpReactionDamping = 14.f;
+
+	//세기 1일 때 기울기 각충격량 — 부딪힌 쪽이 들리는 정도
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpTiltStrength = 220.f;
+
+	//기울기 최대 각도(도) 클램프
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpTiltMaxAngle = 20.f;
+
+	//세기 1일 때 수직 들썩 충격량 (0이면 들썩 없이 기울기만)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpHopStrength = 90.f;
+
+	//수직 들썩 최대 높이(cm) 클램프
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpHopMaxHeight = 8.f;
+
+	//외부 넉백(거대카트·체크아웃존 등)에서 리액션 세기 환산 기준 — 이 넉백 강도면 세기 1.0
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "1"))
+	float BumpReactionKnockbackRef = 800.f;
+
 	//---------- 미끄럼 (F 맵 기믹 연동: 물웅덩이 등) ----------
 	//미끄럼 중 지면 마찰 (낮을수록 더 미끄러짐)
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip", meta = (ClampMin = "0"))
@@ -348,6 +393,9 @@ protected:
 	void StartSlip(float Duration, float SpinAngleDeg);
 	void EndSlip();
 
+	//몸통 메시(SlipSpinMeshName) 탐색 + 기준 상대회전/위치 캡처 (슬립·범프 리액션 공용, 최초 1회)
+	void EnsureBodyMeshResolved();
+
 	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용
 	UFUNCTION()
 	void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
@@ -401,8 +449,17 @@ private:
 	float SlipSpinDir = 1.f;           //스핀 방향(+1/-1) — 기믹이 준 SpinAngleDeg의 부호
 	float DefaultGroundFriction = 0.f; //미끄럼 후 마찰 복구용 백업
 
-	//빙글 돌릴 카트 메시 (SlipSpinMeshName으로 최초 1회 탐색·캐시) + 원래 상대 회전(복구용)
+	//빙글 돌릴 카트 메시 (SlipSpinMeshName으로 최초 1회 탐색·캐시) + 원래 상대 회전/위치(복구용). 범프 리액션도 공유
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> SlipSpinMesh;
 	FRotator SlipSpinMeshBaseRelRot = FRotator::ZeroRotator;
+	FVector SlipSpinMeshBaseRelLoc = FVector::ZeroVector; //몸통 메시 원래 상대 위치(들썩 복구용)
+	bool bBodyMeshResolved = false;                       //몸통 메시 탐색·기준값 캡처 완료
+
+	//---------- 충돌 리액션 스프링 상태 (로컬 연출, 복제 안 함) ----------
+	//몸통 메시 상대 pitch/roll(도) 오프셋 + 각 속도, 수직 들썩(cm) 오프셋 + 속도. 스프링으로 0(기준)에 복귀
+	float BumpTiltPitch = 0.f;    float BumpTiltPitchVel = 0.f;
+	float BumpTiltRoll = 0.f;     float BumpTiltRollVel = 0.f;
+	float BumpHopOffsetZ = 0.f;   float BumpHopVel = 0.f;
+	bool bBumpReactionActive = false; //스프링이 움직이는 중일 때만 Tick에서 메시 갱신
 };

@@ -1239,7 +1239,7 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
     OnRep_CurrentCheckoutZoneState();
 
     // 정산 중 계산대 닫힐 경우 정산 취소
-    if (bIsCheckoutInProgress && NewState != ECheckoutZoneState::Open)
+    if (bIsCheckoutInProgress && NewState == ECheckoutZoneState::Closed)
     {
         CancelCheckout();
     }
