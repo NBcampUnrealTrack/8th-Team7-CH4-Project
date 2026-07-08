@@ -215,7 +215,7 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
 
         if (CheckoutManagerRef)
         {
-            CheckoutManagerRef->PrepareNextCheckoutZoneState(3);
+            CheckoutManagerRef->StartCheckoutRotation();
         }
 
 
@@ -235,11 +235,7 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     case ERoundPhase::RandomOpenTwo:
         // 랜덤 오픈 시작 / 계산대 3개중 2개 오픈
         PhaseName = TEXT("RandomOpenTwo (계산대 3개 중 2개 오픈)");
-
-        if (CheckoutManagerRef)
-        {
-            CheckoutManagerRef->PrepareNextCheckoutZoneState(2);
-        }
+        
         break;
 
     case ERoundPhase::SaleEvent:
@@ -268,10 +264,7 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     case ERoundPhase::FinalWarningOneOpen:
         // 마지막 30초 경고 및 계산대 1게만 오픈
         PhaseName = TEXT("FinalWarningOneOpen (마지막 30초 경고 및 계산대 1개만 오픈)");
-        if (CheckoutManagerRef)
-        {
-            CheckoutManagerRef->PrepareNextCheckoutZoneState(1);
-        }
+
         break;
 
     case ERoundPhase::RoundEnd:
@@ -280,7 +273,7 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         PhaseName = TEXT("RoundEnd (라운드 종료 계산대 전부 닫음)");
         if (CheckoutManagerRef)
         {
-            CheckoutManagerRef->PrepareNextCheckoutZoneState(0);
+            CheckoutManagerRef->StopCheckoutRotation();
         }
 
         GetWorldTimerManager().ClearTimer(Timer_RoundTick);
