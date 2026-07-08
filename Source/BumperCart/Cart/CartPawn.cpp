@@ -155,8 +155,14 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//입력(bBrakeHeld)과 실제 상태(bIsBraking)를 분리. 소유자가 판정 후 서버/타 클라에 복제 (부스터와 동일 패턴)
 	if (IsLocallyControlled())
 	{
-		//부스트 중엔 브레이크 무시(부스트는 커밋된 돌진), 미끄럼 중엔 조작 불능 => 감속·스파크 연출도 차단
-		const bool bBrakeEffective = bBrakeHeld && !bIsBoosting && !bIsSlipping && Move->Velocity.Size2D() > BrakeStopSpeed;
+		//브레이크로 부스트 취소 — 부스트 중 브레이크 누르면 부스트를 끊고 감속으로 전환 (즉시 정지 X: 감속도가 낮아 끌려가다 멈춤)
+		if (bBrakeHeld && bIsBoosting)
+		{
+			EndBoost();
+		}
+
+		//정지 상태(BrakeStopSpeed 이하)·미끄럼 중·후진 중(ForwardSpeed<=0)엔 브레이크 무효
+		const bool bBrakeEffective = bBrakeHeld && !bIsSlipping && ForwardSpeed > 0.f && Move->Velocity.Size2D() > BrakeStopSpeed;
 		if (bBrakeEffective != bIsBraking)
 		{
 			bIsBraking = bBrakeEffective;
@@ -213,6 +219,33 @@ void ACartPawn::Tick(float DeltaSeconds)
 			SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
 			SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
 			bBumpReactionActive = false;
+		}
+	}
+
+	//--- 충돌 후 무적: 서버는 시간 카운트다운, 모든 클라는 몸통 깜빡 ---
+	if (HasAuthority() && bBumpInvincible)
+	{
+		BumpInvincibleTimeRemaining -= DeltaSeconds;
+		if (BumpInvincibleTimeRemaining <= 0.f)
+		{
+			bBumpInvincible = false;
+		}
+	}
+	if (SlipSpinMesh)
+	{
+		if (bBumpInvincible)
+		{
+			BumpBlinkAccum += DeltaSeconds;
+			if (BumpBlinkAccum >= BumpBlinkInterval)
+			{
+				BumpBlinkAccum = 0.f;
+				SlipSpinMesh->SetVisibility(!SlipSpinMesh->GetVisibleFlag(), true);
+			}
+		}
+		else if (!SlipSpinMesh->GetVisibleFlag())
+		{
+			SlipSpinMesh->SetVisibility(true, true); //무적 끝 => 확실히 보이게
+			BumpBlinkAccum = 0.f;
 		}
 	}
 
@@ -343,6 +376,16 @@ void ACartPawn::Tick(float DeltaSeconds)
 
     }
 
+	//연속 이동 시간 추적 (출발 그레이스 판정용) — 거의 정지면 리셋
+	if (Move->Velocity.Size2D() > 50.f)
+	{
+		TimeSinceMoveStart += DeltaSeconds;
+	}
+	else
+	{
+		TimeSinceMoveStart = 0.f;
+	}
+
 	//충돌 세기 계산용: 이번 프레임 속도를 저장 (다음 프레임 NotifyHit에서 '충돌 직전' 속도로 사용)
 	PreviousVelocity = GetVelocity();
 }
@@ -428,9 +471,14 @@ void ACartPawn::OnBrakeStart(const FInputActionValue& Value)
 	//브레이크 효과음 (소유 클라 로컬) — 실제로 브레이크가 걸릴 때만.
 	//정지 상태(BrakeStopSpeed 이하)·부스트 중·미끄럼 중엔 브레이크가 무효라 사운드도 재생 안 함 (Tick의 bBrakeEffective와 동일 조건)
 	const UCharacterMovementComponent* Move = GetCharacterMovement();
-	if (BrakeSound && Move && !bIsBoosting && !bIsSlipping && Move->Velocity.Size2D() > BrakeStopSpeed)
+	if (BrakeSound && Move && !bIsSlipping && Move->Velocity.Size2D() > BrakeStopSpeed)
 	{
-		UGameplayStatics::PlaySound2D(this, BrakeSound);
+		//후진 중(ForwardSpeed<=0)엔 브레이크 무효라 사운드도 재생 안 함
+		const float FwdSpeed = FVector::DotProduct(Move->Velocity, GetActorForwardVector());
+		if (FwdSpeed > 0.f)
+		{
+			UGameplayStatics::PlaySound2D(this, BrakeSound);
+		}
 	}
 }
 
@@ -468,6 +516,7 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 
 void ACartPawn::EndBoost()
 {
+	GetWorldTimerManager().ClearTimer(BoostTimerHandle); //브레이크 취소 등 조기 종료 시 남은 지속 타이머 정리 (중복 발동 방지)
 	bIsBoosting = false;
 	ServerSetBoosting(false); //부스터 종료 서버에 통지
 	GetWorldTimerManager().SetTimer(BoostCooldownTimerHandle, this, &ACartPawn::ResetBoostCooldown, BoostCooldown, false);
@@ -487,6 +536,8 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	DOREPLIFETIME_CONDITION(ACartPawn, bIsBraking, COND_SkipOwner);
 	//회전 yaw: 소유자는 로컬 회전을 쓰므로 제외, 비소유(타 클라)만 복제받아 보간
 	DOREPLIFETIME_CONDITION(ACartPawn, ReplicatedYaw, COND_SkipOwner);
+	//충돌 무적: 모든 클라가 몸통 깜빡 연출을 해야 하므로 소유자 포함 전체 복제
+	DOREPLIFETIME(ACartPawn, bBumpInvincible);
 }
 
 //B5 : 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
@@ -635,6 +686,13 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 
 	//상대가 카트면 그 카트의 '충돌 직전' 속도를, 아니면(차단벽·장애물 등 정적) 0으로
 	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
+
+	//무적 중이면(나 또는 상대) 이 충돌은 완전 무시 — 넉백·틸트·효과음·드롭 전부 skip
+	if (bBumpInvincible || (OtherCart && OtherCart->bBumpInvincible))
+	{
+		return;
+	}
+
 	const FVector OtherVel = OtherCart ? OtherCart->PreviousVelocity : FVector::ZeroVector;
 	const FVector RelativeVelocity = PreviousVelocity - OtherVel;
 
@@ -651,6 +709,17 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	if (ClosingSpeed < MinBumpSpeed)
 	{
 		return; //약하게 스치는 접촉은 무시
+	}
+
+	//출발 그레이스: 막 움직이기 시작한(부스트 아님) 카트가 단독으로 만든 충돌은 무효 — 바로 앞 카트 밀기 오판정 방지
+	//'정당한 돌진자'(상대 쪽으로 실제 이동 중 + 그레이스 지남 or 부스트)가 한 명도 없으면 충돌로 안 침
+	const float MyToward = FVector::DotProduct(PreviousVelocity, ToOther);
+	const float OtherToward = OtherCart ? FVector::DotProduct(OtherVel, -ToOther) : 0.f;
+	const bool bMyChargeLegit = MyToward > 50.f && (bIsBoosting || TimeSinceMoveStart >= BumpStartGraceTime);
+	const bool bOtherChargeLegit = OtherCart && OtherToward > 50.f && (OtherCart->bIsBoosting || OtherCart->TimeSinceMoveStart >= BumpStartGraceTime);
+	if (!bMyChargeLegit && !bOtherChargeLegit)
+	{
+		return;
 	}
 
 	//충돌 연출: 세기만 여기서 계산하고, 재생은 공용 함수로 위임 (서버 => 소유 클라)
@@ -693,6 +762,16 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	MulticastPlayBumpReaction(-ToOther, ReactionIntensity);
 
 	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
+
+	//충돌 성립 => 잠깐 무적 (연타/비비기 방지, 그동안 깜빡). 부스트 중인 카트는 제외 — 돌진 유지, 연속 타격 가능
+	if (!bIsBoosting)
+	{
+		StartBumpInvincibility();
+	}
+	if (OtherCart && !OtherCart->bIsBoosting)
+	{
+		OtherCart->StartBumpInvincibility();
+	}
 }
 
 //충돌음을 소유 클라에서 재생 (BumpSound 비어있으면 무음)
@@ -844,4 +923,15 @@ void ACartPawn::EnsureBodyMeshResolved()
         SlipSpinMeshBaseRelLoc = SlipSpinMesh->GetRelativeLocation();
         bBodyMeshResolved = true;
     }
+}
+
+//충돌 후 무적 시작 (서버) — 지속시간 동안 추가 충돌 무시. bBumpInvincible 복제로 전 클라가 몸통 깜빡
+void ACartPawn::StartBumpInvincibility()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    bBumpInvincible = true;
+    BumpInvincibleTimeRemaining = BumpInvincibleDuration;
 }

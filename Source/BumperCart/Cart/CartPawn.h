@@ -266,11 +266,23 @@ protected:
 	//---------- 충돌/스필 드롭 (B4/B5) ----------
 	//충격속도(cm/s)를 C 드롭 충격량으로 환산하는 배율 (충돌용)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpImpulseScale = 1.0f;
+	float BumpImpulseScale = 2.0f;
 
-	//이 충격속도(cm/s) 미만의 약한 접촉은 무시 (충돌용)
+	//이 접근속도(cm/s) 미만의 약한 접촉은 충돌로 안 침
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float MinBumpSpeed = 200.f;
+	float MinBumpSpeed = 600.f;
+
+	//출발 그레이스(초) — 정지에서 움직이기 시작한 지 이 시간 안에 만든 충돌은 무효 (바로 앞 카트 밀기 오판정 방지). 부스트는 예외
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpStartGraceTime = 0.7f;
+
+	//충돌 판정 후 무적 지속(초) — 이 동안 추가 충돌 완전 무시 + 몸통 깜빡 (연타/비비기 방지)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BumpInvincibleDuration = 1.f;
+
+	//무적 중 몸통 깜빡임 간격(초)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0.01"))
+	float BumpBlinkInterval = 0.08f;
 
 	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초) — 모든 스필(충돌·부스터오용) 공통
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
@@ -290,7 +302,7 @@ protected:
 
 	//이 접근속도(cm/s)에서 쉐이크가 최대 세기에 도달 (MinBumpSpeed~이 값 사이를 보간)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpShakeFullSpeed = 1200.f;
+	float BumpShakeFullSpeed = 900.f;
 
 	//---------- 충돌 넉백 + 리액션(몸통 들썩·기울임) ----------
 	//부스트로 상대 카트를 박았을 때 상대를 밀어내는 세기 (B: 부스트 비비기 방지). LaunchCharacter 속도
@@ -396,6 +408,9 @@ protected:
 	//몸통 메시(SlipSpinMeshName) 탐색 + 기준 상대회전/위치 캡처 (슬립·범프 리액션 공용, 최초 1회)
 	void EnsureBodyMeshResolved();
 
+	//충돌 후 무적 시작 (서버) — 지속시간 동안 추가 충돌 무시, 복제되어 전 클라 깜빡
+	void StartBumpInvincibility();
+
 	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용
 	UFUNCTION()
 	void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
@@ -431,6 +446,9 @@ private:
 	//충돌 직전 프레임의 속도 (NotifyHit 시점엔 비물리라 속도가 0으로 깎여 신뢰 불가 => Tick에서 매 프레임 캐시)
 	FVector PreviousVelocity = FVector::ZeroVector;
 
+	//연속 이동 시간(초) — 정지하면 0으로 리셋. 출발 그레이스 판정용(서버)
+	float TimeSinceMoveStart = 0.f;
+
     //카트 회전(yaw) 네트워크 동기화 — 소유자가 갱신, 비소유(타 클라·서버)는 이 값으로 보간해 따라간다
     //RepMovement 회전이 클라 조종 카트에서 느리게/스텝으로 전파되는 문제를 우회. COND_SkipOwner(소유자는 로컬 유지)
     UPROPERTY(Replicated)
@@ -462,4 +480,11 @@ private:
 	float BumpTiltRoll = 0.f;     float BumpTiltRollVel = 0.f;
 	float BumpHopOffsetZ = 0.f;   float BumpHopVel = 0.f;
 	bool bBumpReactionActive = false; //스프링이 움직이는 중일 때만 Tick에서 메시 갱신
+
+	//---------- 충돌 후 무적 상태 ----------
+	//무적 여부 (복제: 모든 클라가 몸통 깜빡). 서버가 시간 관리
+	UPROPERTY(Replicated)
+	bool bBumpInvincible = false;
+	float BumpInvincibleTimeRemaining = 0.f; //서버 카운트다운
+	float BumpBlinkAccum = 0.f;              //로컬 깜빡 타이머
 };
