@@ -7,6 +7,7 @@
 #include "GameState/MainGameState.h"
 #include "MainGameMode.generated.h"
 
+enum class ETitleType : uint8;
 class ACheckoutManager; // 계산대 매니저
 class UProductShelfManagerConfig;
 class USaleEventConfig;
@@ -61,6 +62,35 @@ private:
 
     // 모든 플레이어 로비로 복귀
     void ReturnAllPlayersToLobby();
+
+    // 플레이어에게 칭호 부여
+    void ApplyTitles();
+
+    // 보너스 점수 추가
+    void ApplyBonusScores();
+
+    // 칭호에 따른 보너스 점수 계산
+    float GetTitleBonusScore(ETitleType Title) const;
+
+    // 칭호별 보너스 점수
+    UPROPERTY(EditAnywhere, Category = "BonusScore")
+    float TitleBonus_MartKing;
+
+    UPROPERTY(EditAnywhere, Category = "BonusScore")
+    float TitleBonus_BumpKing;
+
+    UPROPERTY(EditAnywhere, Category = "BonusScore")
+    float TitleBonus_DestroyKing ;
+
+    UPROPERTY(EditAnywhere, Category = "BonusScore")
+    float TitleBonus_ReceiptCollector;
+
+    UPROPERTY(EditAnywhere, Category = "BonusScore")
+    float TitleBonus_SafeCart;
+
+    UPROPERTY(EditAnywhere, Category = "BonusScore")
+    float TitleBonus_Default;
+
 
     // 결과창 노출 시간
     UPROPERTY(EditDefaultsOnly, Category = "Round Schedule")

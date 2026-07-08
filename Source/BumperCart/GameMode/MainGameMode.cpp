@@ -35,6 +35,13 @@ AMainGameMode::AMainGameMode()
     CheckoutManagerRef = nullptr;
 
 
+    // 추가 점수 및 추가 점수 감소 초기화
+    TitleBonus_MartKing = 30.f;
+    TitleBonus_BumpKing = -20.f;
+    TitleBonus_DestroyKing = -15.f;
+    TitleBonus_ReceiptCollector = 15.f;
+    TitleBonus_SafeCart = 10.f;
+    TitleBonus_Default = 0.f;
 }
 
 UClass* AMainGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
@@ -278,6 +285,16 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
 
         GetWorldTimerManager().ClearTimer(Timer_RoundTick);
 
+        // 보너스 점수 계산 전 등수 집계
+        UpdateAllPlayerRanks();
+
+        // 칭호 적용
+        ApplyTitles();
+
+        // 칭호에 맞추어 추가 점수 계산
+        ApplyBonusScores();
+
+        // 보너수 점수 계산 후 등수 집계
         UpdateAllPlayerRanks();
 
         // 결과 화면 노출 시간 이후 로비로 복귀
@@ -352,4 +369,55 @@ void AMainGameMode::ReturnAllPlayersToLobby()
 {
     UE_LOG(LogMainGameMode, Warning, TEXT("결과 화면 종료, 로비로 복귀"));
     GetWorld()->ServerTravel(TEXT("/Game/Developers/LSJae/Levels/TestLobbyLevel"));
+}
+
+// 라운드 종료 시 통계 기반 보너스 점수 정산
+void AMainGameMode::ApplyBonusScores()
+{
+    AMainGameState* GS = GetGameState<AMainGameState>();
+    if (!GS) return;
+
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        AMainPlayerState* MainPS = Cast<AMainPlayerState>(PS);
+        if (!MainPS) continue;
+
+        float BonusScore = GetTitleBonusScore(MainPS->GetTitle());
+
+        MainPS->AddPlayerScore(BonusScore);
+    }
+}
+
+void AMainGameMode::ApplyTitles()
+{
+    AMainGameState* GS = GetGameState<AMainGameState>();
+    if (!GS) return;
+
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        if (AMainPlayerState* MainPS = Cast<AMainPlayerState>(PS))
+        {
+            MainPS->SetTitle();
+        }
+    }
+}
+
+float AMainGameMode::GetTitleBonusScore(ETitleType Title) const
+{
+    switch (Title)
+    {
+    case ETitleType::MartKing:
+        return TitleBonus_MartKing;
+    case ETitleType::BumpKing:
+        return TitleBonus_BumpKing;
+    case ETitleType::DestroyKing:
+        return TitleBonus_DestroyKing;
+    case ETitleType::ReceiptCollector:
+        return TitleBonus_ReceiptCollector;
+    case ETitleType::SafeCart:
+        return TitleBonus_SafeCart;
+    case ETitleType::Default:
+    default:
+        return TitleBonus_Default;
+    }
 }

@@ -11,6 +11,13 @@ class AMainGameMode;
 AMainPlayerState::AMainPlayerState()
 {
     bReplicates = true;
+
+    PlayerScore = 0;
+    Rank = 0;
+    CheckoutCount = 0;
+    BumpCartCount = 0;
+    DroppedItemCount = 0;
+    Title = ETitleType::Default;
 }
 
 void AMainPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -22,6 +29,7 @@ void AMainPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME(AMainPlayerState, CheckoutCount);
     DOREPLIFETIME(AMainPlayerState, BumpCartCount);
     DOREPLIFETIME(AMainPlayerState, DroppedItemCount);
+    DOREPLIFETIME(AMainPlayerState, Title);
 }
 
 // 점수 관련
@@ -140,6 +148,49 @@ void AMainPlayerState::OnRep_DroppedItemCount()
     OnPlayerStatsChanged.Broadcast();
 }
 
+// 칭호 부여 판단 로직
+void AMainPlayerState::SetTitle()
+{
+    if (!HasAuthority()) return;
+
+    ETitleType NewTitle = ETitleType::Default;
+
+  if (Rank == 1)
+  {
+      NewTitle = ETitleType::MartKing;
+  }
+  else if (BumpCartCount >= 15)
+  {
+    NewTitle = ETitleType::BumpKing;
+  }
+  else if (DroppedItemCount >= 8)
+  {
+      NewTitle = ETitleType::DestroyKing;
+  }
+  else if (CheckoutCount >= 4)
+  {
+      NewTitle = ETitleType::ReceiptCollector;
+  }
+  else if (BumpCartCount <= 2 && DroppedItemCount <= 2 && CheckoutCount >= 1)
+  {
+      NewTitle = ETitleType::SafeCart;
+  }
+
+    if (Title == NewTitle) return;
+
+    OnPlayerStatsChanged.Broadcast();
+}
+
+ETitleType AMainPlayerState::GetTitle() const
+{
+    return Title;
+}
+
+void AMainPlayerState::OnRep_Title()
+{
+    OnPlayerStatsChanged.Broadcast();
+}
+
 //모든 통계 초기화
 void AMainPlayerState::ResetStats()
 {
@@ -150,6 +201,7 @@ void AMainPlayerState::ResetStats()
     CheckoutCount = 0;
     BumpCartCount = 0;
     DroppedItemCount = 0;
+    Title = ETitleType::Default;
 
     OnPlayerStatsChanged.Broadcast();
 }
