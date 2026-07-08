@@ -11,6 +11,8 @@ class UProductDataAsset;
 class UStaticMeshComponent;
 class USphereComponent;
 class UStaticMesh;
+class UNiagaraComponent;
+class UNiagaraSystem;
 
 
 UCLASS()
@@ -89,6 +91,9 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
     TObjectPtr<UStaticMeshComponent> Mesh;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
+    TObjectPtr<UNiagaraComponent> AuraComponent;
+
 
     /* 오버레이 머티리얼 */
 
@@ -97,6 +102,12 @@ protected:
 
     UPROPERTY()
     TObjectPtr<UMaterialInstanceDynamic> ValueOverlayMID;
+
+
+    /* 오라 나이아가라 */
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Visual")
+    TObjectPtr<UNiagaraSystem> AuraSystem;
 
 
     /* Product 기본 변수 */
@@ -219,7 +230,8 @@ private:
 
     // 현재 가치에 따라 오버레이 수치들을 가져오는 함수
     FLinearColor GetValueOverlayColor() const;
-    float GetValueOverlayIntensity() const;
-    float GetValueOverlayOpacity() const;
-    float GetValueOverlayExpandAmount() const;
+
+    void ApplyValueAura();
+
+    void RefreshAuraActive();
 };
