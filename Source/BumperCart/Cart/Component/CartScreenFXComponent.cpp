@@ -226,7 +226,7 @@ void UCartScreenFXComponent::DriveSkidDecals(float ForwardSpeed)
 	const bool bWantSkid = OwnerCart && OwnerCart->IsBraking() && ForwardSpeed > SkidDecalMinSpeed;
 	if (!bWantSkid || !SkidDecalMaterial)
 	{
-		//브레이크를 뗐거나 조건 미달 → 다음 자국은 새 라인으로 시작(연속선 끊기)
+		//브레이크를 뗐거나 조건 미달 => 다음 자국은 새 라인으로 시작(연속선 끊기)
 		bHasLastSkidLeft = false;
 		bHasLastSkidRight = false;
 		return;
@@ -274,7 +274,7 @@ void UCartScreenFXComponent::SpawnSkidDecalAt(const FVector& WorldPos)
 		return;
 	}
 
-	//데칼은 로컬 X축으로 바닥에 투영된다 → X를 아래로, 길이축(DecalSize.Z)을 '실제 이동 방향'에 정렬
+	//데칼은 로컬 X축으로 바닥에 투영된다 => X를 아래로, 길이축(DecalSize.Z)을 '실제 이동 방향'에 정렬
 	//미끄러질 땐 카트가 바라보는 방향(yaw)과 실제 진행 방향(속도)이 달라서, 속도 방향을 써야 자국이 경로를 따라 눕는다
 	FVector MoveDir = OwnerCart ? OwnerCart->GetVelocity() : FVector::ZeroVector;
 	MoveDir.Z = 0.f;
