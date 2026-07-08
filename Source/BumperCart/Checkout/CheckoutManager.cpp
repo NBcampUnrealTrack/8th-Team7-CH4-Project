@@ -9,6 +9,17 @@ ACheckoutManager::ACheckoutManager()
 {
     PrimaryActorTick.bCanEverTick = false;
     bReplicates = false;
+
+    // 기본 스케줄
+    RotationSteps =
+    {
+        { 30.0f, 2 },
+        { 60.0f, 2 },
+        { 90.0f, 2 },
+        { 120.0f, 2 },
+        { 150.0f, 1 },
+        { 180.0f, 0 }
+    };
 }
 
 void ACheckoutManager::BeginPlay()
@@ -104,10 +115,185 @@ bool ACheckoutManager::InitializeCheckoutZones()
     return true;
 }
 
+bool ACheckoutManager::AreCheckoutZonesValid() const
+{
+    if (CheckoutZones.IsEmpty())
+    {
+        return false;
+    }
+
+    for (ACheckoutZone* CheckoutZone : CheckoutZones)
+    {
+        if (!IsValid(CheckoutZone))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 // ------------------------------------------------------------
 // 계산대 상태 변경
 // ------------------------------------------------------------
+void ACheckoutManager::StartCheckoutRotation()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!AreCheckoutZonesValid())
+    {
+        return;
+    }
+
+    StopCheckoutRotation();
+
+    bIsCheckoutRotationRunning = true;
+    CheckoutRotationStartWorldTime = GetWorld()->GetTimeSeconds();
+    CurrentRotationStepIndex = 0;
+
+    // 라운드 시작 시 계산대는 전부 Open
+    OpenAllCheckoutZones();
+
+    // 첫 번째 step의 ClosingSoon 시작 예약
+    ScheduleNextRotationStepWarning();
+}
+
+void ACheckoutManager::StopCheckoutRotation()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    GetWorldTimerManager().ClearTimer(RotationStepWarningTimerHandle);
+    GetWorldTimerManager().ClearTimer(ClosingSoonTimerHandle);
+
+    bIsCheckoutRotationRunning = false;
+    CurrentRotationStepIndex = INDEX_NONE;
+
+    RandomOpenCheckoutZones.Empty();
+
+    // 라운드 종료 시 계산대 전부 Closed
+    CloseAllCheckoutZones();
+}
+
+void ACheckoutManager::ScheduleNextRotationStepWarning()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!bIsCheckoutRotationRunning)
+    {
+        return;
+    }
+
+    if (!RotationSteps.IsValidIndex(CurrentRotationStepIndex))
+    {
+        return;
+    }
+
+    const FCheckoutRotationStep& CurrentStep = RotationSteps[CurrentRotationStepIndex];
+
+    const float CurrentElapsedTime =
+        GetWorld()->GetTimeSeconds() - CheckoutRotationStartWorldTime;
+
+    // ApplyTime보다 ClosingSoonDuration만큼 먼저 경고 시작
+    const float WarningStartTime = FMath::Max(CurrentStep.ApplyTime - ClosingSoonDuration, 0.0f);
+
+    const float WarningDelay = FMath::Max(WarningStartTime - CurrentElapsedTime, 0.0f);
+
+    GetWorldTimerManager().SetTimer(
+        RotationStepWarningTimerHandle,
+        this,
+        &ThisClass::HandleRotationStepWarning,
+        WarningDelay,
+        false
+    );
+}
+
+void ACheckoutManager::OpenAllCheckoutZones()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!AreCheckoutZonesValid())
+    {
+        return;
+    }
+
+    GetWorldTimerManager().ClearTimer(ClosingSoonTimerHandle);
+
+    RandomOpenCheckoutZones.Empty();
+
+    for (ACheckoutZone* CheckoutZone : CheckoutZones)
+    {
+        if (!IsValid(CheckoutZone))
+        {
+            continue;
+        }
+
+        CheckoutZone->SetCheckoutZoneState(ECheckoutZoneState::Open);
+    }
+}
+
+void ACheckoutManager::CloseAllCheckoutZones()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!AreCheckoutZonesValid())
+    {
+        return;
+    }
+
+    GetWorldTimerManager().ClearTimer(ClosingSoonTimerHandle);
+
+    RandomOpenCheckoutZones.Empty();
+
+    for (ACheckoutZone* CheckoutZone : CheckoutZones)
+    {
+        if (!IsValid(CheckoutZone))
+        {
+            continue;
+        }
+
+        CheckoutZone->SetCheckoutZoneState(ECheckoutZoneState::Closed);
+    }
+}
+
+void ACheckoutManager::HandleRotationStepWarning()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    if (!bIsCheckoutRotationRunning)
+    {
+        return;
+    }
+
+    if (!RotationSteps.IsValidIndex(CurrentRotationStepIndex))
+    {
+        return;
+    }
+
+    const FCheckoutRotationStep& CurrentStep = RotationSteps[CurrentRotationStepIndex];
+
+    // 기존 함수 재사용
+    // 여기서 닫힐 계산대가 ClosingSoon으로 바뀌고,
+    // ClosingSoonDuration 뒤 ChangeNextCheckoutZoneState()가 호출됨
+    PrepareNextCheckoutZoneState(CurrentStep.OpenCount);
+}
 
 // 계산대 정산 완료 시,
 // 모든 계산대가 Open 상태일 경우   -> 계속 Open 상태로 유지
@@ -126,6 +312,11 @@ void ACheckoutManager::HandleCheckoutCompleted(ACheckoutZone* CompletedCheckoutZ
 
     // 이미 닫힌 계산대여도 진행 중인 정산이 완료되면 정산
     if (CompletedCheckoutZone->GetCheckoutZoneState() == ECheckoutZoneState::Closed)
+    {
+        return;
+    }
+
+    if (CompletedCheckoutZone->GetCheckoutZoneState() == ECheckoutZoneState::ClosingSoon)
     {
         return;
     }
@@ -192,6 +383,9 @@ void ACheckoutManager::PrepareNextCheckoutZoneState(int32 OpenCount)
             return;
         }
     }
+
+    // Closing Soon 타이머 제거
+    GetWorldTimerManager().ClearTimer(ClosingSoonTimerHandle);
 
     // 최대 오픈 개수는 월드에 존재하는 계산대 수만큼
     const int32 ClampedOpenCount = FMath::Clamp(OpenCount, 0, CheckoutZones.Num());
@@ -315,6 +509,13 @@ void ACheckoutManager::ChangeNextCheckoutZoneState()
 
     // 랜덤 선택된 계산대 비우기
     RandomOpenCheckoutZones.Empty();
+
+    // 다음 Step으로 넘어가기
+    if (bIsCheckoutRotationRunning)
+    {
+        ++CurrentRotationStepIndex;
+        ScheduleNextRotationStepWarning();
+    }
 }
 
 

@@ -414,6 +414,8 @@ void UCartGrabComponent::RequestGrab()
     if (CachedAimDistance <= KINDA_SMALL_NUMBER) return;
     if (GrabSpeed <= KINDA_SMALL_NUMBER) return;
 
+    if (bIsGrabDisabledByCheckout) return;
+
     // 클라이언트에서 계산한 값이므로 인자로 넘겨야 함
     Server_GrabProduct(CachedAimDirection, CachedAimDistance);
 }
@@ -426,6 +428,8 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     AActor* OwnerActor = GetOwner();
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
     if (!bCanGrab) return;
+
+    if (bIsGrabDisabledByCheckout) return;
 
     FVector Direction = FVector(AimDirection).GetSafeNormal();
     if (Direction.IsNearlyZero()) return;
@@ -1058,4 +1062,14 @@ bool UCartGrabComponent::IsLocallyControlled() const
 {
     APawn* OwnerPawn = Cast<APawn>(GetOwner());
     return IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled();
+}
+
+void UCartGrabComponent::SetGrabDisabledByCheckout(bool bShouldGrabDisable)
+{
+    bIsGrabDisabledByCheckout = bShouldGrabDisable;
+}
+
+bool UCartGrabComponent::IsGrabDisabledByCheckout() const
+{
+    return bIsGrabDisabledByCheckout;
 }

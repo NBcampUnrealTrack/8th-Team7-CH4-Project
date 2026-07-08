@@ -350,4 +350,19 @@ private:
 
     // 그랩 종료 확인용 타이머
     FTimerHandle GrabFinishTimer;
+
+    /* ---------------- 정산 중 ---------------- */
+
+public:
+    // bIsGrabDisabledByCheckout 설정
+    // CheckoutZone에서 정산 시작, 취소 시 호출
+    void SetGrabDisabledByCheckout(bool bShouldDisable);
+
+    // 정산 중인지 리턴
+    bool IsGrabDisabledByCheckout() const;
+
+private:
+    // 정산 중 Grab 금지
+    bool bIsGrabDisabledByCheckout = false;
+
 };

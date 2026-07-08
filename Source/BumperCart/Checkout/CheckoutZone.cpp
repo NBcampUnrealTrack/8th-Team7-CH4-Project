@@ -1,7 +1,8 @@
 ﻿#include "Checkout/CheckoutZone.h"
 
-#include "Cart/Component/CartLoadComponent.h"
 #include "Cart/CartPawn.h"
+#include "Cart/Component/CartLoadComponent.h"
+#include "Cart/Component/CartGrabComponent.h"
 #include "Product/ProductTypes.h"
 #include "Checkout/CheckoutScoreCalculator.h"
 #include "Checkout/CheckoutBarrier.h"
@@ -860,6 +861,12 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     CheckoutProgress = 0.0f;
     ElapsedCheckoutTime = 0.0f;
 
+    UCartGrabComponent* GrabComponent = CurrentCheckoutPlayer->FindComponentByClass<UCartGrabComponent>();
+    if (IsValid(GrabComponent))
+    {
+        GrabComponent->SetGrabDisabledByCheckout(true);
+    }
+
     // 기존에 먼저 들어와 있던 비정산 플레이어 배출
     if (bUseCheckoutBarrier)
     {
@@ -1083,6 +1090,15 @@ void ACheckoutZone::ResetCheckout()
 
     // 정산 완료 시 벽 해제
     SetCheckoutBarrierEnabled(false);
+
+    if (IsValid(CurrentCheckoutPlayer))
+    {
+        UCartGrabComponent* GrabComponent = CurrentCheckoutPlayer->FindComponentByClass<UCartGrabComponent>();
+        if (IsValid(GrabComponent))
+        {
+            GrabComponent->SetGrabDisabledByCheckout(false);
+        }
+    }
 
     CurrentCheckoutPlayer = nullptr;
     bIsCheckoutInProgress = false;
