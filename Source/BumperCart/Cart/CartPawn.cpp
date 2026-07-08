@@ -115,6 +115,9 @@ void ACartPawn::BeginPlay()
 	ReplicatedYaw = GetActorRotation().Yaw;
 	LastSentYaw = ReplicatedYaw;
 	ControlledYaw = ReplicatedYaw;
+
+	//몸통 메시 기준 회전/위치를 디자인값으로 1회 캡처 (슬립·범프 리액션 공용). 어떤 FX가 메시를 건드리기 전에
+	EnsureBodyMeshResolved();
 }
 
 void ACartPawn::Tick(float DeltaSeconds)
@@ -179,6 +182,37 @@ void ACartPawn::Tick(float DeltaSeconds)
 			const float Eased = 1.f - FMath::Square(1.f - Progress);
 			const float SpinYaw = SlipSpinDir * SlipSpinTurns * 360.f * Eased;
 			SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot + FRotator(0.f, SpinYaw, 0.f));
+		}
+	}
+
+	//--- 충돌 리액션(몸통 들썩·기울임): 슬립이 아닐 때만 (슬립은 몸통 yaw 스핀을 점유). 스프링으로 기준값 복귀 ---
+	if (bBumpReactionActive && !bIsSlipping && SlipSpinMesh)
+	{
+		//감쇠 스프링 1스텝: 가속 = -k·x - c·v (감쇠 약하면 여러 번 덜컹). 최대치로 클램프
+		auto SpringStep = [&](float& X, float& V, float MaxAbs)
+		{
+			const float Accel = -BumpReactionStiffness * X - BumpReactionDamping * V;
+			V += Accel * DeltaSeconds;
+			X += V * DeltaSeconds;
+			X = FMath::Clamp(X, -MaxAbs, MaxAbs);
+		};
+		SpringStep(BumpTiltPitch, BumpTiltPitchVel, BumpTiltMaxAngle);
+		SpringStep(BumpTiltRoll, BumpTiltRollVel, BumpTiltMaxAngle);
+		SpringStep(BumpHopOffsetZ, BumpHopVel, BumpHopMaxHeight);
+
+		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot + FRotator(BumpTiltPitch, 0.f, BumpTiltRoll));
+		SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc + FVector(0.f, 0.f, BumpHopOffsetZ));
+
+		//충분히 잦아들면 정지 — 기준값으로 스냅하고 비활성화(불필요한 매 프레임 갱신 방지)
+		if (FMath::Abs(BumpTiltPitch) < 0.05f && FMath::Abs(BumpTiltPitchVel) < 0.5f &&
+			FMath::Abs(BumpTiltRoll) < 0.05f && FMath::Abs(BumpTiltRollVel) < 0.5f &&
+			FMath::Abs(BumpHopOffsetZ) < 0.05f && FMath::Abs(BumpHopVel) < 0.5f)
+		{
+			BumpTiltPitch = BumpTiltRoll = BumpHopOffsetZ = 0.f;
+			BumpTiltPitchVel = BumpTiltRollVel = BumpHopVel = 0.f;
+			SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
+			SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
+			bBumpReactionActive = false;
 		}
 	}
 
@@ -506,29 +540,20 @@ void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
 	SlipTimeRemaining = SlipDurationTotal;
 	SlipSpinDir = (SpinAngleDeg < 0.f) ? -1.f : 1.f; //기믹이 준 각도는 부호만 방향으로 사용
 
-	//빙글 돌릴 카트 메시 탐색(최초 1회 캐시) — BP_CartPawn의 카트 스태틱 메시
+	//몸통 메시 탐색·기준 회전/위치 캡처 (범프 리액션과 공용, 최초 1회). base는 BeginPlay에서 이미 잡혀있음
+	EnsureBodyMeshResolved();
 	if (!SlipSpinMesh)
 	{
-		TArray<UStaticMeshComponent*> MeshComps;
-		GetComponents(MeshComps);
-		for (UStaticMeshComponent* MeshComp : MeshComps)
-		{
-			if (MeshComp && MeshComp->GetFName() == SlipSpinMeshName)
-			{
-				SlipSpinMesh = MeshComp;
-				break;
-			}
-		}
-		if (!SlipSpinMesh)
-		{
-			UE_LOG(LogBumperCart, Warning, TEXT("CartSlip: 카트 메시(%s)를 찾지 못해 스핀 연출 없이 조작 잠금만 적용합니다."), *SlipSpinMeshName.ToString());
-		}
+		UE_LOG(LogBumperCart, Warning, TEXT("CartSlip: 카트 메시(%s)를 찾지 못해 스핀 연출 없이 조작 잠금만 적용합니다."), *SlipSpinMeshName.ToString());
 	}
-
-	//원래 상대 회전 백업 (종료 시 복구)
-	if (SlipSpinMesh)
+	else
 	{
-		SlipSpinMeshBaseRelRot = SlipSpinMesh->GetRelativeRotation();
+		//진행 중이던 범프 리액션은 슬립이 몸통 회전을 점유하므로 초기화하고 기준 자세로 되돌린다
+		BumpTiltPitch = BumpTiltRoll = BumpHopOffsetZ = 0.f;
+		BumpTiltPitchVel = BumpTiltRollVel = BumpHopVel = 0.f;
+		bBumpReactionActive = false;
+		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
+		SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
 	}
 
 	//미끄럼 효과음 — 내 카트는 2D(귀에 크게), 상대 카트는 위치 기반 3D (StartSlip은 멀티캐스트로 전 클라 실행)
@@ -560,6 +585,7 @@ void ACartPawn::EndSlip()
 	if (SlipSpinMesh)
 	{
 		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
+		SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
 	}
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
@@ -640,16 +666,31 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	//충돌음: 소유 클라에서 재생
 	ClientPlayBumpSound();
 
-	//드롭 역할 판정 — 카트끼리만 부스터 역할, 벽/장애물은 Normal
+	//드롭 역할 판정 + 넉백 세기 산정 — 상대 카트를 밀어낸다 (일반=충돌 세기 비례로 살짝, 부스트=멀리)
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
+	//기본(일반 충돌): 접근속도 비례로 살짝, 상한 클램프
+	float OtherKnockStrength = FMath::Min(ClosingSpeed * NormalKnockbackScale, NormalKnockbackMax);
 	if (bIsBoosting)
 	{
 		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터로 박음 => 덜 흘림
+		OtherKnockStrength = BoostKnockbackStrength;       //부스터에 박힌 쪽은 더 멀리 (부스트 비비기 방지)
 	}
 	else if (OtherCart && OtherCart->bIsBoosting)
 	{
 		DropRole = EDropCollisionRole::BoostedTarget; //부스터한테 박힘 => 더 흘림
+		OtherKnockStrength = 0.f;                      //상대가 부스터로 나를 박는 중 — 부스터는 안 밀림(상대 NotifyHit이 나를 멀리 밀어냄)
 	}
+
+	//상대를 밀어냄 — ApplyExternalKnockback이 넉백 + 상대 몸통 리액션까지 공용 처리
+	if (OtherCart && OtherKnockStrength > 0.f)
+	{
+		OtherCart->ApplyExternalKnockback(ToOther, OtherKnockStrength);
+	}
+
+	//내 카트 몸통 리액션(들썩·기울임) — 밀려나는 방향(-ToOther)으로. 세기는 쉐이크와 동일 매핑 재사용
+	const float ReactionIntensity = FMath::GetMappedRangeValueClamped(
+		FVector2D(MinBumpSpeed, BumpShakeFullSpeed), FVector2D(0.25f, 1.f), ClosingSpeed);
+	MulticastPlayBumpReaction(-ToOther, ReactionIntensity);
 
 	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
 }
@@ -741,4 +782,67 @@ void ACartPawn::ApplyExternalKnockback(const FVector& Direction, float Strength)
 
     const FVector LaunchVelocity = KnockbackDirection * Strength;
     LaunchCharacter(LaunchVelocity, true, false);
+
+    //넉백과 함께 몸통 들썩 리액션도 전 클라에 재생 — 거대카트·체크아웃존 등 외부 시스템 공용.
+    //넉백 강도(Strength)를 기준값으로 0~1 세기로 환산
+    const float ReactionIntensity = FMath::Clamp(Strength / BumpReactionKnockbackRef, 0.25f, 1.f);
+    MulticastPlayBumpReaction(KnockbackDirection, ReactionIntensity);
+}
+
+//충돌 리액션(몸통 들썩·기울임)을 로컬에서 재생 — 각 클라가 자기 화면의 몸통 메시에 스프링 충격을 준다 (순수 연출)
+void ACartPawn::MulticastPlayBumpReaction_Implementation(FVector WorldPushDir, float Intensity)
+{
+    //슬립 중엔 몸통 스핀이 회전을 점유 → 범프 틸트 생략 (넉백·셰이크·드롭은 별개로 이미 처리됨)
+    if (Intensity <= 0.f || bIsSlipping)
+    {
+        return;
+    }
+
+    EnsureBodyMeshResolved();
+    if (!SlipSpinMesh)
+    {
+        return; //몸통 메시가 없으면 연출만 생략 (넉백·셰이크는 영향 없음)
+    }
+
+    //밀려나는 방향을 카트 로컬로 변환 → 부딪힌 쪽(밀리는 반대쪽)이 들리도록 pitch/roll 충격 주입
+    const FVector LocalPush = GetActorTransform().InverseTransformVectorNoScale(WorldPushDir.GetSafeNormal2D());
+    const float StruckFwd = -LocalPush.X;   //+면 앞에서 맞음 → 앞이 들림(nose up)
+    const float StruckRight = -LocalPush.Y; //+면 오른쪽에서 맞음 → 오른쪽이 들림
+    const float Amt = FMath::Clamp(Intensity, 0.f, 1.f);
+
+    //스프링 속도에 충격을 누적. 화면에서 기울기 부호가 반대로 보이면 아래 두 줄 부호만 뒤집으면 됨
+    BumpTiltPitchVel += StruckFwd * BumpTiltStrength * Amt;
+    BumpTiltRollVel += StruckRight * BumpTiltStrength * Amt;
+    BumpHopVel += BumpHopStrength * Amt; //위로 들썩
+    bBumpReactionActive = true;
+}
+
+//몸통 메시(SlipSpinMeshName) 탐색 + 기준 상대회전/위치 캡처 (슬립·범프 리액션 공용, 최초 1회)
+void ACartPawn::EnsureBodyMeshResolved()
+{
+    if (bBodyMeshResolved)
+    {
+        return;
+    }
+
+    if (!SlipSpinMesh)
+    {
+        TArray<UStaticMeshComponent*> MeshComps;
+        GetComponents(MeshComps);
+        for (UStaticMeshComponent* MeshComp : MeshComps)
+        {
+            if (MeshComp && MeshComp->GetFName() == SlipSpinMeshName)
+            {
+                SlipSpinMesh = MeshComp;
+                break;
+            }
+        }
+    }
+
+    if (SlipSpinMesh)
+    {
+        SlipSpinMeshBaseRelRot = SlipSpinMesh->GetRelativeRotation();
+        SlipSpinMeshBaseRelLoc = SlipSpinMesh->GetRelativeLocation();
+        bBodyMeshResolved = true;
+    }
 }
