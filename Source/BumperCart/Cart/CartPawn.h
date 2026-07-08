@@ -51,11 +51,11 @@ public:
     //외부에서 카트를 강제로 밀어내기
     void ApplyExternalKnockback(const FVector& Direction, float Strength);
 
-    //토마토에 맞은 소유 클라 화면에 가림 위젯 표시 (서버 → 소유 클라)
+    //토마토에 맞은 소유 클라 화면에 가림 위젯 표시 (서버 => 소유 클라)
     UFUNCTION(Client, Reliable)
     void ClientApplyTomatoScreenBlock(float Duration);
 
-    //카메라 셰이크를 이 카트 소유 클라 화면에 재생 (서버에서 호출 → 소유 클라 실행).
+    //카메라 셰이크를 이 카트 소유 클라 화면에 재생 (서버에서 호출 => 소유 클라 실행).
     //범프 충돌 외에도 거대 카트 충돌·아이템 드롭 등 다른 시스템이 공용으로 호출. ShakeClass가 비면 카트 기본(BumpCameraShakeClass) 사용
     UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Cart|Camera")
     void ClientPlayCameraShake(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale);
@@ -85,9 +85,7 @@ protected:
 	UFUNCTION(Client, Unreliable)
 	void ClientPlayBumpSound();
 
-	//충돌 리액션(카트 몸통 들썩·기울임)을 모든 클라에 재생 — 넉백·충돌 공용 진입점.
-	//WorldPushDir=밀려나는 방향(월드), Intensity=0~1 세기. 순수 연출(몸통 메시만)이라 물리·위치복제 없음.
-	//서버에서만 호출(NotifyHit·ApplyExternalKnockback 모두 서버 권한). 각 클라가 로컬 스프링으로 몸통 메시를 흔든다
+	//충돌 리액션(몸통 들썩·기울임)을 모든 클라에 재생. 서버에서만 호출
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastPlayBumpReaction(FVector WorldPushDir, float Intensity);
 
