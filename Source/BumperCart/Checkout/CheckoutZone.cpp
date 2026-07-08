@@ -233,9 +233,23 @@ void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Styl
         CheckoutZoneVisualMID->SetVectorParameterValue(TEXT("BorderColor"), Style.RingColor);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("BorderEmissiveStrength"), Style.RingEmissiveStrength);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("BorderOpacity"), Style.RingOpacity);
+
         CheckoutZoneVisualMID->SetVectorParameterValue(TEXT("FillColor"), Style.FillColor);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillEmissiveStrength"), Style.FillEmissiveStrength);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillOpacity"), Style.FillOpacity);
+
+        // Closing Soon 펄스 적용
+        const bool bShouldPulse = CurrentCheckoutZoneState == ECheckoutZoneState::ClosingSoon;
+
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseEnabled"), bShouldPulse ? 1.0f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseSpeed"), bShouldPulse ? 2.2f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseMin"), bShouldPulse ? 0.25f : 1.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseMax"), bShouldPulse ? 5.0f : 1.0f);
+
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseEnabled"), bShouldPulse ? 1.0f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseSpeed"), bShouldPulse ? 1.1f : 0.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMin"), bShouldPulse ? 0.35f : 1.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMax"), bShouldPulse ? 0.85f : 1.0f);
     }
 }
 
