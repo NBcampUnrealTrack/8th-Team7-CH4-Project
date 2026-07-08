@@ -13,6 +13,9 @@ class USphereComponent;
 class UStaticMesh;
 class UNiagaraComponent;
 class UNiagaraSystem;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UProductValueVisualConfig;
 
 
 UCLASS()
@@ -108,6 +111,10 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Visual")
     TObjectPtr<UNiagaraSystem> AuraSystem;
+
+    // 가치에 따라 이펙트 적용을 어떻게 할지 정리된 규칙
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Visual")
+    TObjectPtr<UProductValueVisualConfig> ValueVisualConfig;
 
 
     /* Product 기본 변수 */
@@ -231,7 +238,11 @@ private:
     // 현재 가치에 따라 오버레이 수치들을 가져오는 함수
     FLinearColor GetValueOverlayColor() const;
 
+    // 오라 이펙트 적용
     void ApplyValueAura();
 
+    // 오라 이펙트 On/Off 처리
     void RefreshAuraActive();
+
+    const FProductValueVisualRule* FindValueVisualRule() const;
 };

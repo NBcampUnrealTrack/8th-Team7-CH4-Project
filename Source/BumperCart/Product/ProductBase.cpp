@@ -11,7 +11,7 @@
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 #include "GameFramework/GameState.h"
 #include "NiagaraComponent.h"
-#include "Util/Utility.h"
+#include "ProductValueVisualConfig.h"
 
 AProductBase::AProductBase()
 {
@@ -585,8 +585,6 @@ void AProductBase::ApplyValueOverlay()
 {
     if (!IsValid(Mesh)) return;
 
-    int32 Value = GetValue();
-
     // 동적 머티리얼 생성
     ValueOverlayMID = UMaterialInstanceDynamic::Create(ValueOverlayMaterial, this);
     if (!IsValid(ValueOverlayMID))
@@ -602,21 +600,18 @@ void AProductBase::ApplyValueOverlay()
 
 FLinearColor AProductBase::GetValueOverlayColor() const
 {
-    int32 Value = GetValue();
+    if (!IsValid(ValueVisualConfig))
+    {
+        return FLinearColor::White;
+    }
 
-    if (Value >= 80) return BCColor::Gold; // 가장 가치 있음, 황금색or빨강
-    if (Value >= 60) return BCColor::Purple; // 높은 가치, 보라
-    if (Value >= 40) return BCColor::Blue; // 중간 가치, 파랑
-    if (Value >= 20) return BCColor::Green; // 낮은 가치 초록
-
-    return BCColor::White; // 제일 저렴함, 흰색
+    const FProductValueVisualRule* Rule = FindValueVisualRule();
+    return Rule ? Rule->OverlayColor : ValueVisualConfig->DefaultColor;
 }
 
 void AProductBase::ApplyValueAura()
 {
     if (!IsValid(AuraComponent) || !AuraSystem) return;
-
-    int32 Value = GetValue();
 
     AuraComponent->SetAsset(AuraSystem);
 
@@ -642,4 +637,27 @@ void AProductBase::RefreshAuraActive()
     {
         AuraComponent->DeactivateImmediate();
     }
+}
+
+const FProductValueVisualRule* AProductBase::FindValueVisualRule() const
+{
+    if (!IsValid(ValueVisualConfig)) return nullptr;
+
+    int32 Value = GetValue();
+
+    const FProductValueVisualRule* SelectedRule = nullptr;
+
+    for (const FProductValueVisualRule& Rule : ValueVisualConfig->Rules)
+    {
+        if (Value >= Rule.MinValue)
+        {
+            // 규칙을 적용하지 않았거나, 현재 규칙보다 가치가 클 경우 선택
+            if (!SelectedRule || Rule.MinValue > SelectedRule->MinValue)
+            {
+                SelectedRule = &Rule;
+            }
+        }
+    }
+
+    return SelectedRule;
 }
