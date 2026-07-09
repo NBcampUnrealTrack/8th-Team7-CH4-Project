@@ -17,6 +17,8 @@
 #include "Components/DecalComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Cart/CartPawn.h"
+#include "Net/UnrealNetwork.h"
 
 
 namespace NiagaraParamName
@@ -82,8 +84,10 @@ UCartGrabComponent::UCartGrabComponent()
     GrabSpeed = 1400.f;
     GrabRange = 500.f;
     GrabRadius = 20.f;
-    bCanGrab = true;
+    bGrabExtended = false;
     SocketName = TEXT("ProductSocket");
+    bGrabDisabledByCheckout = false;
+    bGrabDisabledBySlip = false;
 
     static ConstructorHelpers::FObjectFinder<USoundBase> GrabSuccessSoundFinder(
         TEXT("/Game/Developers/dongh/Audio/GrabSuccess.GrabSuccess")
@@ -159,6 +163,30 @@ void UCartGrabComponent::SetupInput()
 
     // 조준선 활성화
     StartAimVisual();
+}
+
+void UCartGrabComponent::SetGrabDisabledByCheckout(bool bShouldGrabDisable)
+{
+    if (bGrabDisabledByCheckout == bShouldGrabDisable) return;
+
+    bGrabDisabledByCheckout = bShouldGrabDisable;
+
+    if (AActor* OwnerActor = GetOwner())
+    {
+        OwnerActor->ForceNetUpdate();
+    }
+}
+
+void UCartGrabComponent::SetGrabDisabledBySlip(bool bShouldDisable)
+{
+    if (bGrabDisabledBySlip == bShouldDisable) return;
+
+    bGrabDisabledBySlip = bShouldDisable;
+
+    if (AActor* OwnerActor = GetOwner())
+    {
+        OwnerActor->ForceNetUpdate();
+    }
 }
 
 void UCartGrabComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -250,6 +278,14 @@ void UCartGrabComponent::EnsureVisualComponents()
     }
 }
 
+bool UCartGrabComponent::CanShowAimVisual() const
+{
+    return IsLocallyControlled()
+        && VisualState == EGrabVisualState::None
+        && !bGrabDisabledByCheckout
+        && !bGrabDisabledBySlip;
+}
+
 void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -301,6 +337,14 @@ void UCartGrabComponent::BeginPlay()
     }
 }
 
+void UCartGrabComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME_CONDITION(ThisClass, bGrabDisabledByCheckout, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(ThisClass, bGrabDisabledBySlip, COND_OwnerOnly);
+}
+
 void UCartGrabComponent::StopAimVisual()
 {
     CachedAimDirection = FVector::ZeroVector;
@@ -319,7 +363,7 @@ void UCartGrabComponent::Multicast_PlayGrab_Implementation(FVector_NetQuantize S
 
 void UCartGrabComponent::HandleFinishGrab()
 {
-    bCanGrab = true;
+    bGrabExtended = false;
 
     AActor* OwnerActor = GetOwner();
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
@@ -348,6 +392,12 @@ void UCartGrabComponent::UpdateGrabAim()
 {
     APawn* OwnerPawn = Cast<APawn>(GetOwner());
     if (!IsValid(OwnerPawn))
+    {
+        StopAimVisual();
+        return;
+    }
+
+    if (!CanShowAimVisual())
     {
         StopAimVisual();
         return;
@@ -408,13 +458,20 @@ void UCartGrabComponent::UpdateGrabAim()
     UpdateAimDecal(CachedAimTargetLocation);
 }
 
+bool UCartGrabComponent::CanGrab() const
+{
+    return !bGrabExtended
+        && !bGrabDisabledByCheckout
+        && !bGrabDisabledBySlip;
+}
+
 void UCartGrabComponent::RequestGrab()
 {
     if (CachedAimDirection.IsNearlyZero()) return;
     if (CachedAimDistance <= KINDA_SMALL_NUMBER) return;
     if (GrabSpeed <= KINDA_SMALL_NUMBER) return;
 
-    if (bIsGrabDisabledByCheckout) return;
+    if (!CanShowAimVisual()) return;
 
     // 클라이언트에서 계산한 값이므로 인자로 넘겨야 함
     Server_GrabProduct(CachedAimDirection, CachedAimDistance);
@@ -427,9 +484,7 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
 
     AActor* OwnerActor = GetOwner();
     if (!IsValid(OwnerActor) || !OwnerActor->HasAuthority()) return;
-    if (!bCanGrab) return;
-
-    if (bIsGrabDisabledByCheckout) return;
+    if (!CanGrab()) return;
 
     FVector Direction = FVector(AimDirection).GetSafeNormal();
     if (Direction.IsNearlyZero()) return;
@@ -442,7 +497,7 @@ void UCartGrabComponent::Server_GrabProduct_Implementation(FVector_NetQuantizeNo
     FVector End = Start + Direction * ActualAimDistance;
 
     // 그랩 끝나기 전까진 사용 불가능, 
-    bCanGrab = false;
+    bGrabExtended = true;
     GrabbedProduct.Reset();
 
     // 서버 그랩 세팅
@@ -1064,12 +1119,16 @@ bool UCartGrabComponent::IsLocallyControlled() const
     return IsValid(OwnerPawn) && OwnerPawn->IsLocallyControlled();
 }
 
-void UCartGrabComponent::SetGrabDisabledByCheckout(bool bShouldGrabDisable)
+void UCartGrabComponent::OnRep_GrabDisableState()
 {
-    bIsGrabDisabledByCheckout = bShouldGrabDisable;
-}
+    if (!CanShowAimVisual())
+    {
+        StopAimVisual();
+    }
+    else
+    {
+        UpdateGrabAim();
+    }
 
-bool UCartGrabComponent::IsGrabDisabledByCheckout() const
-{
-    return bIsGrabDisabledByCheckout;
+    RefreshTickEnabled();
 }

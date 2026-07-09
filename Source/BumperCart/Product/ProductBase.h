@@ -77,7 +77,7 @@ protected:
 
     virtual void OnConstruction(const FTransform& Transform) override;
 
-    void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
     // 데이터 에셋을 적용하는 함수
     void ApplyDataAsset();

@@ -52,6 +52,11 @@ public:
     // 상품 정보 구조체 배열을 채우고, 현재 적재된 상품을 전부 제거함
     bool CheckoutProducts(TArray<FLoadedProductInfo>& OutProducts);
 
+    // 더미 메시 연출 갱신하는 함수
+    void UpdateLoadVisual();
+
+    void SetLoadDummyBlinkVisible(bool bVisible);
+
 public:
     UPROPERTY(BlueprintAssignable)
     FOnLoadInfoChanged OnLoadInfoChanged;
@@ -83,9 +88,6 @@ private:
 
     // 더미 메시 생성하는 함수
     void CreateDummyMeshes();
-
-    // 더미 메시 연출 갱신하는 함수
-    void UpdateLoadVisual();
 
     // 더미 상품을 몇개 보여줄지 계산하는 함수
     int32 GetVisibleDummyCount() const;
