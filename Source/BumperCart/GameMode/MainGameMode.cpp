@@ -456,7 +456,13 @@ void AMainGameMode::UpdateAllPlayerRanks()
 void AMainGameMode::ReturnAllPlayersToLobby()
 {
     UE_LOG(LogMainGameMode, Warning, TEXT("결과 화면 종료, 로비로 복귀"));
-    GetWorld()->ServerTravel(TEXT("/Game/Developers/LSJae/Levels/TestLobbyLevel"));
+
+    UMainGameInstance* MainGI = Cast<UMainGameInstance>(GetGameInstance());
+    if (!MainGI) return;
+
+    const FString LevelPath = MainGI->LobbyLevel.ToSoftObjectPath().GetLongPackageName();
+
+    GetWorld()->ServerTravel(LevelPath);
 }
 
 // 라운드 종료 시 통계 기반 보너스 점수 정산
