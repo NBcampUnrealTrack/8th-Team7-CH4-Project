@@ -1,4 +1,4 @@
-// MainGameMode.cpp
+﻿// MainGameMode.cpp
 
 
 #include "GameMode/MainGameMode.h"
@@ -11,6 +11,7 @@
 #include "GameInstance/MainGameInstance.h"
 #include "MapGimmickManager/MapGimmickManager.h"
 #include "PlayerState/MainPlayerState.h"
+#include "Item/Spawn/ItemSpawnManager.h"
 
 class AMainPlayerState;
 DEFINE_LOG_CATEGORY_STATIC(LogMainGameMode, Log, All);
@@ -35,6 +36,7 @@ AMainGameMode::AMainGameMode()
     PhaseScheduleMap.Add(180.f, ERoundPhase::RoundEnd);
 
     CheckoutManagerRef = nullptr;
+    ItemSpawnManager = nullptr;
 
 
     // 추가 점수 및 추가 점수 감소 초기화
@@ -113,7 +115,11 @@ void AMainGameMode::BeginPlay()
         MapGimmickManager = Cast<AMapGimmickManager>(FoundActor2);
     }
 
-
+    AActor* FoundActor3 = UGameplayStatics::GetActorOfClass(GetWorld(), AItemSpawnManager::StaticClass());
+    if (FoundActor3)
+    {
+        ItemSpawnManager = Cast<AItemSpawnManager>(FoundActor3);
+    }
 }
 
 void AMainGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
@@ -296,6 +302,10 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
             CheckoutManagerRef->StartCheckoutRotation();
         }
 
+        if (ItemSpawnManager)
+        {
+            ItemSpawnManager->StartSpawning();
+        }
 
         if (UProductShelfSubsystem* ShelfSubsystem = GetWorld()->GetSubsystem<UProductShelfSubsystem>())
         {
@@ -352,6 +362,11 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         if (CheckoutManagerRef)
         {
             CheckoutManagerRef->StopCheckoutRotation();
+        }
+
+        if (ItemSpawnManager)
+        {
+            ItemSpawnManager->StopSpawning();
         }
 
         GetWorldTimerManager().ClearTimer(Timer_RoundTick);
