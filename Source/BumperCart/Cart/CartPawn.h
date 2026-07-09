@@ -37,6 +37,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBraking() const { return bIsBraking; }
 
+	//미끄럼(물웅덩이 등) 중인지 — 조작 잠금 상태. 외부 시스템(예: 로봇손)이 발동 스킵 판정에 사용
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	bool IsSlipping() const { return bIsSlipping; }
+
 	//현재 적재율(0~1). SetLoadRatio로 갱신
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	float GetLoadRatio() const { return LoadRatio; }
