@@ -15,6 +15,7 @@ class ULimitedEventConfig;
 class AMapGimmickManager;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameStartEvent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRoundResultsReady);
 
 UCLASS()
 class BUMPERCART_API AMainGameMode : public AGameMode
@@ -29,6 +30,8 @@ public:
 \
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnGameStartEvent OnGameStartEvent;
+    UPROPERTY(BlueprintAssignable, Category = "Events")
+    FOnRoundResultsReady OnRoundResultsReady;
 
 protected:
     // 매치가 InProgress로 전환될 때 엔진이 자동 호출

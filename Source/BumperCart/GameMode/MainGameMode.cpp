@@ -368,6 +368,8 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         // 보너수 점수 계산 후 등수 집계
         UpdateAllPlayerRanks();
 
+        OnRoundResultsReady.Broadcast();
+
         // 결과 화면 노출 시간 이후 로비로 복귀
         GetWorldTimerManager().SetTimer(Timer_ReturnToLobby, this, &AMainGameMode::ReturnAllPlayersToLobby, ResultScreenDuration, false);
         break;
