@@ -772,7 +772,11 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	}
 
 	//충돌 시 정산 취소 (차단벽 정산 중 충돌 시 잠깐 정산 불가)
-	CancelCheckout(0.2f);
+    CancelCheckout(0.5f);
+    if (IsValid(OtherCart))
+    {
+        OtherCart->CancelCheckout(0.5f);
+    }
 
 	//출발 그레이스: 막 움직이기 시작한(부스트 아님) 카트가 단독으로 만든 충돌은 무효 — 바로 앞 카트 밀기 오판정 방지
 	//'정당한 돌진자'(상대 쪽으로 실제 이동 중 + 그레이스 지남 or 부스트)가 한 명도 없으면 충돌로 안 침
