@@ -1,4 +1,4 @@
-// MainGameMode.h
+﻿// MainGameMode.h
 
 #pragma once
 
@@ -13,6 +13,7 @@ class UProductShelfManagerConfig;
 class USaleEventConfig;
 class ULimitedEventConfig;
 class AMapGimmickManager;
+class AItemSpawnManager;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameStartEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRoundResultsReady);
@@ -119,6 +120,9 @@ private:
 
     UPROPERTY()
     ACheckoutManager* CheckoutManagerRef;
+
+    UPROPERTY(EditAnywhere, Category = "GameMode | Managers")
+    AItemSpawnManager* ItemSpawnManager;
 
     UPROPERTY(EditAnywhere, Category = "Config")
     TObjectPtr<UProductShelfManagerConfig> ProductShelfManagerConfig;
