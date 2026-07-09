@@ -99,6 +99,3 @@ void ACustomerAI::SetKnockedOut()
 
     OnRep_CustomerState();
 }
-
-
-

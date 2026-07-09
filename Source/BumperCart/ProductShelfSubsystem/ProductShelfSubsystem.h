@@ -69,11 +69,11 @@ private:
 
     // 한 번에 스폰되는 최대 갯수
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
-    int32 MaxSpawnLimit = 3;
+    int32 MaxSpawnLimit = 1;
 
     // 아이템 리스폰 시간
     UPROPERTY(VisibleAnywhere, Category = "Manager | Product Spawn")
-    float RespawnDelay = 10.0f;
+    float RespawnDelay = 20.0f;
 
     // 스폰시 사용할 이펙트
     UPROPERTY(EditAnywhere, Category = "FX")

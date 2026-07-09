@@ -18,12 +18,15 @@ public:
 protected:
     virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
+    // 쇼핑 할 확률
     UPROPERTY(EditAnywhere, Category = "Shopping Logic")
     float ShoppingIntentChance;
 
+    // 이동할 위치
     UPROPERTY(EditAnywhere, Category = "Blackboard")
     FBlackboardKeySelector TargetLocationKey;
 
+    // 쇼핑 행동 확인
     UPROPERTY(EditAnywhere, Category = "Blackboard")
     FBlackboardKeySelector IsTargetPointKey;
 
