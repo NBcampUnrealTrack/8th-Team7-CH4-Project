@@ -55,7 +55,7 @@ void AMapGimmickManager::BeginPlay()
 
 
     // 테스트용 - 게임 모드에서 호출시 삭제 예정
-    StartGimmickSpawning();
+    //StartGimmickSpawning();
 }
 
 void AMapGimmickManager::StartGimmickSpawning()
