@@ -28,7 +28,7 @@ public:
 
     UFUNCTION()
     void UpdateAllPlayerRanks();
-\
+
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnGameStartEvent OnGameStartEvent;
     UPROPERTY(BlueprintAssignable, Category = "Events")
