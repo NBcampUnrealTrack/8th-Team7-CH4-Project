@@ -12,6 +12,7 @@
 #include "GameFramework/GameState.h"
 #include "NiagaraComponent.h"
 #include "ProductValueVisualConfig.h"
+#include "Components/DecalComponent.h"
 
 AProductBase::AProductBase()
 {
@@ -41,6 +42,14 @@ AProductBase::AProductBase()
     AuraComponent->SetupAttachment(Mesh);
     AuraComponent->SetAutoActivate(false);
     AuraComponent->SetRelativeLocation(FVector::ZeroVector);
+
+    GroundAuraComponent = CreateDefaultSubobject<UDecalComponent>(TEXT("GroundAuraComponent"));
+    GroundAuraComponent->SetupAttachment(ProductCollision);
+    GroundAuraComponent->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+    GroundAuraComponent->DecalSize = FVector(20.f, 32.f, 32.f);
+    GroundAuraComponent->SetVisibility(false);
+    GroundAuraComponent->SetHiddenInGame(true);
+    GroundAuraComponent->SetFadeScreenSize(0.001f);
 
     bOnSale = false;
 
@@ -153,6 +162,7 @@ void AProductBase::ApplyDataAsset()
 
     ApplyValueOverlay();
     ApplyValueAura();
+    ApplyGroundAura();
 }
 
 void AProductBase::ApplyProductState()
@@ -638,17 +648,21 @@ void AProductBase::ApplyValueAura()
 
 void AProductBase::RefreshAuraActive()
 {
-    if (!IsValid(AuraComponent)) return;
+    if (!IsValid(AuraComponent) || !IsValid(GroundAuraComponent)) return;
 
-    bool bShowAura = ProductState.State == EProductState::Display && AuraSystem;
+    bool bShowAura = ProductState.State == EProductState::Display && AuraSystem && GroundAuraMaterial;
 
     if (bShowAura)
     {
         AuraComponent->Activate();
+        GroundAuraComponent->SetVisibility(true);
+        GroundAuraComponent->SetHiddenInGame(false);
     }
     else
     {
         AuraComponent->DeactivateImmediate();
+        GroundAuraComponent->SetVisibility(false);
+        GroundAuraComponent->SetHiddenInGame(true);
     }
 }
 
@@ -673,4 +687,28 @@ const FProductValueVisualRule* AProductBase::FindValueVisualRule() const
     }
 
     return SelectedRule;
+}
+
+void AProductBase::ApplyGroundAura()
+{
+    if (!IsValid(GroundAuraComponent)) return;
+
+    if (!IsValid(GroundAuraMaterial))
+    {
+        GroundAuraComponent->SetVisibility(false);
+        GroundAuraComponent->SetHiddenInGame(true);
+        return;
+    }
+
+    // 처음엔 생성
+    if (!IsValid(GroundAuraMID))
+    {
+        GroundAuraMID = UMaterialInstanceDynamic::Create(GroundAuraMaterial, this);
+        if (!IsValid(GroundAuraMID)) return;
+        GroundAuraComponent->SetDecalMaterial(GroundAuraMID);
+    }
+
+    GroundAuraMID->SetVectorParameterValue(TEXT("AuraColor"), GetValueOverlayColor());
+
+    UE_LOG(LogTemp, Warning, TEXT("Test"));
 }
