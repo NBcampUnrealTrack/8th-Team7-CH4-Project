@@ -56,7 +56,7 @@ void AMainGameState::OnRep_CurrentPhase()
     OnRoundPhaseChanged.Broadcast();
 }
 
-//서버에서만 호출 - 최종 1등 명단 저장
+// 서버에서만 호출 - 최종 1등 명단 저장
 void AMainGameState::SetFinalWinners(const TArray<FString>& InWinnerNames)
 {
     if (!HasAuthority())
@@ -67,8 +67,21 @@ void AMainGameState::SetFinalWinners(const TArray<FString>& InWinnerNames)
     FinalWinnerNames = InWinnerNames;
 }
 
-//최종 1등 명단 조회
+// 최종 1등 명단 조회
 TArray<FString> AMainGameState::GetFinalWinners() const
 {
     return FinalWinnerNames;
+}
+
+// 플레이어가 움직일 수 있는지 확인 / 게임 시작 전이면 움직이면 안됨
+bool AMainGameState::bCanPlayerMove() const
+{
+    if (CurrentPhase == ERoundPhase::WaitingToStart)
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
 }

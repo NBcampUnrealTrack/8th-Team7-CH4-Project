@@ -8,11 +8,13 @@
 #include "MainGameMode.generated.h"
 
 enum class ETitleType : uint8;
-class ACheckoutManager; // 계산대 매니저
+class ACheckoutManager;
 class UProductShelfManagerConfig;
 class USaleEventConfig;
 class ULimitedEventConfig;
 class AMapGimmickManager;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameStartEvent);
 
 UCLASS()
 class BUMPERCART_API AMainGameMode : public AGameMode
@@ -24,6 +26,9 @@ public:
 
     UFUNCTION()
     void UpdateAllPlayerRanks();
+\
+    UPROPERTY(BlueprintAssignable, Category = "Events")
+    FOnGameStartEvent OnGameStartEvent;
 
 protected:
     // 매치가 InProgress로 전환될 때 엔진이 자동 호출
@@ -72,6 +77,7 @@ private:
     // 칭호에 따른 보너스 점수 계산
     float GetTitleBonusScore(ETitleType Title) const;
 
+
     // 칭호별 보너스 점수
     UPROPERTY(EditAnywhere, Category = "BonusScore")
     float TitleBonus_MartKing;
@@ -91,11 +97,15 @@ private:
     UPROPERTY(EditAnywhere, Category = "BonusScore")
     float TitleBonus_Default;
 
+    // 게임 시작 연출을 위한 대기 시간
+    UPROPERTY(EditDefaultsOnly, Category = "Round Schedule")
+    float StartDelay;
 
     // 결과창 노출 시간
     UPROPERTY(EditDefaultsOnly, Category = "Round Schedule")
-    float ResultScreenDuration = 5.f;
+    float ResultScreenDuration;
 
+    FTimerHandle Timer_StartDelay;
     FTimerHandle Timer_ReturnToLobby;
 
 #pragma region Managers
@@ -119,4 +129,22 @@ private:
 
 
 #pragma endregion
+
+#pragma region PlayLoadCheck
+
+private:
+    void CheckAllPlayersLoaded();
+
+
+    FTimerHandle Timer_PlayerLoadCheck;
+
+
+    // 모든 플레이어가 접속했는지 확인하는 주기
+    float PlayerLoadCheckInterval;
+    // 모든 플레이어가 접속하지 않았더라도 강제 시작하는 시간
+    float PlayerLoadWaitTimeout;
+    // 실제 기다린 시간
+    float PlayerLoadWait;
+#pragma endregion
 };
+

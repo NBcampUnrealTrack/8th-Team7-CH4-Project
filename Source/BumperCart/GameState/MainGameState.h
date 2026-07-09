@@ -9,7 +9,7 @@
 UENUM(BlueprintType)
 enum class ERoundPhase : uint8
 {
-    None                  UMETA(DisplayName = "None"),
+    WaitingToStart        UMETA(DisplayName = "게임 시작 전 대기"),
     RoundStart            UMETA(DisplayName = "0:00 - 라운드 시작"),
     RandomOpenTwo         UMETA(DisplayName = "0:30 - 랜덤 오픈 시작"),
     SaleEvent             UMETA(DisplayName = "1:00 - 세일 상품 이벤트"),
@@ -54,6 +54,10 @@ public:
     UFUNCTION()
     TArray<FString> GetFinalWinners() const;
 
+    // 라운드 시작 전인지 확인
+    UFUNCTION()
+    bool bCanPlayerMove() const;
+
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -62,7 +66,7 @@ private:
     void OnRep_CurrentPhase();
 
     UPROPERTY(ReplicatedUsing = OnRep_CurrentPhase)
-    ERoundPhase CurrentPhase = ERoundPhase::None;
+    ERoundPhase CurrentPhase = ERoundPhase::WaitingToStart;
 
     UPROPERTY(Replicated)
     float RoundStartServerTime = 0.f;

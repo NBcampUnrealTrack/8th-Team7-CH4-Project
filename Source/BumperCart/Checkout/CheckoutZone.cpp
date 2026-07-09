@@ -817,7 +817,7 @@ bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
     }
 
     if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd ||
-        MainGameState->GetCurrentPhase() == ERoundPhase::None)
+        MainGameState->GetCurrentPhase() == ERoundPhase::WaitingToStart)
     {
         return false;
     }
@@ -903,7 +903,7 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
         GrabComponent->SetGrabDisabledByCheckout(true);
     }
 
-    // 벽 충돌 켜질 시 
+    // 벽 충돌 켜질 시
     if (bUseCheckoutBarrier)
     {
         // 정산자는 충돌 무시 처리
@@ -1036,7 +1036,7 @@ void ACheckoutZone::CompleteCheckout()
     }
 
     // 라운드 종료 시 정산 멈춤
-    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd || MainGameState->GetCurrentPhase() == ERoundPhase::None)
+    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd || MainGameState->GetCurrentPhase() == ERoundPhase::WaitingToStart)
     {
         CancelCheckout();
         return;
