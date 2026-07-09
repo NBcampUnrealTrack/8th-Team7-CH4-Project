@@ -106,11 +106,25 @@ bool ALobbyGameState::IsCharacterIndexSelectedByOtherPlayer(int32 CharacterIndex
 
         if (ALobbyPlayerState* LPS = Cast<ALobbyPlayerState>(PS))
         {
-            if (LPS->IsReady() && LPS->GetSelectedCharacterIndex() == CharacterIndex)
+            if (LPS->GetSelectedCharacterIndex() == CharacterIndex)
             {
                 return true;
             }
         }
     }
     return false;
+}
+
+int32 ALobbyGameState::GetNextAvailableCharacterIndex() const
+{
+    const TArray<FCharacterData>& Characters = GetAvailableCharacters();
+
+    for (int32 index = 0; index < Characters.Num(); index++)
+    {
+        if (!IsCharacterIndexSelectedByOtherPlayer(index, nullptr))
+        {
+            return index;
+        }
+    }
+    return INDEX_NONE;
 }
