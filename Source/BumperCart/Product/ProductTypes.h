@@ -14,9 +14,6 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
     int32 Weight = 1;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
-    bool bDamageable = false;
 };
 
 USTRUCT(BlueprintType)
@@ -81,4 +78,20 @@ public:
     // 서버에서 연출을 시작한 시간
     UPROPERTY(BlueprintReadOnly)
     float LaunchServerStartTime = 0.f;
+};
+
+
+USTRUCT(BlueprintType)
+struct FProductValueVisualRule
+{
+    GENERATED_BODY()
+
+public:
+    // 규칙을 적용하기 위한 최소 가치
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 MinValue = 0;
+
+    // 적용할 외곽선 + 오라 색상
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FLinearColor OverlayColor = FLinearColor::White;
 };

@@ -10,6 +10,8 @@
 #include "Net/UnrealNetwork.h"
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 #include "GameFramework/GameState.h"
+#include "NiagaraComponent.h"
+#include "ProductValueVisualConfig.h"
 
 AProductBase::AProductBase()
 {
@@ -34,6 +36,11 @@ AProductBase::AProductBase()
     Mesh->SetSimulatePhysics(false);
     Mesh->SetMobility(EComponentMobility::Movable);
     Mesh->SetReceivesDecals(false);
+
+    AuraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("AuraComponent"));
+    AuraComponent->SetupAttachment(Mesh);
+    AuraComponent->SetAutoActivate(false);
+    AuraComponent->SetRelativeLocation(FVector::ZeroVector);
 
     bOnSale = false;
 
@@ -145,6 +152,7 @@ void AProductBase::ApplyDataAsset()
     }
 
     ApplyValueOverlay();
+    ApplyValueAura();
 }
 
 void AProductBase::ApplyProductState()
@@ -180,6 +188,11 @@ void AProductBase::ApplyProductState()
 
         SetActorTickEnabled(false);
         break;
+    }
+
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        RefreshAuraActive();
     }
 }
 
@@ -572,8 +585,6 @@ void AProductBase::ApplyValueOverlay()
 {
     if (!IsValid(Mesh)) return;
 
-    int32 Value = GetValue();
-
     // 동적 머티리얼 생성
     ValueOverlayMID = UMaterialInstanceDynamic::Create(ValueOverlayMaterial, this);
     if (!IsValid(ValueOverlayMID))
@@ -589,12 +600,64 @@ void AProductBase::ApplyValueOverlay()
 
 FLinearColor AProductBase::GetValueOverlayColor() const
 {
+    if (!IsValid(ValueVisualConfig))
+    {
+        return FLinearColor::White;
+    }
+
+    const FProductValueVisualRule* Rule = FindValueVisualRule();
+    return Rule ? Rule->OverlayColor : ValueVisualConfig->DefaultColor;
+}
+
+void AProductBase::ApplyValueAura()
+{
+    if (!IsValid(AuraComponent) || !AuraSystem) return;
+
+    AuraComponent->SetAsset(AuraSystem);
+
+    FLinearColor Color = GetValueOverlayColor();
+    Color.A = 0.08f;
+
+    AuraComponent->SetVariableLinearColor(TEXT("User.AuraColor"), Color);
+
+    RefreshAuraActive();
+}
+
+void AProductBase::RefreshAuraActive()
+{
+    if (!IsValid(AuraComponent)) return;
+
+    bool bShowAura = ProductState.State == EProductState::Display && AuraSystem;
+
+    if (bShowAura)
+    {
+        AuraComponent->Activate();
+    }
+    else
+    {
+        AuraComponent->DeactivateImmediate();
+    }
+}
+
+const FProductValueVisualRule* AProductBase::FindValueVisualRule() const
+{
+    if (!IsValid(ValueVisualConfig)) return nullptr;
+
     int32 Value = GetValue();
 
-    if (Value >= 80) return FLinearColor(1.f, 0.74f, 0.15f); // 가장 가치 있음, 황금색or빨강
-    if (Value >= 60) return FLinearColor(0.85f, 0.25f, 1.f); // 높은 가치, 보라
-    if (Value >= 40) return FLinearColor(0.2f, 0.55f, 1.f); // 중간 가치, 파랑
-    if (Value >= 20) return FLinearColor(0.25f, 1.f, 0.65f); // 낮은 가치 초록
+    const FProductValueVisualRule* SelectedRule = nullptr;
 
-    return FLinearColor::White; // 제일 저렴함, 흰색
+    for (const FProductValueVisualRule& Rule : ValueVisualConfig->Rules)
+    {
+        if (Value >= Rule.MinValue)
+        {
+            // 규칙을 적용하지 않았거나, 현재 규칙보다 가치가 클 경우 선택
+            if (!SelectedRule || Rule.MinValue > SelectedRule->MinValue)
+            {
+                SelectedRule = &Rule;
+            }
+        }
+    }
+
+    return SelectedRule;
 }

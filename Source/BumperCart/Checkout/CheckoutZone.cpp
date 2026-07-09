@@ -56,27 +56,6 @@ ACheckoutZone::ACheckoutZone()
     CheckoutZoneVisual->SetGenerateOverlapEvents(false);
     CheckoutZoneVisual->SetCastShadow(false);
 
-    // 배출점 4개
-    USceneComponent* EjectPointFront = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointFront"));
-    EjectPointFront->SetupAttachment(SceneRoot);
-    EjectPointFront->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
-    EjectPoints.Add(EjectPointFront);
-
-    USceneComponent* EjectPointBack = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointBack "));
-    EjectPointBack->SetupAttachment(SceneRoot);
-    EjectPointBack->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
-    EjectPoints.Add(EjectPointBack);
-
-    USceneComponent* EjectPointRight = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointRight "));
-    EjectPointRight->SetupAttachment(SceneRoot);
-    EjectPointRight->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
-    EjectPoints.Add(EjectPointRight);
-
-    USceneComponent* EjectPointLeft = CreateDefaultSubobject<USceneComponent>(TEXT("EjectPointLeft "));
-    EjectPointLeft->SetupAttachment(SceneRoot);
-    EjectPointLeft->SetRelativeLocation(FVector(500.0f, 0.0f, 0.0f));
-    EjectPoints.Add(EjectPointLeft);
-
     CheckoutProcessingAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("CheckoutProcessingAudio"));
     CheckoutProcessingAudio->SetupAttachment(SceneRoot);
     CheckoutProcessingAudio->bAutoActivate = false;
@@ -86,9 +65,10 @@ void ACheckoutZone::BeginPlay()
 {
 	Super::BeginPlay();
 
+    CreateEjectPointsFromComponents();
+
     CheckoutTrigger->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneBeginOverlap);
     CheckoutTrigger->OnComponentEndOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneEndOverlap);
-
 
     InitializeCheckoutZoneMaterials();
 
@@ -381,6 +361,31 @@ ACheckoutBarrier* ACheckoutZone::GetCheckoutBarrier() const
 // 플레이어 동시 진입
 // ------------------------------------------------------------
 
+void ACheckoutZone::CreateEjectPointsFromComponents()
+{
+    EjectPoints.Empty();
+
+    TArray<USceneComponent*> SceneComponents;
+    GetComponents<USceneComponent>(SceneComponents);
+
+    for (USceneComponent* SceneComponent : SceneComponents)
+    {
+        if (!IsValid(SceneComponent))
+        {
+            continue;
+        }
+
+        const FString ComponentName = SceneComponent->GetName();
+
+        if (!ComponentName.StartsWith(TEXT("EjectPoint_")))
+        {
+            continue;
+        }
+
+        EjectPoints.Add(SceneComponent);
+    }
+}
+
 void ACheckoutZone::EjectPlayer(ACartPawn* PlayerCharacter)
 {
     if (!HasAuthority())
@@ -417,6 +422,8 @@ void ACheckoutZone::EjectPlayer(ACartPawn* PlayerCharacter)
 
     // 배출 플레이어 배열에 추가
     EjectingPlayers.AddUnique(PlayerCharacter);
+
+    MulticastSetPlayerBarrierIgnore(PlayerCharacter, true);
 
     PlayerCharacter->ApplyExternalKnockback(EjectDirection, EjectStrength);
 }
@@ -541,6 +548,18 @@ bool ACheckoutZone::IsEjectPathClear(const ACartPawn* PlayerCharacter, const FVe
     QueryParams.AddIgnoredActor(PlayerCharacter);
     QueryParams.AddIgnoredActor(this);
 
+    // 차단벽 충돌 방지
+    ACheckoutBarrier* CheckoutBarrier = GetCheckoutBarrier();
+    if (IsValid(CheckoutBarrier))
+    {
+        QueryParams.AddIgnoredActor(CheckoutBarrier);
+    }
+
+    if (IsValid(CurrentCheckoutPlayer))
+    {
+        QueryParams.AddIgnoredActor(CurrentCheckoutPlayer);
+    }
+
     FHitResult HitResult;
 
     const ECollisionChannel TraceChannel = CapsuleComponent->GetCollisionObjectType();
@@ -584,6 +603,11 @@ void ACheckoutZone::SetPlayerBarrierIgnore(ACartPawn* PlayerCharacter, bool bSho
     }
 
     CapsuleComponent->IgnoreActorWhenMoving(CheckoutBarrier, bShouldIgnore);
+}
+
+void ACheckoutZone::MulticastSetPlayerBarrierIgnore_Implementation(ACartPawn* PlayerCharacter, bool bShouldIgnore)
+{
+    SetPlayerBarrierIgnore(PlayerCharacter, bShouldIgnore);
 }
 
 void ACheckoutZone::UpdateCheckoutPlayerBarrierIgnore()
@@ -659,8 +683,17 @@ void ACheckoutZone::RemovePlayerFromZone(ACartPawn* PlayerCharacter)
         CartLoadComponent->OnLoadInfoChanged.RemoveDynamic(this, &ThisClass::HandleLoadInfoChanged);
     }
 
+    const bool bWasEjecting = EjectingPlayers.Contains(PlayerCharacter);
+
     PlayersInZone.Remove(PlayerCharacter);
     EjectingPlayers.Remove(PlayerCharacter);
+    CancelCheckoutPlayers.Remove(PlayerCharacter);
+
+    // 밖으로 나간 뒤에는 다시 벽과 충돌
+    if (bWasEjecting)
+    {
+        MulticastSetPlayerBarrierIgnore(PlayerCharacter, false);
+    }
 
     UE_LOG(LogTemp, Warning, TEXT("계산 구역 이탈: %s / 현재 계산대 내 인원: %d"), *GetNameSafe(PlayerCharacter), PlayersInZone.Num());
 
@@ -761,52 +794,53 @@ ACartPawn* ACheckoutZone::FindNextCheckoutPlayer()
 // ------------------------------------------------------------
 bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
 {
-    // 플레이어인지
     if (!IsValid(PlayerCharacter))
     {
         return false;
     }
 
-    // 배출 중인 플레이어인지
     if (EjectingPlayers.Contains(PlayerCharacter))
     {
         return false;
     }
 
-    // GameState가 없거나 라운드가 종료되었을 경우
+    // 정산 중 충돌로 정산이 취소된 상태인지
+    if (CancelCheckoutPlayers.Contains(PlayerCharacter))
+    {
+        return false;
+    }
+
     const AMainGameState* MainGameState = GetWorld()->GetGameState<AMainGameState>();
     if (!IsValid(MainGameState))
     {
         return false;
     }
-    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd || MainGameState->GetCurrentPhase() == ERoundPhase::None)
+
+    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd ||
+        MainGameState->GetCurrentPhase() == ERoundPhase::WaitingToStart)
     {
         return false;
     }
 
-
-    // 계산대 오픈 중인지
     if (CurrentCheckoutZoneState == ECheckoutZoneState::Closed)
     {
         return false;
     }
 
-    // 계산 중인지
+    // 정산 중인 계산대인지
     if (bIsCheckoutInProgress)
     {
         return false;
     }
 
-    // 플레이어가 배열 안에 있는지
+    // 정산 구역에 있는지
     if (!PlayersInZone.Contains(PlayerCharacter))
     {
         return false;
     }
 
     UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
-
-    // 적재 컴포넌트가 존재하는지
-    if(!IsValid(CartLoadComponent))
+    if (!IsValid(CartLoadComponent))
     {
         return false;
     }
@@ -815,6 +849,8 @@ bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
     {
         return false;
     }
+
+    UE_LOG(LogTemp, Warning, TEXT("정산 가능: %s / 상품 수: %d"), *GetNameSafe(PlayerCharacter), CartLoadComponent->GetCurrentLoadedCount());
 
     return true;
 }
@@ -867,23 +903,37 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
         GrabComponent->SetGrabDisabledByCheckout(true);
     }
 
-    // 기존에 먼저 들어와 있던 비정산 플레이어 배출
+    // 벽 충돌 켜질 시
     if (bUseCheckoutBarrier)
     {
+        // 정산자는 충돌 무시 처리
+        UpdateCheckoutPlayerBarrierIgnore();
+
+        // 비정산 플레이어 배출
         EjectNonCheckoutPlayers();
+
+        // 충돌 즉시 활성화
+        // 메시는 0.2초에 걸쳐 생성
+        SetCheckoutBarrierEnabled(true);
     }
 
-    // 정산 시작 시 차단벽 생성 연출
-    // Reveal 연출 끝난 뒤 충돌 활성화
-    if (bUseCheckoutBarrier)
+    AMainGameState* MainGameState = GetWorld()->GetGameState<AMainGameState>();
+    if (!IsValid(MainGameState))
     {
-        SetCheckoutBarrierEnabled(true);
+        return;
+    }
+
+    bool bIsFinalPhase = false;
+
+    if (MainGameState->GetCurrentPhase() == ERoundPhase::FinalWarningOneOpen)
+    {
+        bIsFinalPhase = true;
     }
 
     // 적재된 상품 수에 따라 추가 정산 시간
     int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
     LastLoadedProductCount = ProductCount;
-    RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount);
+    RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount, bIsFinalPhase);
 
     // 클라이언트와 동기화된 정산 시작 시점
     AGameStateBase* GameStateBase = GetWorld()->GetGameState<AGameStateBase>();
@@ -927,25 +977,19 @@ void ACheckoutZone::UpdateCheckoutProgress()
         return;
     }
 
+    // 충돌 취소 상태일 경우
+    if (CurrentCheckoutPlayer->IsCancelCheckoutState())
+    {
+        // 정산 취소 플레이어 배열에 추가
+        CancelCheckoutPlayers.AddUnique(CurrentCheckoutPlayer);
+
+        CancelCheckout();
+        TryStartCheckout();
+        return;
+    }
+
     CheckoutProgress = GetCheckoutProgress();
     ElapsedCheckoutTime = CheckoutProgress * RequiredCheckoutTime;
-
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(
-            1,
-            0.1f,
-            FColor::Green,
-            FString::Printf(TEXT("정산 진행 시간: %.1f"), ElapsedCheckoutTime)
-        );
-
-        GEngine->AddOnScreenDebugMessage(
-            2,
-            0.1f,
-            FColor::Green,
-            FString::Printf(TEXT("정산 진행도: %.0f%%"), CheckoutProgress * 100.0f)
-        );
-    }
 
     if (CheckoutProgress >= 1.0f)
     {
@@ -992,7 +1036,7 @@ void ACheckoutZone::CompleteCheckout()
     }
 
     // 라운드 종료 시 정산 멈춤
-    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd || MainGameState->GetCurrentPhase() == ERoundPhase::None)
+    if (MainGameState->GetCurrentPhase() == ERoundPhase::RoundEnd || MainGameState->GetCurrentPhase() == ERoundPhase::WaitingToStart)
     {
         CancelCheckout();
         return;
@@ -1044,15 +1088,6 @@ void ACheckoutZone::CompleteCheckout()
     MulticastPlayCheckoutCompleteSound();
 
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(
-            1,
-            3.0f,
-            FColor::Blue,
-            FString::Printf(TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore)
-        );
-    }
 
     // 정산이 완료되면 플레이어는 대기열에서 제거
     //PlayersInZone.Remove(CompletedPlayer);
@@ -1117,8 +1152,13 @@ void ACheckoutZone::ResetCheckout()
 // ------------------------------------------------------------
 // 계산 시간 및 점수
 // ------------------------------------------------------------
-float ACheckoutZone::CalculateCheckoutDuration(int32 ProductCount) const
+float ACheckoutZone::CalculateCheckoutDuration(int32 ProductCount, bool bIsFinalPhase) const
 {
+    if (bIsFinalPhase)
+    {
+        return FMath::Max(FinalPhaseCheckoutTime, 0.1f);
+    }
+
     // 아이템 수
     const int32 SafeProductCount = FMath::Max(ProductCount, 0);
 
@@ -1126,7 +1166,7 @@ float ACheckoutZone::CalculateCheckoutDuration(int32 ProductCount) const
     const float CalculatedDuration = BaseCheckoutTime + AdditionalCheckoutTime * SafeProductCount;
 
     // 최대 정산 시간
-    const float SafeMaxCheckoutTime = FMath::Max(MaxCheckoutTime, BaseCheckoutTime);
+    const float SafeMaxCheckoutTime = FMath::Max(MaxCheckoutTime, 0.1f);
 
     return FMath::Min(CalculatedDuration, SafeMaxCheckoutTime);
 }
@@ -1239,7 +1279,7 @@ void ACheckoutZone::SetCheckoutZoneState(ECheckoutZoneState NewState)
     OnRep_CurrentCheckoutZoneState();
 
     // 정산 중 계산대 닫힐 경우 정산 취소
-    if (bIsCheckoutInProgress && NewState != ECheckoutZoneState::Open)
+    if (bIsCheckoutInProgress && NewState == ECheckoutZoneState::Closed)
     {
         CancelCheckout();
     }
