@@ -60,6 +60,15 @@ public:
     UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Cart|Camera")
     void ClientPlayCameraShake(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale);
 
+    //---------- 충돌 시 정산 취소 상태 반영 ----------
+    //정산 취소 상태인지
+    bool IsCancelCheckoutState() const;
+
+    //정산 취소 시 Duration 동안 정산 못함
+    void CancelCheckout(float Duration = 0.2f);
+
+    void ClearCancelCheckoutState();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -439,6 +448,11 @@ private:
 
 	FTimerHandle BoostTimerHandle;
 	FTimerHandle BoostCooldownTimerHandle;
+
+	//정산 취소 상태인지
+	bool bIsCancelCheckoutState = false;
+	//정산 취소 시간
+	FTimerHandle CancelCheckoutTimerHandle;
 
 	//마지막으로 스필(드롭)을 요청한 시각 — BumpDropCooldown 공통 적용
 	float LastBumpDropTime = -1000.f;

@@ -527,6 +527,36 @@ void ACartPawn::ResetBoostCooldown()
 	bBoostOnCooldown = false;
 }
 
+bool ACartPawn::IsCancelCheckoutState() const
+{
+	return bIsCancelCheckoutState;
+}
+
+//정산 취소 시 Duration 동안 정산 못함
+void ACartPawn::CancelCheckout(float Duration)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	bIsCancelCheckoutState = true;
+
+	GetWorldTimerManager().ClearTimer(CancelCheckoutTimerHandle);
+	GetWorldTimerManager().SetTimer(
+		CancelCheckoutTimerHandle,
+		this,
+		&ACartPawn::ClearCancelCheckoutState,
+		Duration,
+		false
+	);
+}
+
+void ACartPawn::ClearCancelCheckoutState()
+{
+	bIsCancelCheckoutState = false;
+}
+
 void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -710,6 +740,9 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	{
 		return; //약하게 스치는 접촉은 무시
 	}
+
+	//충돌 시 정산 취소 (차단벽 정산 중 충돌 시 잠깐 정산 불가)
+	CancelCheckout(0.2f);
 
 	//출발 그레이스: 막 움직이기 시작한(부스트 아님) 카트가 단독으로 만든 충돌은 무효 — 바로 앞 카트 밀기 오판정 방지
 	//'정당한 돌진자'(상대 쪽으로 실제 이동 중 + 그레이스 지남 or 부스트)가 한 명도 없으면 충돌로 안 침
