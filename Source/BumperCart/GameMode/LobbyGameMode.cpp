@@ -3,6 +3,7 @@
 
 #include "GameMode/LobbyGameMode.h"
 
+#include "GameInstance/MainGameInstance.h"
 #include "GameState/LobbyGameState.h"
 #include "PlayerState/LobbyPlayerState.h"
 
@@ -65,6 +66,11 @@ void ALobbyGameMode::StartGame()
     {
         UE_LOG(LogTemp, Warning, TEXT("[Lobby] 아직 모든 플레이어가 준비 완료 상태가 아니므로 게임을 시작할 수 없습니다."));
         return;
+    }
+
+    if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+    {
+        GI->SetExpectedPlayerCount(GS->PlayerArray.Num());
     }
 
     GetWorld()->ServerTravel(TEXT("/Game/Developers/dongh/L_MarketLevel_Blockout"));

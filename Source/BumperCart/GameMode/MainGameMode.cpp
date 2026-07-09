@@ -20,7 +20,9 @@ AMainGameMode::AMainGameMode()
     GameStateClass = AMainGameState::StaticClass();
     PlayerStateClass = AMainPlayerState::StaticClass();
 
-
+    // 시작 및 종료 연출 시간
+    StartDelay = 3.f;
+    ResultScreenDuration = 10.f;
 
     bUseSeamlessTravel = true;
 
@@ -42,6 +44,11 @@ AMainGameMode::AMainGameMode()
     TitleBonus_ReceiptCollector = 15.f;
     TitleBonus_SafeCart = 10.f;
     TitleBonus_Default = 0.f;
+
+    // 모든 플레이어 접속 확인
+    PlayerLoadCheckInterval = 0.5f;
+    PlayerLoadWaitTimeout = 15.f;
+    PlayerLoadWait = 0.f;
 }
 
 UClass* AMainGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
@@ -124,15 +131,86 @@ void AMainGameMode::InitGame(const FString& MapName, const FString& Options, FSt
     Super::InitGame(MapName, Options, ErrorMessage);
 }
 
+// GameState, PlayerState가 세팅된 이후 게임 시작 가능한 시점에서 호출
 void AMainGameMode::HandleMatchHasStarted()
 {
     Super::HandleMatchHasStarted();
 
-
-
     UE_LOG(LogMainGameMode, Warning, TEXT("=== HandleMatchHasStarted: 매치가 시작되었습니다! ==="));
-    StartRound();
+
+    // 모듶 플레이어가 접속했는지 체크
+    CheckAllPlayersLoaded();
+
 }
+
+// 모든 플레이어가 접속했는지 체크
+void AMainGameMode::CheckAllPlayersLoaded()
+{
+    // GameState가 존재하지 않으면 타이머를 통해 다시 체크
+    AMainGameState* GS = GetGameState<AMainGameState>();
+    if (!GS)
+    {
+        GetWorldTimerManager().SetTimer(Timer_PlayerLoadCheck, this, &AMainGameMode::CheckAllPlayersLoaded, PlayerLoadCheckInterval, false);
+        return;
+    }
+
+    // 플레이어 기다린 시간 증가
+    PlayerLoadWait += PlayerLoadCheckInterval;
+
+    int32 ExpectedPlayerCount = 0;
+    if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+    {
+        ExpectedPlayerCount = GI->GetExpectedPlayerCount();
+    }
+
+   // 모든 플레이어가 접속했는지 체크
+    bool bIsAllLoaded = true;
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        APlayerController* PC = PS ? Cast<APlayerController>(PS->GetOwner()) : nullptr;
+
+        if (!PC || !PC->HasClientLoadedCurrentWorld())
+        {
+            bIsAllLoaded = false;
+            break;
+        }
+    }
+
+   bool bTimedOut = false;
+   if(PlayerLoadWait >= PlayerLoadWaitTimeout)
+   {
+       bTimedOut = true;
+   }
+
+    // 모든 플레이어가 접속했거나 접속 대기 시간 초과 시 강제 시작
+    if (bIsAllLoaded || bTimedOut)
+    {
+        // 어떤 식으로 시작했는지 확인용 로그
+        if (bTimedOut &&  !bIsAllLoaded)
+        {
+            UE_LOG(LogMainGameMode, Warning,
+                TEXT("[플레이어 접속 체크] 타임아웃 발생 - 접속된 인원(%d/%d)으로 강제 시작"),
+                GS->PlayerArray.Num(), ExpectedPlayerCount);
+        }
+        else
+        {
+            UE_LOG(LogMainGameMode, Warning,
+                TEXT("[플레이어 접속 체크] 모든 플레이어(%d명) 접속 완료"), GS->PlayerArray.Num());
+        }
+
+        // 시작 연출 대기 이후 실제 라운드 시작
+        OnGameStartEvent.Broadcast();
+        GetWorldTimerManager().SetTimer(Timer_StartDelay, this, &AMainGameMode::StartRound, StartDelay, false);
+        return;
+    }
+
+    UE_LOG(LogMainGameMode, Log,
+      TEXT("[플레이어 접속 체크] 대기 중 (%d/%d명 접속, 경과 %.2f초)"), GS->PlayerArray.Num(), ExpectedPlayerCount, PlayerLoadWait);
+
+    // 시작 조건 미충족 시 다시 타이머를 통해 다음 주기에 다시 체크
+    GetWorldTimerManager().SetTimer(Timer_PlayerLoadCheck, this, &AMainGameMode::CheckAllPlayersLoaded, PlayerLoadCheckInterval, false);
+}
+
 
 // 라운드 시작 지점
 void AMainGameMode::StartRound()
@@ -235,7 +313,7 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
     case ERoundPhase::RandomOpenTwo:
         // 랜덤 오픈 시작 / 계산대 3개중 2개 오픈
         PhaseName = TEXT("RandomOpenTwo (계산대 3개 중 2개 오픈)");
-        
+
         break;
 
     case ERoundPhase::SaleEvent:

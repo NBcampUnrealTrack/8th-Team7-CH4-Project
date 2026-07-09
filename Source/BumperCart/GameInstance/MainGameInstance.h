@@ -24,6 +24,13 @@ public:
     TSoftObjectPtr<UWorld> GamePlayLevel;
 
 
+    // 플레이 예정 인원 수
+    int32 ExpectedPlayerCount = 0;
+    // 플레이 예정 인원 수 설정
+    void SetExpectedPlayerCount(int32 InCount);
+    // 플레이 예정 인원 수 조회
+    int32 GetExpectedPlayerCount() const;
+
 #pragma region Character
 public:
     UPROPERTY(EditDefaultsOnly, Category = "Lobby|Character")

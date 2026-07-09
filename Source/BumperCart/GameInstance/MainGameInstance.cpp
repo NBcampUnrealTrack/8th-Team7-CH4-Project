@@ -22,3 +22,15 @@ int32 UMainGameInstance::GetPlayerCharacter(const FUniqueNetIdRepl& PlayerId) co
     }
     return INDEX_NONE;
 }
+
+// 플레이 예정 인원 수 설정
+void UMainGameInstance::SetExpectedPlayerCount(int32 InCount)
+{
+    ExpectedPlayerCount = InCount;
+}
+
+// 플레이 예정 인원 수 조회
+int32 UMainGameInstance::GetExpectedPlayerCount() const
+{
+    return ExpectedPlayerCount;
+}
