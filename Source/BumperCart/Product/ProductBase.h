@@ -16,6 +16,7 @@ class UNiagaraSystem;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UProductValueVisualConfig;
+class UDecalComponent;
 
 
 UCLASS()
@@ -100,6 +101,8 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
     TObjectPtr<UNiagaraComponent> AuraComponent;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product|Component")
+    TObjectPtr<UDecalComponent> GroundAuraComponent;
 
     /* 오버레이 머티리얼 */
 
@@ -109,6 +112,11 @@ protected:
     UPROPERTY()
     TObjectPtr<UMaterialInstanceDynamic> ValueOverlayMID;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Visual")
+    TObjectPtr<UMaterialInterface> GroundAuraMaterial;
+
+    UPROPERTY()
+    TObjectPtr<UMaterialInstanceDynamic> GroundAuraMID;
 
     /* 오라 나이아가라 */
 
@@ -248,4 +256,7 @@ private:
     void RefreshAuraActive();
 
     const FProductValueVisualRule* FindValueVisualRule() const;
+
+    // 바닥 오라 적용하는 함수
+    void ApplyGroundAura();
 };
