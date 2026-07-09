@@ -271,11 +271,6 @@ void ULobbyWidget::RefreshCharacterSelectionUI()
             Button->SetIsEnabled(bCanClick);
 
             // 내가 선택 중인 캐릭터는 살짝 다른 스타일로 표시(선택 강조)
-            FButtonStyle Style = Button->WidgetStyle;
-            const FLinearColor NormalTint = (MySelectedIndex == i) ? FLinearColor(0.3f, 0.7f, 1.0f) : FLinearColor::White;
-            Style.Normal.TintColor = FSlateColor(NormalTint);
-            Style.Hovered.TintColor = FSlateColor(NormalTint);
-            Button->SetStyle(Style);
         }
     }
 }
