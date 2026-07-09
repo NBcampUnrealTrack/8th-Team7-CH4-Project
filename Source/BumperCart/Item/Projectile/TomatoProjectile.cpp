@@ -6,6 +6,12 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundAttenuation.h"
+
 
 ATomatoProjectile::ATomatoProjectile()
 {
@@ -31,11 +37,16 @@ ATomatoProjectile::ATomatoProjectile()
     TomatoMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     TomatoMesh->SetGenerateOverlapEvents(false);
 
+    // 토마토 궤적
+    TrailNiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("TrailNiagaraComponent"));
+    TrailNiagaraComponent->SetupAttachment(CollisionComponent);
+    TrailNiagaraComponent->SetAutoActivate(false);
+
     ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
     ProjectileMovement->UpdatedComponent = CollisionComponent;
     ProjectileMovement->InitialSpeed = ProjectileSpeed;
     ProjectileMovement->MaxSpeed = ProjectileSpeed;
-    ProjectileMovement->ProjectileGravityScale = 0.0f;
+    ProjectileMovement->ProjectileGravityScale = ProjectileGravityScale;    // 중력 적용
     ProjectileMovement->bRotationFollowsVelocity = true;
 }
 
@@ -53,6 +64,23 @@ void ATomatoProjectile::BeginPlay()
             CollisionComponent->IgnoreActorWhenMoving(GetOwner(), true);
         }
     }
+
+    if (IsValid(ProjectileMovement))
+    {
+        ProjectileMovement->InitialSpeed = ProjectileSpeed;
+        ProjectileMovement->MaxSpeed = ProjectileSpeed;
+        ProjectileMovement->ProjectileGravityScale = ProjectileGravityScale;
+    }
+
+    // 궤적 이펙트 적용
+    if (IsValid(TrailNiagaraComponent) && IsValid(TrailNiagaraSystem))
+    {
+        TrailNiagaraComponent->SetAsset(TrailNiagaraSystem);
+        TrailNiagaraComponent->Activate(true);
+    }
+
+    // 사운드 적용
+    PlayThrowTomatoSound();
 
     SetLifeSpan(MaxLifeTime);
 }
@@ -127,6 +155,10 @@ void ATomatoProjectile::HandleHitCart(ACartPawn* HitPlayer)
 
     UE_LOG(LogTemp, Warning, TEXT("투사체 플레이어 타격"));
 
+    // 주변 플레이어 사운드 재생
+    MulticastPlayHitTomatoSound(GetActorLocation());
+
+    // 토마토 화면 가림 적용
     HitPlayer->ClientApplyTomatoScreenBlock(ScreenBlockDuration);
 
     Destroy();
@@ -141,6 +173,32 @@ void ATomatoProjectile::HandleHitOtherActor(AActor* HitActor)
 
     UE_LOG(LogTemp, Warning, TEXT("다른 액터와 충돌"));
 
+    MulticastPlayHitTomatoSound(GetActorLocation());
+
     Destroy();
+}
+
+// ------------------------------------------------------------
+// 사운드
+// ------------------------------------------------------------
+
+void ATomatoProjectile::PlayThrowTomatoSound() const
+{
+    if (!IsValid(ThrowTomatoSound))
+    {
+        return;
+    }
+
+    UGameplayStatics::PlaySoundAtLocation(this, ThrowTomatoSound, GetActorLocation(), 1.0f, 1.0f);
+}
+
+void ATomatoProjectile::MulticastPlayHitTomatoSound_Implementation(const FVector& SoundLocation)
+{
+    if (!IsValid(HitTomatoSound))
+    {
+        return;
+    }
+
+    UGameplayStatics::PlaySoundAtLocation(this, HitTomatoSound, SoundLocation, 1.0f, 1.0f, 0.0f, HitSoundAttenuation);
 }
 
