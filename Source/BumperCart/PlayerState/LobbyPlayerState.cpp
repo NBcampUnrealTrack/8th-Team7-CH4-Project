@@ -48,20 +48,6 @@ void ALobbyPlayerState::ApplyReady(bool IsReady)
     ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
 
 
-    /*
-    //캐릭터 선택한 내용 저장
-    if (IsReady)
-    {
-        if (SelectedCharacterIndex == INDEX_NONE) return;
-
-        if (GS && GS->IsCharacterIndexSelectedByOtherPlayer(SelectedCharacterIndex, this)) return;
-
-        if (UMainGameInstance* MainGI = GetWorld()->GetGameInstance<UMainGameInstance>())
-        {
-            MainGI->SetPlayerCharacter(GetUniqueId(), SelectedCharacterIndex);
-        }
-     }
-    */
     bIsReady = IsReady;
     UE_LOG(LogTemp, Warning, TEXT("플레이어 준비 완료"))
 
@@ -101,9 +87,9 @@ void ALobbyPlayerState::Server_SelectCharacter_Implementation(int32 CharacterInd
 
 void ALobbyPlayerState::ApplySelectCharacter(int32 CharacterIndex)
 {
-    //서버 및 준비가 안된 플레이어만 호출 가능
+    //서버 플레이어만 호출 가능
     if (!HasAuthority()) return;
-    if (bIsReady) return;
+    //if (bIsReady) return;
 
     ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
     if (!GS) return;
@@ -115,6 +101,11 @@ void ALobbyPlayerState::ApplySelectCharacter(int32 CharacterIndex)
 
     SelectedCharacterIndex = CharacterIndex;
     GS->RefreshPlayerInfos();
+
+    if (UMainGameInstance* MainGI = GetWorld()->GetGameInstance<UMainGameInstance>())
+    {
+        MainGI->SetPlayerCharacter(GetUniqueId(), SelectedCharacterIndex);
+    }
 
     // 정상작동 확인 로그
     FString CharacterName = TEXT("Unknown");

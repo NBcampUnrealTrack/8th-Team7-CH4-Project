@@ -25,6 +25,21 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 
     if (ALobbyGameState* GS = GetGameState<ALobbyGameState>())
     {
+        // 로비 입장 순서대로 아직 아무도 선택하지 않은 캐릭터를 자동 배정
+        if (ALobbyPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<ALobbyPlayerState>() : nullptr)
+        {
+            const int32 CharacterIndex = GS->GetNextAvailableCharacterIndex();
+            if (CharacterIndex != INDEX_NONE)
+            {
+                PS->SelectCharacter(CharacterIndex);
+                UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 캐릭터 index %d 자동 배정"), *NewPlayer->GetName(), CharacterIndex);
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 배정 가능한 캐릭터가 없습니다."), *NewPlayer->GetName());
+            }
+        }
+
         GS->RefreshPlayerInfos();
     }
 }
