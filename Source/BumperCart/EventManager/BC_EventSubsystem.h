@@ -70,6 +70,7 @@ public:
     // 세일 이벤트중 반복 호출될 스폰 함수
     void ExecuteRepeatSpawn();
 
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Sale Event | Sale Product")
     FORCEINLINE TSubclassOf<AProductBase> GetCurrentSaleProduct() const { return CurrentSaleProduct; }
 #pragma endregion
 
