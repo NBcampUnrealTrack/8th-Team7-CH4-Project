@@ -88,5 +88,10 @@ void ALobbyGameMode::StartGame()
         GI->SetExpectedPlayerCount(GS->PlayerArray.Num());
     }
 
-    GetWorld()->ServerTravel(TEXT("/Game/Developers/dongh/L_MarketLevel_Blockout"));
+    UMainGameInstance* MainGI = Cast<UMainGameInstance>(GetGameInstance());
+    if (!MainGI) return;
+
+    const FString LevelPath = MainGI->GamePlayLevel.ToSoftObjectPath().GetLongPackageName();
+
+    GetWorld()->ServerTravel(LevelPath);
 }
