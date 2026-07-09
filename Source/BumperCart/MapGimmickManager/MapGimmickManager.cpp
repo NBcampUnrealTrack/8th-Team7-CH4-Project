@@ -222,6 +222,7 @@ void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* Target
 
     // 라인 트레이스 시작점과 정면 방향 설정
     FVector StartPos = TargetPoint->GetActorLocation();
+    // 플레이어 위로 쏴지게
     StartPos.Z += 100.0f;
     FVector ForwardDir = TargetPoint->GetActorForwardVector();
 
@@ -257,10 +258,10 @@ void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* Target
     float TotalDistance = FVector::Dist(StartPos, EndPos);
     float Radius = TotalDistance * 0.5f;
 
-    Multicast_SpawnWarningDecal(CenterVector, Radius);
+    SpawnWarningDecal(CenterVector, Radius);
 }
 
-void AMapGimmickManager::Multicast_SpawnWarningDecal_Implementation(FVector CenterPoint, float Radius)
+void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, float Radius)
 {
     if (WarningSound)
     {

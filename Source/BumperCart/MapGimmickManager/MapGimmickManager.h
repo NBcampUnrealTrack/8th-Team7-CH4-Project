@@ -125,8 +125,7 @@ public:
 
     void CalculateTraceDimensionsFromTarget(ATargetPoint* TargetPoint, float MaxTraceDistance);
 
-    UFUNCTION(NetMulticast, Reliable)
-    void Multicast_SpawnWarningDecal(FVector CenterPoint, float Radius);
+    void SpawnWarningDecal(FVector CenterPoint, float Radius);
 
 #pragma endregion
 
