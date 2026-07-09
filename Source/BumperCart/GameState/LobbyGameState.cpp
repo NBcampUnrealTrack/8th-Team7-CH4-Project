@@ -57,6 +57,8 @@ bool ALobbyGameState::bIsAllPlayersReady() const
     {
         if (!PS) continue;
 
+        if (IsHostPlayerState(PS)) continue;
+
         const ALobbyPlayerState* LPS = Cast<ALobbyPlayerState>(PS);
         if (!LPS || !LPS->IsReady()) return false;
     }
