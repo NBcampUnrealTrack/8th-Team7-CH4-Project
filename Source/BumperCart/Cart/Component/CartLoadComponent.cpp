@@ -210,6 +210,19 @@ bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProduct
     return OutProducts.Num() > 0;
 }
 
+void UCartLoadComponent::SetLoadDummyBlinkVisible(bool bVisible)
+{
+    int32 VisibleCount = GetVisibleDummyCount();
+
+    for (int32 i = 0; i < LoadDummyMeshes.Num(); ++i)
+    {
+        if (!IsValid(LoadDummyMeshes[i])) continue;
+
+        bool bShouldVisible = i < VisibleCount;
+        LoadDummyMeshes[i]->SetVisibility(bShouldVisible && bVisible, false);
+    }
+}
+
 int32 UCartLoadComponent::CalculateDropCount(float Impulse, EDropCollisionRole Role) const
 {
     if (LoadedProducts.IsEmpty()) return 0;

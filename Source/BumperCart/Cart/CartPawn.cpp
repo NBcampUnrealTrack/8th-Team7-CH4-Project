@@ -240,12 +240,21 @@ void ACartPawn::Tick(float DeltaSeconds)
 			if (BumpBlinkAccum >= BumpBlinkInterval)
 			{
 				BumpBlinkAccum = 0.f;
-				SlipSpinMesh->SetVisibility(!SlipSpinMesh->GetVisibleFlag(), true);
+				SlipSpinMesh->SetVisibility(!SlipSpinMesh->GetVisibleFlag(), false);
+
+                if (IsValid(LoadComponent))
+                {
+                    LoadComponent->SetLoadDummyBlinkVisible(!SlipSpinMesh->GetVisibleFlag());
+                }
 			}
 		}
 		else if (!SlipSpinMesh->GetVisibleFlag())
 		{
-			SlipSpinMesh->SetVisibility(true, true); //무적 끝 => 확실히 보이게
+			SlipSpinMesh->SetVisibility(true, false); //무적 끝 => 확실히 보이게
+            if (IsValid(LoadComponent))
+            {
+                LoadComponent->UpdateLoadVisual();
+            }
 			BumpBlinkAccum = 0.f;
 		}
 	}
@@ -665,6 +674,11 @@ void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
 	{
 		Move->GroundFriction = SlipGroundFriction;
 	}
+
+    if (IsValid(GrabComponent))
+    {
+        GrabComponent->SetGrabDisabledBySlip(true);
+    }
 }
 
 //미끄럼 종료 — 마찰·메시 회전 원복
@@ -683,6 +697,11 @@ void ACartPawn::EndSlip()
 	{
 		Move->GroundFriction = DefaultGroundFriction;
 	}
+
+    if (IsValid(GrabComponent))
+    {
+        GrabComponent->SetGrabDisabledBySlip(false);
+    }
 }
 
 void ACartPawn::SetLoadRatio(float InLoadRatio)

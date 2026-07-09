@@ -45,12 +45,21 @@ public:
     UFUNCTION(BlueprintCallable)
     void SetupInput();
 
+    // bGrabDisabledByCheckout 설정
+    // CheckoutZone에서 정산 시작, 취소 시 호출
+    void SetGrabDisabledByCheckout(bool bShouldDisable);
+
+    // bGrabDisabledBySlip 설정
+    void SetGrabDisabledBySlip(bool bShouldDisable);
+
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 protected:
     virtual void BeginPlay() override;
 
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+    virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Input")
@@ -71,6 +80,8 @@ private:
     // 타이머에 바인딩되어 조준선을 갱신하는 함수
     UFUNCTION()
     void UpdateGrabAim();
+
+    bool CanGrab() const;
 
     // Grab Action에 바인딩되어 호출하는 함수
     // 그랩 방향을 구해 서버로 요청 준비
@@ -141,6 +152,9 @@ private:
     // Owner Actor에 로봇손 스플라인 메시를 확인하고 생성하는 함수
     void EnsureVisualComponents();
 
+    // 조준선 보이는 상황인지 확인하는 함수
+    bool CanShowAimVisual() const;
+
     // 조준선 나이아가라 확인하고 생성하는 함수
     void EnsureAimNiagara();
 
@@ -166,6 +180,9 @@ private:
 
     // 로컬 플레이어인지 확인하는 함수
     bool IsLocallyControlled() const;
+
+    UFUNCTION()
+    void OnRep_GrabDisableState();
 
 private:
     /* ---------------- 로봇손 연출 관련 ---------------- */
@@ -339,30 +356,23 @@ private:
 
     // 현재 그랩 가능한지
     UPROPERTY(VisibleAnywhere, Category = "Cart|Grab")
-    bool bCanGrab;
+    bool bGrabExtended;
 
     // 아이템이 부착될 소켓 이름
     UPROPERTY(EditAnywhere, Category = "Cart|Grab")
     FName SocketName;
+
+    // 계산중에 그랩 못하게 알기 위한 클라 복제 변수
+    UPROPERTY(ReplicatedUsing = OnRep_GrabDisableState)
+    bool bGrabDisabledByCheckout;
+
+    // 미끄러지는중에 그랩 못하게 알기 위한 클라 복제 변수
+    UPROPERTY(ReplicatedUsing = OnRep_GrabDisableState)
+    bool bGrabDisabledBySlip;
 
 
     /* ---------------- 타이머 ---------------- */
 
     // 그랩 종료 확인용 타이머
     FTimerHandle GrabFinishTimer;
-
-    /* ---------------- 정산 중 ---------------- */
-
-public:
-    // bIsGrabDisabledByCheckout 설정
-    // CheckoutZone에서 정산 시작, 취소 시 호출
-    void SetGrabDisabledByCheckout(bool bShouldDisable);
-
-    // 정산 중인지 리턴
-    bool IsGrabDisabledByCheckout() const;
-
-private:
-    // 정산 중 Grab 금지
-    bool bIsGrabDisabledByCheckout = false;
-
 };
