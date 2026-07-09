@@ -39,28 +39,33 @@ bool UTomatoItemAction::Execute(ACartPawn* PlayerCharacter)
     }
 
     // 카트 방향을 기준으로 방향 생성
-    // z축 X
-    FVector FireDirection = PlayerCharacter->GetActorForwardVector();
-    FireDirection.Z = 0.0f;
-    FireDirection = FireDirection.GetSafeNormal();
+    FVector HorizontalDirection = PlayerCharacter->GetActorForwardVector();
+    HorizontalDirection.Z = 0.0f;
+    HorizontalDirection = HorizontalDirection.GetSafeNormal();
 
-    if (FireDirection.IsNearlyZero())
+    if (HorizontalDirection.IsNearlyZero())
     {
         return false;
     }
 
+    // 투사체 방향 계산
+    // 살짝 떠올랐다가 떨어지는 포물선
+    FVector FireDirection = HorizontalDirection + FVector::UpVector * 0.06f;
+    FireDirection = FireDirection.GetSafeNormal();
+
+    // 투사체 생성
     // 카트 위치 + 
     const FVector SpawnLocation =
         PlayerCharacter->GetActorLocation()
-        + FireDirection * SpawnForwardOffset
+        + HorizontalDirection * SpawnForwardOffset
         + FVector(0.0f, 0.0f, SpawnHeightOffset);
 
     // 투사체가 발사 방향을 바라보도록
     const FRotator SpawnRotation = FireDirection.Rotation();
 
     FActorSpawnParameters SpawnParams;
-    SpawnParams.Owner = PlayerCharacter;    
-    SpawnParams.Instigator = PlayerCharacter;
+    SpawnParams.Owner = PlayerCharacter;       
+    SpawnParams.Instigator = PlayerCharacter;  
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     // 서버에서 토마토 투사체 생성

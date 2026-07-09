@@ -18,6 +18,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundBase.h"
+#include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -59,6 +60,11 @@ ACheckoutZone::ACheckoutZone()
     CheckoutProcessingAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("CheckoutProcessingAudio"));
     CheckoutProcessingAudio->SetupAttachment(SceneRoot);
     CheckoutProcessingAudio->bAutoActivate = false;
+
+    OpenStateNiagara = CreateDefaultSubobject<UNiagaraComponent>(TEXT("OpenStateNiagara"));
+    OpenStateNiagara->SetupAttachment(CheckoutZoneVisual);
+    OpenStateNiagara->SetAutoActivate(false);
+    OpenStateNiagara->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
 }
 
 void ACheckoutZone::BeginPlay()
@@ -71,6 +77,11 @@ void ACheckoutZone::BeginPlay()
     CheckoutTrigger->OnComponentEndOverlap.AddDynamic(this, &ThisClass::OnCheckoutZoneEndOverlap);
 
     InitializeCheckoutZoneMaterials();
+
+    if (IsValid(OpenStateNiagara))
+    {
+        OpenStateNiagara->DeactivateImmediate();
+    }
 
     OnRep_CurrentCheckoutZoneState();
 
@@ -174,6 +185,8 @@ void ACheckoutZone::InitializeCheckoutZoneMaterials()
 
 void ACheckoutZone::UpdateCheckoutZoneVisual()
 {
+    UpdateCheckoutNiagara();
+
     if (!IsValid(CheckoutZoneVisual))
     {
         return;
@@ -225,12 +238,12 @@ void ACheckoutZone::ApplyCheckoutZoneVisual(const FCheckoutZoneVisualStyle& Styl
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseEnabled"), bShouldPulse ? 1.0f : 0.0f);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseSpeed"), bShouldPulse ? 2.2f : 0.0f);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseMin"), bShouldPulse ? 0.25f : 1.0f);
-        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseMax"), bShouldPulse ? 5.0f : 1.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("PulseMax"), bShouldPulse ? 1.0f : 1.0f);
 
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseEnabled"), bShouldPulse ? 1.0f : 0.0f);
         CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseSpeed"), bShouldPulse ? 1.1f : 0.0f);
-        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMin"), bShouldPulse ? 0.35f : 1.0f);
-        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMax"), bShouldPulse ? 0.85f : 1.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMin"), bShouldPulse ? 0.9f : 1.0f);
+        CheckoutZoneVisualMID->SetScalarParameterValue(TEXT("FillPulseMax"), bShouldPulse ? 1.2f : 1.0f);
     }
 }
 
@@ -261,6 +274,33 @@ void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
 
     UE_LOG(LogTemp, Warning, TEXT("계산대 오픈"));
 }
+
+void ACheckoutZone::UpdateCheckoutNiagara()
+{
+    if (!IsValid(OpenStateNiagara))
+    {
+        return;
+    }
+
+    // 오픈 상태만 작용
+    const bool bShouldPlayOpenNiagara = CurrentCheckoutZoneState == ECheckoutZoneState::Open;
+
+    if (bShouldPlayOpenNiagara)
+    {
+        if (!OpenStateNiagara->IsActive())
+        {
+            OpenStateNiagara->Activate(true);
+        }
+
+        return;
+    }
+
+    if (OpenStateNiagara->IsActive())
+    {
+        OpenStateNiagara->DeactivateImmediate();
+    }
+}
+
 
 // ------------------------------------------------------------
 // 차단벽
@@ -804,6 +844,11 @@ bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
         return false;
     }
 
+    if (PlayerCharacter->IsCancelCheckoutState())
+    {
+        return false;
+    }
+
     // 정산 중 충돌로 정산이 취소된 상태인지
     if (CancelCheckoutPlayers.Contains(PlayerCharacter))
     {
@@ -976,6 +1021,15 @@ void ACheckoutZone::UpdateCheckoutProgress()
         TryStartCheckout();
         return;
     }
+
+    UE_LOG(
+        LogTemp,
+        Warning,
+        TEXT("[CheckoutTick] Player=%s / CancelState=%d / Progress=%.2f"),
+        *GetNameSafe(CurrentCheckoutPlayer),
+        IsValid(CurrentCheckoutPlayer) ? CurrentCheckoutPlayer->IsCancelCheckoutState() : false,
+        CheckoutProgress
+    );
 
     // 충돌 취소 상태일 경우
     if (CurrentCheckoutPlayer->IsCancelCheckoutState())

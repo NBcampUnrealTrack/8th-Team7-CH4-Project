@@ -25,6 +25,7 @@ void UCartItemInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimePro
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(UCartItemInventoryComponent, CurrentItemData);
+    DOREPLIFETIME(UCartItemInventoryComponent, CurrentItemCount);
 }
 
 void UCartItemInventoryComponent::SetupInput()
@@ -102,10 +103,15 @@ bool UCartItemInventoryComponent::AcquireItem(UItemDataAsset* NewItemData)
         return false;
     }
 
-    // 기존 아이템 지우고, 새 아이템으로 교체
+    // 최대 보유 가능 아이템 수
+    const int32 MaxStackCount = FMath::Max(1, NewItemData->MaxStackCount);
+
+    // MaxStackCount만큼 아이템 지급
     CurrentItemData = NewItemData;
+    CurrentItemCount = MaxStackCount;
 
     HandleItemChanged();
+    OwnerActor->ForceNetUpdate();
 
     return true;
 }
@@ -181,11 +187,24 @@ void UCartItemInventoryComponent::UseItem()
 
     // 아이템 사용
     const bool bExecuted = ItemAction->Execute(PlayerCharacter);
-
-    // 아이템 사용 성공한 경우, 아이템 소모
     if (bExecuted)
     {
-        ClearItem();
+        // 수량 1개 소모
+        CurrentItemCount = FMath::Max(0, CurrentItemCount - 1);
+
+        // 아이템이 없을 경우 슬롯 창 지우기
+        if (CurrentItemCount <= 0)
+        {
+            ClearItem();
+            return;
+        }
+
+        HandleItemChanged();
+
+        if (AActor* OwnerActor = GetOwner())
+        {
+            OwnerActor->ForceNetUpdate();
+        }
     }
 }
 
@@ -204,8 +223,11 @@ void UCartItemInventoryComponent::ClearItem()
     }
 
     CurrentItemData = nullptr;
+    CurrentItemCount = 0;
 
     HandleItemChanged();
+
+    OwnerActor->ForceNetUpdate();
 }
 
 
@@ -223,16 +245,31 @@ UItemDataAsset* UCartItemInventoryComponent::GetCurrentItemData() const
     return CurrentItemData;
 }
 
+int32 UCartItemInventoryComponent::GetCurrentItemCount() const
+{
+    return CurrentItemCount;
+}
+
+int32 UCartItemInventoryComponent::GetCurrentItemMaxStackCount() const
+{
+    if (!IsValid(CurrentItemData))
+    {
+        return 0;
+    }
+
+    return FMath::Max(1, CurrentItemData->MaxStackCount);
+}
+
 // ------------------------------------------------------------
 // 아이템 변경 
 // ------------------------------------------------------------
 
 void UCartItemInventoryComponent::HandleItemChanged()
 {
-
+    OnItemInventoryChanged.Broadcast(this, CurrentItemData, CurrentItemCount);
 }
 
-void UCartItemInventoryComponent::OnRep_CurrentItemData()
+void UCartItemInventoryComponent::OnRep_ItemInventory()
 {
     HandleItemChanged();
 }

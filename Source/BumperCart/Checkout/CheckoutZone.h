@@ -15,6 +15,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class USoundBase;
 class UAudioComponent;
+class UNiagaraComponent;
 
 struct FLoadedProductInfo;
 struct FLoadInfo;
@@ -211,6 +212,18 @@ private:
     // 계산대 열림/폐쇄 사운드
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
     TObjectPtr<USoundBase> CheckoutStateChangeSound;
+
+// ------------------------------------------------------------
+// 나이아가라
+// ------------------------------------------------------------
+private:
+    // 계산대 상태에 따라 Niagara 재생
+    void UpdateCheckoutNiagara();
+
+private:
+    // Open 상태에서만 재생할 계산대 상승 링 이펙트
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|VFX", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UNiagaraComponent> OpenStateNiagara;
 
 // ------------------------------------------------------------
 // 차단벽
