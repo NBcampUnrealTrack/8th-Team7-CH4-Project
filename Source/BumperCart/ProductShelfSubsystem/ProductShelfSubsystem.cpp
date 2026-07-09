@@ -153,8 +153,6 @@ void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProd
 
                 CurrentProductCount++;
                 UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 세일 제품 스폰 및 체크 완료."));
-
-                // 넷 멀티캐스트로 UI 알림 추가해야함
             }
             else
             {
@@ -182,14 +180,9 @@ void UProductShelfSubsystem::LimitedProductSpawn(TSubclassOf<AProductBase> Limit
 
     if (IsValid(SpawnedProduct))
     {
-        // 한정 제품 체크 (변수, Set() 함수 추가 요청)
-        // SpawnedProduct->SetLimitedProduct(true);
-
         CurrentProductCount++;
 
         UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 한정 제품 스폰 및 체크 완료."));
-
-        // 넷 멀티캐스트로 UI 알림 추가해야함
     }
     else
     {

@@ -62,8 +62,6 @@ void AMapGimmickManager::StartGimmickSpawning()
 {
     if (!HasAuthority()) return;
 
-    RespawnObstacles();
-
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnObstacles, ObstacleRespawnInterval, true);
 }
 
