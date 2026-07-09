@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Cart/Bumpable.h"
 #include "CustomerAI.generated.h"
 
 UENUM(BlueprintType)
@@ -13,7 +14,7 @@ enum class ECustomerState : uint8
 };
 
 UCLASS()
-class BUMPERCART_API ACustomerAI : public ACharacter
+class BUMPERCART_API ACustomerAI : public ACharacter, public IBumpable
 {
 	GENERATED_BODY()
 

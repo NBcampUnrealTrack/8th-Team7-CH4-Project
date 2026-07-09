@@ -324,11 +324,19 @@ int32 AProductBase::GetWeight() const
     return ProductDataAsset->ProductData.Weight;
 }
 
-int32 AProductBase::GetValue() const
+int32 AProductBase::GetBaseValue() const
 {
     if (!ProductDataAsset) return 0;
 
     return ProductDataAsset->ProductData.Value;
+}
+
+int32 AProductBase::GetFinalValue() const
+{
+    int32 Value = GetBaseValue();
+
+    // 이벤트 상품은 1.5배
+    return bOnSale ? Value * 1.5 : Value;
 }
 
 EProductState AProductBase::GetProductState() const
@@ -342,8 +350,9 @@ FLoadedProductInfo AProductBase::GetLoadedProductInfo() const
 
     if (IsValid(ProductDataAsset))
     {
+        // 계산대에서 이벤트 수치 곱해서 Base 값을 전달
         Info.ProductId = ProductDataAsset->ProductId;
-        Info.Value = ProductDataAsset->ProductData.Value;
+        Info.Value = GetBaseValue();
     }
     Info.bOnSale = bOnSale;
 
@@ -643,7 +652,7 @@ const FProductValueVisualRule* AProductBase::FindValueVisualRule() const
 {
     if (!IsValid(ValueVisualConfig)) return nullptr;
 
-    int32 Value = GetValue();
+    int32 Value = GetFinalValue();
 
     const FProductValueVisualRule* SelectedRule = nullptr;
 

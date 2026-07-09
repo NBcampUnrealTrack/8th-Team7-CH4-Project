@@ -21,6 +21,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     const FLoadInfo&, LoadInfo
 );
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTotalValueChanged, int32, TotalValue);
+
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class BUMPERCART_API UCartLoadComponent : public UActorComponent
@@ -53,6 +55,9 @@ public:
 public:
     UPROPERTY(BlueprintAssignable)
     FOnLoadInfoChanged OnLoadInfoChanged;
+
+    UPROPERTY(BlueprintAssignable)
+    FOnTotalValueChanged OnTotalValueChanged;
 
 protected:
     virtual void BeginPlay() override;
