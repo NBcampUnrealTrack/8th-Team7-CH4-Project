@@ -14,6 +14,7 @@
 #include "InputMappingContext.h"
 #include "TimerManager.h"
 #include "BumperCart.h"
+#include "GameState/MainGameState.h"
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
 #include "Component/CartScreenFXComponent.h"
@@ -249,6 +250,9 @@ void ACartPawn::Tick(float DeltaSeconds)
 		}
 	}
 
+	//게임 시작 전(대기 페이즈) 동안엔 조작 잠금 (스로틀·조향·부스트 차단)
+	const bool bCanMove = CanPlayerMove();
+
 	//--- 브레이크 / 추력 ---
 	if (bIsBraking && !bIsSlipping)
 	{
@@ -267,6 +271,12 @@ void ACartPawn::Tick(float DeltaSeconds)
 
 	    //미끄럼 중 조작 불능 — 추력 차단, 관성으로만 미끄러짐
 	    if (bIsSlipping)
+	    {
+	        EffectiveThrottle = 0.f;
+	    }
+
+	    //게임 시작 전 대기 중엔 이동 불가
+	    if (!bCanMove)
 	    {
 	        EffectiveThrottle = 0.f;
 	    }
@@ -291,7 +301,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//--- 조향(A/D) yaw 델타 계산 (미끄럼 중엔 조향 불능, 회전은 아래에서 한 번에 적용) ---
 	CurrentSteer = FMath::FInterpTo(CurrentSteer, SteerInput, DeltaSeconds, SteerInterpSpeed);
 	float YawDeltaTotal = 0.f;
-	if (!bIsSlipping && !FMath::IsNearlyZero(CurrentSteer))
+	if (!bIsSlipping && bCanMove && !FMath::IsNearlyZero(CurrentSteer))
 	{
 		//빠를수록 잘 돌고, 정지 시에는 최소 배율만 적용
 		const float Speed = Move->Velocity.Size2D();
@@ -489,7 +499,7 @@ void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
 
 void ACartPawn::OnBoost(const FInputActionValue& Value)
 {
-	if (bIsBoosting || bBoostOnCooldown || bIsSlipping) //미끄럼 중엔 부스트 발동 불가
+	if (bIsBoosting || bBoostOnCooldown || bIsSlipping || !CanPlayerMove()) //미끄럼·게임 시작 전 대기 중엔 부스트 발동 불가
 	{
 		return;
 	}
@@ -967,4 +977,11 @@ void ACartPawn::StartBumpInvincibility()
     }
     bBumpInvincible = true;
     BumpInvincibleTimeRemaining = BumpInvincibleDuration;
+}
+
+//게임 시작 전 대기 페이즈 동안 조작 가능 여부 — MainGameState가 없으면(테스트 레벨 등) 허용
+bool ACartPawn::CanPlayerMove() const
+{
+    const AMainGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMainGameState>() : nullptr;
+    return !GS || GS->bCanPlayerMove();
 }
