@@ -522,15 +522,19 @@ FVector AProductBase::GetSafeLocation(const FVector& Start, const FVector& End, 
 
     FCollisionShape Shape = FCollisionShape::MakeSphere(ProductCollision->GetScaledSphereRadius());
 
+    FCollisionResponseParams ResponseParams;
+    ResponseParams.CollisionResponse = ProductCollision->GetCollisionResponseToChannels();
+
     FHitResult Hit;
-    bool bHit = World->SweepSingleByProfile(
+    bool bHit = World->SweepSingleByChannel(
         Hit,
         SafeStart,
         SafeEnd,
         FQuat::Identity,
-        ProductCollision->GetCollisionProfileName(),
+        ProductCollision->GetCollisionObjectType(),
         Shape,
-        Params
+        Params,
+        ResponseParams
     );
 
     // Sweep 으로 충돌 안했으면 안전한 위치임
