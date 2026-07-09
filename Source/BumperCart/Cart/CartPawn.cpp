@@ -244,7 +244,8 @@ void ACartPawn::Tick(float DeltaSeconds)
 
                 if (IsValid(LoadComponent))
                 {
-                    LoadComponent->SetLoadDummyBlinkVisible(!SlipSpinMesh->GetVisibleFlag());
+                    //토글 후 플래그는 이미 새 값 => 그대로 넘겨야 몸통과 같은 위상으로 깜빡임
+                    LoadComponent->SetLoadDummyBlinkVisible(SlipSpinMesh->GetVisibleFlag());
                 }
 			}
 		}
@@ -784,46 +785,73 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		return;
 	}
 
-	//충돌 연출: 세기만 여기서 계산하고, 재생은 공용 함수로 위임 (서버 => 소유 클라)
-	if (BumpCameraShakeClass)
+	//--- 충돌 확정: 첫 NotifyHit이 나+상대를 전부 해결 ---
+	//아래서 양쪽에 무적이 걸리면 상대 쪽 NotifyHit은 위 무적 체크에서 무효화되므로,
+	//사운드·셰이크·넉백·리액션·드롭을 여기서 양쪽 다 처리해야 피해자 쪽이 누락되지 않는다
+
+	//셰이크·충돌음 — 나 + 상대 (세기는 접근속도 비례, 동일 적용)
+	const float ShakeScale = FMath::GetMappedRangeValueClamped(
+		FVector2D(MinBumpSpeed, BumpShakeFullSpeed),
+		FVector2D(BumpShakeScale, BumpShakeMaxScale),
+		ClosingSpeed);
+	ClientPlayCameraShake(BumpCameraShakeClass, ShakeScale);
+	ClientPlayBumpSound();
+	if (OtherCart)
 	{
-		const float ShakeScale = FMath::GetMappedRangeValueClamped(
-			FVector2D(MinBumpSpeed, BumpShakeFullSpeed),
-			FVector2D(BumpShakeScale, BumpShakeMaxScale),
-			ClosingSpeed);
-		ClientPlayCameraShake(BumpCameraShakeClass, ShakeScale);
+		OtherCart->ClientPlayCameraShake(nullptr, ShakeScale); //nullptr => 상대 기본 셰이크
+		OtherCart->ClientPlayBumpSound();
 	}
 
-	//충돌음: 소유 클라에서 재생
-	ClientPlayBumpSound();
-
-	//드롭 역할 + 상대 넉백 세기 (일반=속도 비례로 살짝, 부스트=멀리)
+	//드롭 역할 + 넉백 세기 (일반=양쪽 다 속도 비례로 살짝, 부스트=박힌 쪽만 멀리)
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
-	//기본(일반 충돌): 접근속도 비례로 살짝, 상한 클램프
-	float OtherKnockStrength = FMath::Min(ClosingSpeed * NormalKnockbackScale, NormalKnockbackMax);
+	EDropCollisionRole OtherDropRole = EDropCollisionRole::Normal;
+	const float NormalKnock = FMath::Min(ClosingSpeed * NormalKnockbackScale, NormalKnockbackMax);
+	float OtherKnockStrength = NormalKnock;
+	float MyKnockStrength = OtherCart ? NormalKnock : 0.f; //벽·장애물은 나를 안 밀어냄
 	if (bIsBoosting)
 	{
 		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터로 박음 => 덜 흘림
-		OtherKnockStrength = BoostKnockbackStrength;       //부스터에 박힌 쪽은 더 멀리 (부스트 비비기 방지)
+		OtherDropRole = EDropCollisionRole::BoostedTarget;
+		OtherKnockStrength = BoostKnockbackStrength; //부스터에 박힌 쪽은 더 멀리 (부스트 비비기 방지)
+		MyKnockStrength = 0.f;                       //부스터 본인은 안 밀림
 	}
 	else if (OtherCart && OtherCart->bIsBoosting)
 	{
 		DropRole = EDropCollisionRole::BoostedTarget; //부스터한테 박힘 => 더 흘림
-		OtherKnockStrength = 0.f;                      //상대가 부스터로 날 박는 중 => 부스터는 안 밀림
+		OtherDropRole = EDropCollisionRole::BoosterInstigator;
+		OtherKnockStrength = 0.f;
+		MyKnockStrength = BoostKnockbackStrength;
 	}
 
-	//상대를 밀어냄 (ApplyExternalKnockback이 넉백+리액션 공용)
-	if (OtherCart && OtherKnockStrength > 0.f)
-	{
-		OtherCart->ApplyExternalKnockback(ToOther, OtherKnockStrength);
-	}
-
-	//내 카트 몸통 리액션. 세기는 쉐이크와 동일 매핑
+	//넉백 — ApplyExternalKnockback이 넉백+몸통 리액션 공용 처리. 안 밀리는 쪽도 리액션은 재생
 	const float ReactionIntensity = FMath::GetMappedRangeValueClamped(
 		FVector2D(MinBumpSpeed, BumpShakeFullSpeed), FVector2D(0.25f, 1.f), ClosingSpeed);
-	MulticastPlayBumpReaction(-ToOther, ReactionIntensity);
+	if (OtherCart)
+	{
+		if (OtherKnockStrength > 0.f)
+		{
+			OtherCart->ApplyExternalKnockback(ToOther, OtherKnockStrength);
+		}
+		else
+		{
+			OtherCart->MulticastPlayBumpReaction(ToOther, ReactionIntensity); //부스터 본인(안 밀림)
+		}
+	}
+	if (MyKnockStrength > 0.f)
+	{
+		ApplyExternalKnockback(-ToOther, MyKnockStrength);
+	}
+	else
+	{
+		MulticastPlayBumpReaction(-ToOther, ReactionIntensity); //벽 충돌·부스터 본인(안 밀림)
+	}
 
+	//드롭 — 나 + 상대
 	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
+	if (OtherCart)
+	{
+		OtherCart->RequestSpill(ClosingSpeed * OtherCart->BumpImpulseScale, OtherDropRole);
+	}
 
 	//충돌 성립 => 잠깐 무적 (연타/비비기 방지, 그동안 깜빡). 부스트 중인 카트는 제외 — 돌진 유지, 연속 타격 가능
 	if (!bIsBoosting)
