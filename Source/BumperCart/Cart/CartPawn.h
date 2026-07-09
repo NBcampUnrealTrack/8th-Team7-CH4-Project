@@ -420,6 +420,9 @@ protected:
 	//충돌 후 무적 시작 (서버) — 지속시간 동안 추가 충돌 무시, 복제되어 전 클라 깜빡
 	void StartBumpInvincibility();
 
+	//게임 시작 전 대기 페이즈 동안 조작 가능 여부 (MainGameState 질의). GameState 없으면 true
+	bool CanPlayerMove() const;
+
 	//C 적재 정보가 바뀔 때 호출되는 델리게이트 핸들러. AddDynamic용
 	UFUNCTION()
 	void HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo);
