@@ -11,6 +11,12 @@ class UInputMappingContext;
 
 struct FInputActionValue;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+    FOnItemInventoryChanged,
+    UCartItemInventoryComponent*, ItemInventoryComponent,
+    UItemDataAsset*, CurrentItemData,
+    int32, CurrentItemCount
+);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BUMPERCART_API UCartItemInventoryComponent : public UActorComponent
@@ -49,10 +55,18 @@ protected:
 // ------------------------------------------------------------
 // 아이템 정보
 // ------------------------------------------------------------
+public:
+    UPROPERTY(BlueprintAssignable, Category = "Item")
+    FOnItemInventoryChanged OnItemInventoryChanged;
+
 private:
     // 현재 보유 중인 아이템
-    UPROPERTY(ReplicatedUsing = OnRep_CurrentItemData)
-    TObjectPtr<UItemDataAsset> CurrentItemData;
+    UPROPERTY(ReplicatedUsing = OnRep_ItemInventory)
+    TObjectPtr<UItemDataAsset> CurrentItemData = nullptr;
+
+    // 현재 보유 중인 아이템 개수
+    UPROPERTY(ReplicatedUsing = OnRep_ItemInventory)
+    int32 CurrentItemCount = 0;
 
 // ------------------------------------------------------------
 // 아이템 획득
@@ -93,6 +107,14 @@ public:
     UFUNCTION(BlueprintPure, Category = "Item")
     UItemDataAsset* GetCurrentItemData() const;
 
+    // 현재 아이템 개수 반환
+    UFUNCTION(BlueprintPure, Category = "Item")
+    int32 GetCurrentItemCount() const;
+
+    // 현재 보유 중인 아이템의 MaxStackCount
+    UFUNCTION(BlueprintPure, Category = "Item")
+    int32 GetCurrentItemMaxStackCount() const;
+
 // ------------------------------------------------------------
 // 아이템 변경 
 // ------------------------------------------------------------
@@ -102,5 +124,5 @@ private:
 
     // 아이템 복제 시 호출
     UFUNCTION()
-    void OnRep_CurrentItemData();
+    void OnRep_ItemInventory();
 };
