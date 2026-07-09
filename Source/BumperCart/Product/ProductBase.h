@@ -49,7 +49,10 @@ public:
     int32 GetWeight() const;
 
     UFUNCTION(BlueprintPure)
-    int32 GetValue() const;
+    int32 GetBaseValue() const;
+
+    UFUNCTION(BlueprintPure)
+    int32 GetFinalValue() const;
 
     UFUNCTION(BlueprintPure)
     EProductState GetProductState() const;

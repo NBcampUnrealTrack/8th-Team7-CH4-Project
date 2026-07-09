@@ -167,7 +167,7 @@ int32 UCartLoadComponent::GetTotalValue() const
     {
         if (IsValid(Product))
         {
-            TotalValue += Product->GetValue();
+            TotalValue += Product->GetFinalValue();
         }
     }
 
@@ -519,4 +519,5 @@ void UCartLoadComponent::OnRep_LoadInfo()
     UpdateLoadVisual();
 
     OnLoadInfoChanged.Broadcast(GetOwner(), LoadInfo);
+    OnTotalValueChanged.Broadcast(GetTotalValue());
 }
