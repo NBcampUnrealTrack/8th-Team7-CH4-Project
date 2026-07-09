@@ -70,7 +70,7 @@ UCartGrabComponent::UCartGrabComponent()
     AimDotSize = 20.f;
     NiagaraHeightOffset = 10.f;
 
-    // 로봇손 판정
+    // 로봇손 서버 판정
     bServerGrab = false;
     ServerGrabStartLocation = FVector::ZeroVector;
     ServerGrabDirection = FVector::ZeroVector;
@@ -78,10 +78,10 @@ UCartGrabComponent::UCartGrabComponent()
     ServerGrabCurrentDistance = 0.f;
     AimPlaneZ = 120.f;
 
-    // 로봇손 관련
+    // 로봇손 밸런스 관련
     GrabSpeed = 1400.f;
     GrabRange = 500.f;
-    GrabRadius = 10.f;
+    GrabRadius = 20.f;
     bCanGrab = true;
     SocketName = TEXT("ProductSocket");
 
