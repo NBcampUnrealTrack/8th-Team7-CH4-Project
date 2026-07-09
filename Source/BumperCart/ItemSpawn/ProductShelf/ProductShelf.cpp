@@ -8,6 +8,8 @@
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Components/BoxComponent.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "DrawDebugHelpers.h"
 
 AProductShelf::AProductShelf()
 {
@@ -63,17 +65,9 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
 {
     if (!HasAuthority() || !ItemClass) return nullptr;
 
-    // 처음 스폰되는 곳 (선반의 중심)
-    FVector SpawnStartLocation = FVector::ZeroVector;
-
-    if (ShelfMesh)
-    {
-        // 선반 메쉬의 진짜 3D 바운딩 박스(크기) 정보를 가져옵니다.
-        FBoxSphereBounds MeshBounds = ShelfMesh->Bounds;
-
-        // 피벗 위치와 상관없는 '진짜 기하학적 중심점'
-        SpawnStartLocation = MeshBounds.Origin;
-    }
+    // 처음 스폰되는 곳
+    FVector SpawnStartLocation = LaunchPoints->GetComponentLocation();
+    FRotator SpawnStartRoation = LaunchPoints->GetComponentRotation();    
 
     // 스폰시 충돌 처리 규칙
     // 강제 스폰
@@ -81,17 +75,16 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     // 제품 스폰
-    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, SpawnStartLocation, FRotator::ZeroRotator, SpawnParams);
+    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, SpawnStartLocation, SpawnStartRoation, SpawnParams);
 
     // 제품 스폰 성공
     if (SpawnedProduct)
     {
         // 스폰 후 날아가는 위치
-        FVector SpawnLocation = GetRandomPointInVolume();
-        FRotator SpawnRotation = UKismetMathLibrary::RandomRotator();
+        FVector SpawnEndLocation = GetRandomPointInVolume();
 
         // 제품 베이스의 StartSpawn()으로 날아가는 느낌 표현
-        SpawnedProduct->StartSpawn(SpawnStartLocation, SpawnLocation, this);
+        SpawnedProduct->StartSpawn(SpawnStartLocation, SpawnEndLocation, this);
 
         // 나이아가라
         if (UWorld* World = GetWorld())
@@ -106,7 +99,7 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
                         World,
                         SpawnFX,
                         SpawnStartLocation,
-                        SpawnRotation,
+                        SpawnStartRoation,
                         FVector(1.0f),
                         true,
                         true
@@ -125,14 +118,26 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
 
 FVector AProductShelf::GetRandomPointInVolume() const
 {
-    // 박스 x/y/z 의 반지름
-    FVector BoxExtent = SpawnAreaBox->GetScaledBoxExtent();
-    // 박스 중심
-    FVector BoxOrigin = SpawnAreaBox->GetComponentLocation();
+    if (!SpawnAreaBox) return GetActorLocation();
 
-    return BoxOrigin + FVector(
+    // 박스 x/y/z 의 반지름
+    FVector BoxExtent = SpawnAreaBox->GetUnscaledBoxExtent();
+    // 박스 중심
+    FVector BoxOrigin = SpawnAreaBox->GetRelativeLocation();
+
+    // 상자 크기를 기준으로 로컬 랜덤 좌표
+    FVector LocalRandomOffset = FVector(
         FMath::FRandRange(-BoxExtent.X, BoxExtent.X),
         FMath::FRandRange(-BoxExtent.Y, BoxExtent.Y),
         FMath::FRandRange(-BoxExtent.Z, BoxExtent.Z));
+
+    // 박스의 배치 시작점에 랜덤 오프셋을 더해 '선반 기준의 로컬 좌표'
+    FVector ShelfLocalLocation = BoxOrigin + LocalRandomOffset;
+
+    // 선반 액터 자체의 월드 트랜스폼(위치/회전)을 가져옵니다.
+    FTransform ShelfTransform = GetActorTransform();
+
+    // TransformPosition이 이 로컬 좌표를 선반이 회전한 각도만큼 돌림.
+    return ShelfTransform.TransformPosition(ShelfLocalLocation);
 }
 
