@@ -69,7 +69,7 @@ void ACheckoutBarrier::SetBarrierEnabled(bool bIsEnabled)
         BarrierMesh->SetHiddenInGame(false);
 
         // 메시 생성 중에는 통과 가능
-        SetBarrierCollisionEnabled(false);
+        SetBarrierCollisionEnabled(true);
 
         // 아래에서 위로 생성
         StartRevealAnimation(1.0f);
@@ -176,8 +176,6 @@ void ACheckoutBarrier::FinishRevealAnimation()
 
     if (bIsBarrierEnabled && RevealTargetValue >= 1.0f)
     {
-        // 벽이 완전히 올라온 뒤 충돌 활성화
-        SetBarrierCollisionEnabled(true);
         return;
     }
 

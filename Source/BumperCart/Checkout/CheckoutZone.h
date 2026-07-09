@@ -154,6 +154,7 @@ private:
     TObjectPtr<UChildActorComponent> CheckoutBarrierComponent;
 
     // 배출점
+    // BeginPlay에서 CreateEjectPointsFromComponents를 통해 생성
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Barrier", meta = (AllowPrivateAccess = "true"))
     TArray<TObjectPtr<USceneComponent>> EjectPoints;
 
@@ -257,6 +258,9 @@ private:
 // 플레이어 동시 진입
 // ------------------------------------------------------------
 private:
+    // 블루프린트에 배치된 EjectPoint 컴포넌트들 수집
+    void CreateEjectPointsFromComponents();
+
     // 정산가 아닌 플레이어를 입구 바깥으로 밀어냄
     void EjectPlayer(ACartPawn* PlayerCharacter);
 
@@ -284,6 +288,11 @@ private:
 private:
     // 플레이어 계산대 차단 무시
     void SetPlayerBarrierIgnore(ACartPawn* PlayerCharacter,  bool bShouldIgnore);
+
+    // 서버/클라이언트 모두 차단벽 무시
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastSetPlayerBarrierIgnore(ACartPawn* PlayerCharacter, bool bShouldIgnore);
+
 
     // 정산 시간 동안 차단벽 무시
     void UpdateCheckoutPlayerBarrierIgnore();
@@ -332,6 +341,9 @@ private:
 
     // 정산 중 마지막으로 확인한 적재 상품 수
     int32 LastLoadedProductCount = 0;
+
+    UPROPERTY(VisibleAnywhere, Category = "Checkout|Player")
+    TArray<TObjectPtr<ACartPawn>> CancelCheckoutPlayers;
 
 // ------------------------------------------------------------
 // 계산 조건
@@ -401,7 +413,7 @@ private:
 // ------------------------------------------------------------
 private:
     // 전체 정산 시간 계산
-    float CalculateCheckoutDuration(int32 ProductCount) const;
+    float CalculateCheckoutDuration(int32 ProductCount, bool bIsFinalPhase) const;
 
 private:
     // 기본 정산 시간
@@ -415,6 +427,10 @@ private:
     // 최대 정산 시간
     UPROPERTY(EditAnywhere, Category = "Checkout|Time", meta = (ClampMin = "0.1"))
     float MaxCheckoutTime = 5.0f;
+
+    // 마지막 라운드 정산 시간
+    UPROPERTY(EditAnywhere, Category = " Checkout|Time")
+    float FinalPhaseCheckoutTime = 1.0f;
 
 // ------------------------------------------------------------
 // 최종 점수 계산
