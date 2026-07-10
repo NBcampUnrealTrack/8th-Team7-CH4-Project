@@ -195,13 +195,20 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//--- 충돌 리액션(몸통 들썩·기울임): 슬립 아닐 때만, 스프링으로 기준값 복귀 ---
 	if (bBumpReactionActive && !bIsSlipping && SlipSpinMesh)
 	{
-		//감쇠 스프링 1스텝: a = -k·x - c·v (감쇠 약하면 덜컹). 클램프
 		auto SpringStep = [&](float& X, float& V, float MaxAbs)
 		{
-			const float Accel = -BumpReactionStiffness * X - BumpReactionDamping * V;
-			V += Accel * DeltaSeconds;
-			X += V * DeltaSeconds;
-			X = FMath::Clamp(X, -MaxAbs, MaxAbs);
+		    //프레임 드랍 시 dt 폭주로 발산 방지 — 0.02초 고정 스텝으로 서브스텝
+		    float Remaining = DeltaSeconds;
+		    while (Remaining > 0.f)
+		    {
+		        const float Step = FMath::Min(Remaining, 0.02f);
+		        Remaining -= Step;
+
+		        const float Accel = -BumpReactionStiffness * X - BumpReactionDamping * V;
+		        V += Accel * Step;
+		        X += V * Step;
+		    }
+		    X = FMath::Clamp(X, -MaxAbs, MaxAbs);
 		};
 		SpringStep(BumpTiltPitch, BumpTiltPitchVel, BumpTiltMaxAngle);
 		SpringStep(BumpTiltRoll, BumpTiltRollVel, BumpTiltMaxAngle);
