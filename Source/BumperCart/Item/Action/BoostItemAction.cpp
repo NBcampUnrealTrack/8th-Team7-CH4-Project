@@ -19,5 +19,6 @@ bool UBoostItemAction::Execute(ACartPawn* PlayerCharacter)
         return false;
     }
 
-    return PlayerCharacter->ActivateBoostFromItem();
+    //부스터 상시화로 아이템 사용 없음 — 클래스/DA_Boost 정리 예정
+    return false;
 }
