@@ -30,6 +30,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     int32 MaxStackCount = 1;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+    float CooldownDuration = 1.0f;
+
     // 아이템 사용 로직
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     TSubclassOf<class UItemAction> ActionClass;

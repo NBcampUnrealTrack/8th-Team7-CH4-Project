@@ -51,3 +51,25 @@ void ALobbyPlayerController::ServerRPCSetDisplayName_Implementation(const FStrin
         }
     }
 }
+
+void ALobbyPlayerController::Client_NotifyHostIsLeaving_Implementation()
+{
+    if (UGameInstance* GI = GetGameInstance())
+    {
+        if (UMainGameInstanceSubsystem* Subsystem = GI->GetSubsystem<UMainGameInstanceSubsystem>())
+        {
+            Subsystem->NotifyLeaveRequestedByHost();
+        }
+    }
+}
+
+void ALobbyPlayerController::Server_AckLeftSession_Implementation()
+{
+    if (UGameInstance* GI = GetGameInstance())
+    {
+        if (UMainGameInstanceSubsystem* Subsystem = GI->GetSubsystem<UMainGameInstanceSubsystem>())
+        {
+            Subsystem->OnClientAckLeftSession(this);
+        }
+    }
+}

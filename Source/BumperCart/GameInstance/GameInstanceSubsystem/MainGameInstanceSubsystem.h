@@ -102,6 +102,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "EOS|Session")
     FString GetRoomName() const { return RoomName; }
 
+    // 클라이언트가 호스트한테 나가라라는 알림을 받았을 때 해당 PlayerController 호출
+    void NotifyLeaveRequestedByHost();
+    // 알림을 받은 클라이언트가 나갔다는 ACK를 받았을 때 PlayerController 호출
+    void OnClientAckLeftSession(APlayerController* FromPC);
+
 private:
     // 로그인 완료 시 호출
     void OnLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
@@ -124,6 +129,14 @@ private:
     // 비공개 방 참가 시도
     void TryJoinPrivateSession();
 
+
+    // 호스트 나가지 전, 클라이어트에게 먼저 나가라고 알림
+    void NotifyClientsToLeaveBeforeHostDestroy();
+    // 실제로 호스트 세션 파괴
+    void DestroyHostSession();
+    // ACK 없이 클라이언트 연결이 끊겼을 때 대기 목록에서 안전하게 제거
+    UFUNCTION()
+    void OnNotifiedClientDestroyed(AActor* DestroyedActor);
 
     // 실제 세션 생성 로직 (재시도/재생성 시에도 캐싱된 RoomName/RoomPassword 사용)
     void CreateSessionInternal();
@@ -157,6 +170,18 @@ private:
 
     // 검색된 방 결과들
     TArray<FOnlineSessionSearchResult> FilteredResults;
+
+    // 호스트가 나갈 때, ACK을 기다려야 하는 클라이언트 목록
+    TSet<TWeakObjectPtr<APlayerController>> PendingHostLeaveAcks;
+
+    // DestroyHostSession 중복 호출 방지
+    bool bHostDestroyInProgress = false;
+
+    // 호스트 알림으로 나가는 중이면 true. 세션 파괴 완료 시 호스트에게 ACK을 보내야 함을 표시.
+    bool bShouldAckHostOnLeaveComplete = false;
+
+    // ACK 대기용 타이머)
+    FTimerHandle HostLeaveWaitTimerHandle;
 
     // 세션 커스텀 세팅 키
     static inline const FName SETTING_ROOMNAME     = TEXT("ROOMNAME");

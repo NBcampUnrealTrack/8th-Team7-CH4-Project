@@ -16,6 +16,7 @@ class UMaterialInstanceDynamic;
 class USoundBase;
 class UAudioComponent;
 class UNiagaraComponent;
+class UNiagaraSystem;
 
 struct FLoadedProductInfo;
 struct FLoadInfo;
@@ -217,13 +218,21 @@ private:
 // 나이아가라
 // ------------------------------------------------------------
 private:
-    // 계산대 상태에 따라 Niagara 재생
-    void UpdateCheckoutNiagara();
+    // 계산대 상태에 따라 이펙트 재생
+    void UpdateCheckoutEffect();
+
+    // 서버와 모든 클라이언트에서 정산 완료 이펙트 재생
+    UFUNCTION(NetMulticast, Unreliable)
+    void MulticastPlayCheckoutCompleteEffect(ACartPawn* CompletedPlayer);
 
 private:
     // Open 상태에서만 재생할 계산대 상승 링 이펙트
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|VFX", meta = (AllowPrivateAccess = "true"))
-    TObjectPtr<UNiagaraComponent> OpenStateNiagara;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Effect", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UNiagaraComponent> OpenStateEffect;
+
+    // 정산 완료 이펙트
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Checkout|Effect", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UNiagaraSystem> CheckoutCompleteEffect;
 
 // ------------------------------------------------------------
 // 차단벽
