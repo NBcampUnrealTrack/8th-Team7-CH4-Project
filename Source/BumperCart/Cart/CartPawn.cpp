@@ -480,7 +480,10 @@ void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 		EIC->BindAction(BrakeAction, ETriggerEvent::Started, this, &ACartPawn::OnBrakeStart);
 		EIC->BindAction(BrakeAction, ETriggerEvent::Completed, this, &ACartPawn::OnBrakeStop);
 	}
-	//부스트는 아이템 전용 (ActivateBoostFromItem) — 직접 입력 없음
+	if (BoostAction)
+	{
+		EIC->BindAction(BoostAction, ETriggerEvent::Started, this, &ACartPawn::OnBoost);
+	}
 
     // 그랩 전용 IMC, IA 연결
     if (IsValid(GrabComponent))
@@ -538,7 +541,26 @@ void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
 	bBrakeHeld = false;
 }
 
-//부스트 시작 핵심 — 상태 + 전방 런치 + 지속 타이머 (사운드 없음). 서버·소유클라 각자 호출
+//부스트 발동 (Shift 입력, 소유 클라) — 예측 시작 + 사운드 + 서버 통지
+void ACartPawn::OnBoost(const FInputActionValue& Value)
+{
+	if (bIsBoosting || bBoostOnCooldown || bIsSlipping || !CanPlayerMove()) //쿨타임·미끄럼·게임 시작 전 대기 중엔 발동 불가
+	{
+		return;
+	}
+
+	StartBoost();
+
+	//부스터 효과음 (소유 클라 로컬)
+	if (BoostSound)
+	{
+		UGameplayStatics::PlaySound2D(this, BoostSound);
+	}
+
+	ServerSetBoosting(true); //서버에 부스터 상태 통지 (충돌 역할용)
+}
+
+//부스트 시작 핵심 — 상태 + 전방 런치 + 지속 타이머 (사운드 없음)
 void ACartPawn::StartBoost()
 {
 	bIsBoosting = true;
@@ -553,56 +575,45 @@ void ACartPawn::StartBoost()
 	GetWorldTimerManager().SetTimer(BoostTimerHandle, this, &ACartPawn::EndBoost, BoostDuration, false);
 }
 
-//아이템으로 부스트 발동 — 서버 전용 (BoostItemAction::Execute가 호출). 쿨다운 없음: 아이템 소비가 게이트
-bool ACartPawn::ActivateBoostFromItem()
+void ACartPawn::EndBoost()
 {
-	if (!HasAuthority())
-	{
-		return false;
-	}
+	GetWorldTimerManager().ClearTimer(BoostTimerHandle); //조기 종료(브레이크·충돌) 시 남은 지속 타이머 정리
+	bIsBoosting = false;
+	bBoostOnCooldown = true;
+	ServerSetBoosting(false); //부스터 종료 서버에 통지
+	GetWorldTimerManager().SetTimer(BoostCooldownTimerHandle, this, &ACartPawn::ResetBoostCooldown, BoostCooldown, false);
+}
 
-	if (bIsBoosting || bIsSlipping || !CanPlayerMove()) //부스트 중·미끄럼·게임 시작 전 대기 중엔 발동 불가
-	{
-		return false;
-	}
+void ACartPawn::ResetBoostCooldown()
+{
+	bBoostOnCooldown = false;
+}
 
-	StartBoost(); //서버 권한 시작 — bIsBoosting은 타 클라에 복제
+//부스트 강제 종료 (서버) — 충돌·기믹 넉백 시 호출. 부스트 중이 아니면 무동작
+void ACartPawn::CancelBoost()
+{
+	if (!HasAuthority() || !bIsBoosting)
+	{
+		return;
+	}
 
 	if (IsLocallyControlled())
 	{
-		//리슨 호스트 본인 사용: 위에서 이미 시작됨 => 사운드만
-		if (BoostSound)
-		{
-			UGameplayStatics::PlaySound2D(this, BoostSound);
-		}
-	}
-	else
-	{
-		ClientStartBoostFX(); //원격 소유 클라: 예측 시작 + 사운드
+		EndBoost(); //리슨 호스트 본인
+		return;
 	}
 
-	return true;
+	bIsBoosting = false;      //서버 즉시 반영 (타 클라 복제)
+	ClientCancelBoost();      //소유 클라: 타이머 정리 + 쿨다운 시작
 }
 
-//아이템 부스트를 소유 클라에 적용 — 예측 시작 + 사운드 (여기서만 재생 => 호스트가 남의 소리 안 들음)
-void ACartPawn::ClientStartBoostFX_Implementation()
+//부스트 강제 종료를 소유 클라에 적용
+void ACartPawn::ClientCancelBoost_Implementation()
 {
-	if (!bIsBoosting) //복제 지연 등으로 이미 켜져 있으면 중복 런치 방지
+	if (bIsBoosting)
 	{
-		StartBoost();
+		EndBoost();
 	}
-
-	if (BoostSound)
-	{
-		UGameplayStatics::PlaySound2D(this, BoostSound);
-	}
-}
-
-void ACartPawn::EndBoost()
-{
-	GetWorldTimerManager().ClearTimer(BoostTimerHandle); //브레이크 취소 등 조기 종료 시 남은 지속 타이머 정리 (중복 발동 방지)
-	bIsBoosting = false;
-	ServerSetBoosting(false); //부스터 종료 서버에 통지
 }
 
 bool ACartPawn::IsCancelCheckoutState() const
@@ -801,6 +812,11 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	//IBumpable(퍼블릭 상속/BP 인터페이스 추가)을 구현한 대상에만 충돌 연출+드롭. 그 외(일반 벽 등)는 그냥 막힘
 	if (!Other->GetClass()->ImplementsInterface(UBumpable::StaticClass()))
 	{
+		//일반 벽 등 판정 밖 대상: 정면으로 박았으면 부스트만 끊김 (스침은 유지)
+		if (FVector::DotProduct(PreviousVelocity, -HitNormal) > MinBumpSpeed)
+		{
+			CancelBoost();
+		}
 		return;
 	}
 
@@ -810,6 +826,11 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	//무적 중이면(나 또는 상대) 이 충돌은 완전 무시 — 넉백·틸트·효과음·드롭 전부 skip
 	if (bBumpInvincible || (OtherCart && OtherCart->bBumpInvincible))
 	{
+		//판정은 무시해도 정면으로 박은 부스트는 끊김 (무적 상대 밀어붙이기 방지)
+		if (FVector::DotProduct(PreviousVelocity, -HitNormal) > MinBumpSpeed)
+		{
+			CancelBoost();
+		}
 		return;
 	}
 
@@ -916,12 +937,16 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 		OtherCart->RequestSpill(ClosingSpeed * OtherCart->BumpImpulseScale, OtherDropRole);
 	}
 
-	//충돌 성립 => 잠깐 무적 (연타/비비기 방지, 그동안 깜빡). 부스트 중인 카트는 제외 — 돌진 유지, 연속 타격 가능
-	if (!bIsBoosting)
+	//부딪히면 부스트 끊김 — 충돌한 양쪽 모두 (역할·넉백 판정엔 위에서 이미 반영됨)
+	CancelBoost();
+	if (OtherCart)
 	{
-		StartBumpInvincibility();
+		OtherCart->CancelBoost();
 	}
-	if (OtherCart && !OtherCart->bIsBoosting)
+
+	//충돌 성립 => 잠깐 무적 (연타/비비기 방지, 그동안 깜빡)
+	StartBumpInvincibility();
+	if (OtherCart)
 	{
 		OtherCart->StartBumpInvincibility();
 	}
@@ -1014,6 +1039,9 @@ void ACartPawn::ApplyExternalKnockback(const FVector& Direction, float Strength)
 
     const FVector LaunchVelocity = KnockbackDirection * Strength;
     LaunchCharacter(LaunchVelocity, true, false);
+
+    //충돌 판정 나는 기믹(거대카트 등)에 밀리면 부스트 끊김
+    CancelBoost();
 
     //넉백과 함께 몸통 리액션도 재생 (외부 시스템 공용). 세기는 Strength/기준값
     const float ReactionIntensity = FMath::Clamp(Strength / BumpReactionKnockbackRef, 0.25f, 1.f);
