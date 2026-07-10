@@ -5,6 +5,7 @@
 #include "Engine/StaticMesh.h"
 #include "GameInstance/MainGameInstance.h"
 #include "DataAsset/CharacterSelectionConfig.h"
+#include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -21,6 +22,16 @@ ALobbyCartDisplay::ALobbyCartDisplay()
 	if (MeshFinder.Succeeded())
 	{
 		CartMesh->SetStaticMesh(MeshFinder.Object);
+	}
+
+	//인게임 카트(BP_CartPawn)와 같은 머티리얼로 통일 — 메시 기본 머티리얼엔 CartColor 파라미터가 없음
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MaterialFinder(TEXT("/Game/Developers/dongh/Cart/Materials/MI_Shopping_Cart_Custom.MI_Shopping_Cart_Custom"));
+	if (MeshFinder.Succeeded() && MaterialFinder.Succeeded())
+	{
+		for (int32 i = 0; i < CartMesh->GetNumMaterials(); ++i)
+		{
+			CartMesh->SetMaterial(i, MaterialFinder.Object);
+		}
 	}
 }
 
