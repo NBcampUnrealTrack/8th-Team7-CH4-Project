@@ -206,6 +206,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 
 		        const float Accel = -BumpReactionStiffness * X - BumpReactionDamping * V;
 		        V += Accel * Step;
+		        V = FMath::Clamp(V, -10000.f, 10000.f);
 		        X += V * Step;
 		    }
 		    X = FMath::Clamp(X, -MaxAbs, MaxAbs);
@@ -453,10 +454,7 @@ void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 		EIC->BindAction(BrakeAction, ETriggerEvent::Started, this, &ACartPawn::OnBrakeStart);
 		EIC->BindAction(BrakeAction, ETriggerEvent::Completed, this, &ACartPawn::OnBrakeStop);
 	}
-	if (BoostAction)
-	{
-		EIC->BindAction(BoostAction, ETriggerEvent::Started, this, &ACartPawn::OnBoost);
-	}
+	//부스트는 아이템 전용 (ActivateBoostFromItem) — 직접 입력 없음
 
     // 그랩 전용 IMC, IA 연결
     if (IsValid(GrabComponent))
@@ -514,22 +512,10 @@ void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
 	bBrakeHeld = false;
 }
 
-void ACartPawn::OnBoost(const FInputActionValue& Value)
+//부스트 시작 핵심 — 상태 + 전방 런치 + 지속 타이머 (사운드 없음). 서버·소유클라 각자 호출
+void ACartPawn::StartBoost()
 {
-	if (bIsBoosting || bBoostOnCooldown || bIsSlipping || !CanPlayerMove()) //미끄럼·게임 시작 전 대기 중엔 부스트 발동 불가
-	{
-		return;
-	}
-
 	bIsBoosting = true;
-	bBoostOnCooldown = true;
-	ServerSetBoosting(true); //서버에도 부스터 상태 통지 (충돌 역할용)
-
-	//부스터 효과음 (소유 클라 로컬)
-	if (BoostSound)
-	{
-		UGameplayStatics::PlaySound2D(this, BoostSound);
-	}
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
@@ -541,17 +527,56 @@ void ACartPawn::OnBoost(const FInputActionValue& Value)
 	GetWorldTimerManager().SetTimer(BoostTimerHandle, this, &ACartPawn::EndBoost, BoostDuration, false);
 }
 
+//아이템으로 부스트 발동 — 서버 전용 (BoostItemAction::Execute가 호출). 쿨다운 없음: 아이템 소비가 게이트
+bool ACartPawn::ActivateBoostFromItem()
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (bIsBoosting || bIsSlipping || !CanPlayerMove()) //부스트 중·미끄럼·게임 시작 전 대기 중엔 발동 불가
+	{
+		return false;
+	}
+
+	StartBoost(); //서버 권한 시작 — bIsBoosting은 타 클라에 복제
+
+	if (IsLocallyControlled())
+	{
+		//리슨 호스트 본인 사용: 위에서 이미 시작됨 => 사운드만
+		if (BoostSound)
+		{
+			UGameplayStatics::PlaySound2D(this, BoostSound);
+		}
+	}
+	else
+	{
+		ClientStartBoostFX(); //원격 소유 클라: 예측 시작 + 사운드
+	}
+
+	return true;
+}
+
+//아이템 부스트를 소유 클라에 적용 — 예측 시작 + 사운드 (여기서만 재생 => 호스트가 남의 소리 안 들음)
+void ACartPawn::ClientStartBoostFX_Implementation()
+{
+	if (!bIsBoosting) //복제 지연 등으로 이미 켜져 있으면 중복 런치 방지
+	{
+		StartBoost();
+	}
+
+	if (BoostSound)
+	{
+		UGameplayStatics::PlaySound2D(this, BoostSound);
+	}
+}
+
 void ACartPawn::EndBoost()
 {
 	GetWorldTimerManager().ClearTimer(BoostTimerHandle); //브레이크 취소 등 조기 종료 시 남은 지속 타이머 정리 (중복 발동 방지)
 	bIsBoosting = false;
 	ServerSetBoosting(false); //부스터 종료 서버에 통지
-	GetWorldTimerManager().SetTimer(BoostCooldownTimerHandle, this, &ACartPawn::ResetBoostCooldown, BoostCooldown, false);
-}
-
-void ACartPawn::ResetBoostCooldown()
-{
-	bBoostOnCooldown = false;
 }
 
 bool ACartPawn::IsCancelCheckoutState() const
@@ -779,7 +804,6 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 	}
 
 	//충돌 시 정산 취소 (차단벽 정산 중 충돌 시 잠깐 정산 불가)
-    CancelCheckout(0.5f);
     if (IsValid(OtherCart))
     {
         OtherCart->CancelCheckout(0.5f);

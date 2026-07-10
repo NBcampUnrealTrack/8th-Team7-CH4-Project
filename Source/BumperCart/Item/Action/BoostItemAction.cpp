@@ -19,7 +19,5 @@ bool UBoostItemAction::Execute(ACartPawn* PlayerCharacter)
         return false;
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("%s: 부스트 아이템 사용"), *GetNameSafe(PlayerCharacter));
-
-    return true;
+    return PlayerCharacter->ActivateBoostFromItem();
 }
