@@ -24,6 +24,7 @@ public class BumperCart : ModuleRules
             "OnlineSubsystemUtils",
             "SlateCore",
             "Niagara",
+            "NavigationSystem",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

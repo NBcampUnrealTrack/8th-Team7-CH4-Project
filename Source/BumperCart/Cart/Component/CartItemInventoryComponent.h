@@ -8,6 +8,7 @@ class ACartPawn;
 class UItemDataAsset;
 class UInputAction;
 class UInputMappingContext;
+class USoundBase;
 
 struct FInputActionValue;
 
@@ -96,6 +97,37 @@ private:
     void ClearItem();
 
 // ------------------------------------------------------------
+// 아이템 쿨타임
+// ------------------------------------------------------------
+public:
+    // 현재 쿨타임인지
+    UFUNCTION(BlueprintPure, Category = "Item|Cooldwon")
+    bool IsItemOnCooldown() const;
+
+    // 남은 쿨타임
+    UFUNCTION(BlueprintPure, Category = "Item|Cooldown")
+    float GetItemCooldownRemaining() const;
+
+    // 쿨타임 비율
+    UFUNCTION(BlueprintPure, Category = "Item|Cooldown")
+    float GetItemCooldownPercent() const;
+
+private:
+    // 서버에서 아이템 쿨타임 시작
+    void StartItemCooldown();
+
+    // 쿨타임 초기화
+    void ResetItemCooldown();
+
+    // 현재 시간
+    float GetCurrentTimeSeconds() const;
+
+private:
+    // 다음 아이템 사용 가능 시간
+    UPROPERTY(Replicated)
+    float ItemCooldownEndTime = 0.0f;
+
+// ------------------------------------------------------------
 // Getter
 // ------------------------------------------------------------
 public:
@@ -125,4 +157,17 @@ private:
     // 아이템 복제 시 호출
     UFUNCTION()
     void OnRep_ItemInventory();
+
+// ------------------------------------------------------------
+//  사운드
+// ------------------------------------------------------------
+private:
+    // 아이템을 획득한 플레이어만 사운드 재생
+    UFUNCTION(Client, Unreliable)
+    void ClientPlayAcquireItemSound();
+
+private:
+    // 아이템 획득 사운드
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Sound", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<USoundBase> AcquireItemSound;
 };
