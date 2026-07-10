@@ -650,13 +650,21 @@ void AProductBase::RefreshAuraActive()
 {
     if (!IsValid(AuraComponent) || !IsValid(GroundAuraComponent)) return;
 
-    bool bShowAura = ProductState.State == EProductState::Display && AuraSystem && GroundAuraMaterial;
+    bool bShowAura = ProductState.State == EProductState::Display
+        || ProductState.State == EProductState::Spawning
+        || ProductState.State == EProductState::Falling;
 
     if (bShowAura)
     {
-        AuraComponent->Activate();
-        GroundAuraComponent->SetVisibility(true);
-        GroundAuraComponent->SetHiddenInGame(false);
+        if (AuraSystem)
+        {
+            AuraComponent->Activate();
+        }
+        if (GroundAuraMaterial)
+        {
+            GroundAuraComponent->SetVisibility(true);
+            GroundAuraComponent->SetHiddenInGame(false);
+        }
     }
     else
     {
