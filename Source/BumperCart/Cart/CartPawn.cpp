@@ -15,6 +15,10 @@
 #include "TimerManager.h"
 #include "BumperCart.h"
 #include "GameState/MainGameState.h"
+#include "GameInstance/MainGameInstance.h"
+#include "DataAsset/CharacterSelectionConfig.h"
+#include "GameFramework/PlayerState.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "Component/CartGrabComponent.h"
 #include "Component/CartScreenFXComponent.h"
@@ -119,6 +123,28 @@ void ACartPawn::BeginPlay()
 
 	//몸통 메시 기준 회전/위치 1회 캡처 (FX가 건드리기 전에)
 	EnsureBodyMeshResolved();
+}
+
+//서버: 로비에서 확정한 캐릭터 색을 카트에 적용 (GameInstance 조회 => CartColor 복제)
+void ACartPawn::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	const APlayerState* PS = GetPlayerState();
+	const UMainGameInstance* GI = GetGameInstance<UMainGameInstance>();
+	if (!PS || !GI || !GI->CharacterSelectionConfig)
+	{
+		return;
+	}
+
+	const int32 CharacterIndex = GI->GetPlayerCharacter(PS->GetUniqueId());
+	if (CharacterIndex == INDEX_NONE)
+	{
+		return; //로비 선택 기록 없음(테스트 직행 등) => 기본 머티리얼 색 유지
+	}
+
+	CartColor = GI->CharacterSelectionConfig->GetColor(CharacterIndex);
+	ApplyCartColor(); //리슨 호스트 본인 화면 (타 클라는 OnRep)
 }
 
 void ACartPawn::Tick(float DeltaSeconds)
@@ -620,6 +646,8 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	DOREPLIFETIME_CONDITION(ACartPawn, ReplicatedYaw, COND_SkipOwner);
 	//충돌 무적: 모든 클라가 몸통 깜빡 연출을 해야 하므로 소유자 포함 전체 복제
 	DOREPLIFETIME(ACartPawn, bBumpInvincible);
+	//카트 색상: 모든 클라가 몸통 색을 그려야 하므로 전체 복제
+	DOREPLIFETIME(ACartPawn, CartColor);
 }
 
 //B5 : 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
@@ -1048,6 +1076,30 @@ void ACartPawn::EnsureBodyMeshResolved()
         SlipSpinMeshBaseRelLoc = SlipSpinMesh->GetRelativeLocation();
         bBodyMeshResolved = true;
     }
+}
+
+void ACartPawn::OnRep_CartColor()
+{
+	ApplyCartColor();
+}
+
+//몸통 메시 전 슬롯에 MID를 만들어 CartColor 파라미터 적용 (파라미터 없는 슬롯은 무동작)
+void ACartPawn::ApplyCartColor()
+{
+	EnsureBodyMeshResolved();
+	if (!SlipSpinMesh)
+	{
+		return;
+	}
+
+	const int32 NumMaterials = SlipSpinMesh->GetNumMaterials();
+	for (int32 i = 0; i < NumMaterials; ++i)
+	{
+		if (UMaterialInstanceDynamic* MID = SlipSpinMesh->CreateAndSetMaterialInstanceDynamic(i))
+		{
+			MID->SetVectorParameterValue(FName("CartColor"), CartColor);
+		}
+	}
 }
 
 //충돌 후 무적 시작 (서버) — 지속시간 동안 추가 충돌 무시. bBumpInvincible 복제로 전 클라가 몸통 깜빡
