@@ -60,6 +60,10 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Spawning")
     float LaunchForce = 500.0f;
 
+    // 스폰 확률
+    UPROPERTY(EditAnywhere, Category = "Spawning | Config")
+    float SpawnProbability = 0.5f;
+
 public:
     // 제품 목록중 랜덤 선택후 스폰 호출, 제품 반환
     AProductBase* SpawnRandomProduct();

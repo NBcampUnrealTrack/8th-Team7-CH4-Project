@@ -65,6 +65,8 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
 {
     if (!HasAuthority() || !ItemClass) return nullptr;
 
+    if (FMath::FRand() > SpawnProbability)  return nullptr;
+
     // 처음 스폰되는 곳
     FVector SpawnStartLocation = LaunchPoints->GetComponentLocation();
     FRotator SpawnStartRoation = LaunchPoints->GetComponentRotation();    
