@@ -10,6 +10,8 @@
 #include "Components/DecalComponent.h"
 #include "MapGimmickManager/NPCRushGimmick/NPCRushWarningArea.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "NavigationSystem.h"
+#include "Customer/CustomerAI.h"
 
 AMapGimmickManager::AMapGimmickManager()
 {
@@ -61,8 +63,6 @@ void AMapGimmickManager::BeginPlay()
 void AMapGimmickManager::StartGimmickSpawning()
 {
     if (!HasAuthority()) return;
-
-    RespawnObstacles();
 
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnObstacles, ObstacleRespawnInterval, true);
 }
@@ -200,6 +200,7 @@ void AMapGimmickManager::SpawnNPCRush()
             if (IsValid(SpawnedGimmick))
             {
                 UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 시작"));
+                SpawnedGimmick->SetLifeSpan(7.0f);
             }
         }
     }
@@ -222,6 +223,7 @@ void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* Target
 
     // 라인 트레이스 시작점과 정면 방향 설정
     FVector StartPos = TargetPoint->GetActorLocation();
+    // 플레이어 위로 쏴지게
     StartPos.Z += 100.0f;
     FVector ForwardDir = TargetPoint->GetActorForwardVector();
 
@@ -257,10 +259,10 @@ void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* Target
     float TotalDistance = FVector::Dist(StartPos, EndPos);
     float Radius = TotalDistance * 0.5f;
 
-    Multicast_SpawnWarningDecal(CenterVector, Radius);
+    SpawnWarningDecal(CenterVector, Radius);
 }
 
-void AMapGimmickManager::Multicast_SpawnWarningDecal_Implementation(FVector CenterPoint, float Radius)
+void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, float Radius)
 {
     if (WarningSound)
     {
@@ -297,4 +299,35 @@ void AMapGimmickManager::Multicast_SpawnWarningDecal_Implementation(FVector Cent
     }
 
     WaitingNpcRush();
+}
+
+void AMapGimmickManager::SpawnCustomerAI()
+{
+    if (!HasAuthority())    return;
+
+    UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetNavigationSystem(GetWorld());
+
+    FVector CentorLocation = GetActorLocation();
+    float SearchRadius = 5000.0f;
+    FNavLocation RandomNavLocation;
+
+    for (int32 i = 0; i < SpawnCustomerAICount; i++)
+    {
+        int32 RandomIndex = FMath::RandRange(0, CustomerAIList.Num() - 1);
+        TSubclassOf<ACustomerAI> CustomerAI = CustomerAIList[RandomIndex];
+
+
+        if (NavigationSystem->GetRandomPointInNavigableRadius(CentorLocation, SearchRadius, RandomNavLocation))
+        {
+            FVector SpawnLocation = RandomNavLocation.Location;
+
+            FRotator SpawnRotation = FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f);
+
+            FActorSpawnParameters SpawnParams;
+            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+            ACustomerAI* SpawnedCustomer = GetWorld()->SpawnActor<ACustomerAI>(CustomerAI, SpawnLocation, SpawnRotation, SpawnParams);
+        }
+    }
+    
 }

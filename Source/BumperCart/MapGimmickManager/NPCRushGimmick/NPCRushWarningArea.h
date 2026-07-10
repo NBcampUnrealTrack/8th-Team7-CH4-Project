@@ -13,5 +13,8 @@ class BUMPERCART_API ANPCRushWarningArea : public ADecalActor
 	GENERATED_BODY()
 
 public:
+
+    ANPCRushWarningArea();
+
     void InitWarningDecal(float Duration);
 };

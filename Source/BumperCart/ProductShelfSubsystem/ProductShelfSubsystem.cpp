@@ -52,12 +52,12 @@ void UProductShelfSubsystem::InitializeConfig(UProductShelfManagerConfig* InConf
         UE_LOG(LogTemp, Log, TEXT("[%s][선반매니저] 데이터 에셋 적용"), *NetModeStr);
 
         // 서버에서만
-        if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
-        {
-            // 게임 모드에서 호출시 삭제 예정 - 테스트용
-            GetWorld()->GetTimerManager().SetTimer(GameStartTimerHandle, this, &UProductShelfSubsystem::StartProductSpawning, RespawnDelay, false);
-            UE_LOG(LogTemp, Log, TEXT("[선반매니저] 아이템 스폰"));
-        }
+        //if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
+        //{
+        //    // 게임 모드에서 호출시 삭제 예정 - 테스트용
+        //    GetWorld()->GetTimerManager().SetTimer(GameStartTimerHandle, this, &UProductShelfSubsystem::StartProductSpawning, RespawnDelay, false);
+        //    UE_LOG(LogTemp, Log, TEXT("[선반매니저] 아이템 스폰"));
+        //}
     }
 }
 
@@ -115,7 +115,7 @@ void UProductShelfSubsystem::StartProductSpawning()
 {
     if (GetWorld() && GetWorld()->GetNetMode() == NM_Client) return;
 
-    GetWorld()->GetTimerManager().SetTimer(RespawnTimerHandle, this, &UProductShelfSubsystem::ProductSpawnCall, RespawnDelay, true);
+    GetWorld()->GetTimerManager().SetTimer(RespawnTimerHandle, this, &UProductShelfSubsystem::ProductSpawnCall, RespawnDelay, true, 0.0f);
 }
 
 void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct)
@@ -153,8 +153,6 @@ void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProd
 
                 CurrentProductCount++;
                 UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 세일 제품 스폰 및 체크 완료."));
-
-                // 넷 멀티캐스트로 UI 알림 추가해야함
             }
             else
             {
@@ -182,14 +180,9 @@ void UProductShelfSubsystem::LimitedProductSpawn(TSubclassOf<AProductBase> Limit
 
     if (IsValid(SpawnedProduct))
     {
-        // 한정 제품 체크 (변수, Set() 함수 추가 요청)
-        // SpawnedProduct->SetLimitedProduct(true);
-
         CurrentProductCount++;
 
         UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 한정 제품 스폰 및 체크 완료."));
-
-        // 넷 멀티캐스트로 UI 알림 추가해야함
     }
     else
     {

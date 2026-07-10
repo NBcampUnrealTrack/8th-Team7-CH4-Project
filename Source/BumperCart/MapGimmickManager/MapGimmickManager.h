@@ -10,6 +10,7 @@ class UNiagaraSystem;
 class ANPCRushGimmick;
 class USoundBase;
 class ANPCRushWarningArea;
+class ACustomerAI;
 
 USTRUCT(BlueprintType)
 struct FObstacleSpawnInfo
@@ -125,9 +126,22 @@ public:
 
     void CalculateTraceDimensionsFromTarget(ATargetPoint* TargetPoint, float MaxTraceDistance);
 
-    UFUNCTION(NetMulticast, Reliable)
-    void Multicast_SpawnWarningDecal(FVector CenterPoint, float Radius);
+    void SpawnWarningDecal(FVector CenterPoint, float Radius);
 
+#pragma endregion
+
+#pragma region CustomerAI
+
+private:
+    UPROPERTY(EditAnywhere, Category = "CustomerAI | SetUp")
+    int32 SpawnCustomerAICount;
+
+protected:
+    UPROPERTY(EditAnywhere, Category = "CustomerAI | List")
+    TArray<TSubclassOf<ACustomerAI>> CustomerAIList;
+
+public:
+    void SpawnCustomerAI();
 #pragma endregion
 
 
