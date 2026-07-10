@@ -78,6 +78,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void PossessedBy(AController* NewController) override; //서버: 로비 선택 색을 카트에 적용
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	//B4 : 카트가 무언가에 부딪혔을 때 호출 (충돌 => 상품 드롭 판정)
@@ -507,4 +508,15 @@ private:
 	bool bBumpInvincible = false;
 	float BumpInvincibleTimeRemaining = 0.f; //서버 카운트다운
 	float BumpBlinkAccum = 0.f;              //로컬 깜빡 타이머
+
+	//---------- 카트 색상 (로비 캐릭터 선택 연동) ----------
+	//서버가 빙의 시 로비 선택(GameInstance)으로 결정 => 전 클라 복제
+	UPROPERTY(ReplicatedUsing = OnRep_CartColor)
+	FLinearColor CartColor = FLinearColor::White;
+
+	UFUNCTION()
+	void OnRep_CartColor();
+
+	//몸통 메시 전 슬롯에 MID를 만들어 CartColor 파라미터 적용
+	void ApplyCartColor();
 };
