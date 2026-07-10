@@ -19,6 +19,8 @@ struct FCharacterData
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
     TSubclassOf<APawn> PawnClass;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
+    FLinearColor Color;
 };
 
 UCLASS()
@@ -31,6 +33,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
     TArray<FCharacterData> CharacterDatas;
 
+    UFUNCTION(BlueprintCallable)
+    FLinearColor GetColor(int32 Index) const;
 
     TSubclassOf<APawn> GetPawnClass(int32 Index) const;
 };

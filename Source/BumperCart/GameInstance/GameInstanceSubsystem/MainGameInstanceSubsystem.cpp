@@ -11,6 +11,7 @@
 #include "Interfaces/OnlineSessionInterface.h"
 #include "Engine/Engine.h"
 #include "GameInstance/MainGameInstance.h"
+#include "PlayerController/LobbyPlayerController.h"
 
 
 IOnlineSessionPtr UMainGameInstanceSubsystem::GetSessionInterface() const
@@ -309,7 +310,7 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
 
     Sessions->OnJoinSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnJoinSessionComplete);
     // Index에 들어온 값에따라 방 참가
-    Sessions->JoinSession(Index, NAME_GameSession, Result);
+    Sessions->JoinSession(0, NAME_GameSession, Result);
 }
 
 void UMainGameInstanceSubsystem::JoinPrivateRoomByName(const FString& InRoomName, const FString& InRoomPassword)
@@ -496,10 +497,133 @@ void UMainGameInstanceSubsystem::LeaveSession()
         return;
     }
 
+    const UWorld* World = GetWorld();
+    const ENetMode CurrentNetMode = World ? World->GetNetMode() : NM_MAX;
+    if (CurrentNetMode == NM_ListenServer)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 호스트 나가기 시작: 클라이언트 우선 퇴장"));
+
+        NotifyClientsToLeaveBeforeHostDestroy();
+
+       return;
+    }
 
     //DestroySession은 비동기이므로 델리게이트 등록하여 추후에 콜백 받음
     Sessions->OnDestroySessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnLeaveSessionComplete);
     Sessions->DestroySession(NAME_GameSession);
+}
+
+void UMainGameInstanceSubsystem::NotifyClientsToLeaveBeforeHostDestroy()
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        DestroyHostSession();
+        return;
+    }
+
+    PendingHostLeaveAcks.Reset();
+
+
+    // 나가야할 클라이언트 추가
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+    {
+        APlayerController* PC = It->Get();
+
+        if (!PC || PC->IsLocalController()) continue;
+
+        if (ALobbyPlayerController* LobbyPC = Cast<ALobbyPlayerController>(PC))
+        {
+            PendingHostLeaveAcks.Add(LobbyPC);
+
+            LobbyPC->OnDestroyed.AddDynamic(this, &UMainGameInstanceSubsystem::OnNotifiedClientDestroyed);
+            LobbyPC->Client_NotifyHostIsLeaving();
+        }
+    }
+
+    // 모든 클라이언트가 나갔으면 호스트 세션 파괴
+    if (PendingHostLeaveAcks.Num() == 0)
+    {
+        DestroyHostSession();
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[EOS] %d명의 클라이언트 ACK 대기 시작"), PendingHostLeaveAcks.Num());
+
+    // 전원 ACK을 못 받는 이상 상황(클라 응답 없음 등)을 대비한 안전장치
+    World->GetTimerManager().SetTimer(HostLeaveWaitTimerHandle,this, &UMainGameInstanceSubsystem::DestroyHostSession,3,false);
+}
+
+void UMainGameInstanceSubsystem::OnClientAckLeftSession(APlayerController* FromPC)
+{
+    if (!FromPC) return;
+
+    const int32 RemoveCount = PendingHostLeaveAcks.Remove(FromPC);
+    if (RemoveCount > 0 )
+    {
+        FromPC->OnDestroyed.RemoveDynamic(this, &UMainGameInstanceSubsystem::OnNotifiedClientDestroyed);
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[EOS] 클라이언트 퇴장 ACK 수신 (남은 대상: %d)"), PendingHostLeaveAcks.Num());
+
+    // 모든 클라이언트 퇴장 완료 시
+    if (PendingHostLeaveAcks.Num() == 0)
+    {
+        DestroyHostSession();
+    }
+}
+
+// 강제종료와 같이 클라이언트 연결이 끝기면 대기 목록에서 제거 및 알림
+void UMainGameInstanceSubsystem::OnNotifiedClientDestroyed(AActor* DestroyedActor)
+{
+    APlayerController* PC = Cast<APlayerController>(DestroyedActor);
+    if (!PC) return;
+
+    if (PendingHostLeaveAcks.Remove(PC) > 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] ACK 없이 클라이언트 연결 종료 감지, 대기 목록에서 제거 (남은 대상: %d)"), PendingHostLeaveAcks.Num());
+
+        if (PendingHostLeaveAcks.Num() == 0)
+        {
+            DestroyHostSession();
+        }
+    }
+}
+
+void UMainGameInstanceSubsystem::DestroyHostSession()
+{
+    if (bHostDestroyInProgress) return;
+
+    bHostDestroyInProgress = true;
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(HostLeaveWaitTimerHandle);
+    }
+
+
+    PendingHostLeaveAcks.Reset();
+
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid() || !Sessions->GetNamedSession(NAME_GameSession))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[EOS] 호스트 세션 파괴 시점에 세션이 이미 없습니다. 타이틀로 이동"));
+        bHostDestroyInProgress = false;
+        ReturnToTitle();
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[EOS] 클라이언트 퇴장 확인 완료. 호스트 세션 파괴 시도"));
+
+    Sessions->ClearOnDestroySessionCompleteDelegates(this);
+    Sessions->OnDestroySessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnLeaveSessionComplete);
+    Sessions->DestroySession(NAME_GameSession);
+}
+
+void UMainGameInstanceSubsystem::NotifyLeaveRequestedByHost()
+{
+    bShouldAckHostOnLeaveComplete = true;
+    LeaveSession();
 }
 
 void UMainGameInstanceSubsystem::OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful)
@@ -524,6 +648,18 @@ void UMainGameInstanceSubsystem::OnLeaveSessionComplete(FName SessionName, bool 
     RoomName.Empty();
     RoomPassword.Empty();
     bIsHardMode = false;
+    bHostDestroyInProgress = false;
+
+    if (bShouldAckHostOnLeaveComplete)
+    {
+        bShouldAckHostOnLeaveComplete = false;
+
+        APlayerController* PC = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController(GetWorld()) : nullptr;
+        if (ALobbyPlayerController* LobbyPC = Cast<ALobbyPlayerController>(PC))
+        {
+            LobbyPC->Server_AckLeftSession();
+        }
+    }
 
     OnLeaveSessionResult.Broadcast(bWasSuccessful);
 

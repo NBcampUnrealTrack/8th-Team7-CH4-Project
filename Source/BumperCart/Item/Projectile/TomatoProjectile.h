@@ -9,6 +9,10 @@ class UCartScreenFXComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 class UProjectileMovementComponent;
+class UNiagaraComponent;
+class UNiagaraSystem;
+class USoundBase;
+class USoundAttenuation;
 
 UCLASS()
 class BUMPERCART_API ATomatoProjectile : public AActor
@@ -45,6 +49,9 @@ private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tomato|Component", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UStaticMeshComponent> TomatoMesh;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tomato|Component", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UNiagaraComponent> TrailNiagaraComponent;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tomato|Movement", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
     
@@ -52,7 +59,7 @@ private:
 // 투사체 발사
 // ------------------------------------------------------------
 public:
-    // 투사체 생성 직후 발사 방향 설정
+    // 토마토 생성 직후 발사 방향 설정
     void FireInDirection(const FVector& Direction);
 
 private:
@@ -67,6 +74,10 @@ private:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
     float ProjectileSpeed = 1500.0f;
 
+    // 중력
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+    float ProjectileGravityScale = 0.1f;
+
     // Destroy 시간
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
     float MaxLifeTime = 3.0f;
@@ -78,5 +89,36 @@ private:
     // 가려질 시간
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Effect", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
     float ScreenBlockDuration = 3.0f;
+
+// ------------------------------------------------------------
+// 궤적 이펙트
+// ------------------------------------------------------------
+private:
+    // 투사체 궤적 Niagara
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Effect", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UNiagaraSystem> TrailNiagaraSystem;
+// ------------------------------------------------------------
+// 사운드
+// ------------------------------------------------------------
+private:
+    // 토마토 생성 시 로컬에서 던지는 사운드 재생
+    void PlayThrowTomatoSound() const;
+
+    // 토마토가 오브젝트와 충돌 시 주변 플레이어에게 사운드 재생
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastPlayHitTomatoSound(const FVector& SoundLocation);
+
+    // 사운드 거리
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Sound", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<USoundAttenuation> HitSoundAttenuation;
+
+private:
+    // 토마토 던질 때 사운드
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Sound", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<USoundBase> ThrowTomatoSound;
+
+    // 토마토 맞았을 때 사운드
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Sound", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<USoundBase> HitTomatoSound;
 
 };

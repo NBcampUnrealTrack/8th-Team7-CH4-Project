@@ -287,7 +287,7 @@ protected:
 
 	//출발 그레이스(초) — 정지에서 움직이기 시작한 지 이 시간 안에 만든 충돌은 무효 (바로 앞 카트 밀기 오판정 방지). 부스트는 예외
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpStartGraceTime = 0.7f;
+	float BumpStartGraceTime = 0.5f;
 
 	//충돌 판정 후 무적 지속(초) — 이 동안 추가 충돌 완전 무시 + 몸통 깜빡 (연타/비비기 방지)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
@@ -320,15 +320,15 @@ protected:
 	//---------- 충돌 넉백 + 리액션(몸통 들썩·기울임) ----------
 	//부스트로 상대 카트를 박았을 때 상대를 밀어내는 세기 (B: 부스트 비비기 방지). LaunchCharacter 속도
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BoostKnockbackStrength = 900.f;
+	float BoostKnockbackStrength = 1500.f;
 
 	//일반 충돌(부스트 아님) 시 상대를 밀어내는 세기 = 접근속도 × 이 배율 (살짝만)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float NormalKnockbackScale = 0.4f;
+	float NormalKnockbackScale = 0.55f;
 
 	//일반 충돌 넉백 상한 (접근속도가 커도 이 이상은 안 밀림)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float NormalKnockbackMax = 500.f;
+	float NormalKnockbackMax = 700.f;
 
 	//리액션 스프링 강성(높을수록 빨리 제자리로). 감쇠와 함께 '덜컹' 리듬 결정
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "1"))
