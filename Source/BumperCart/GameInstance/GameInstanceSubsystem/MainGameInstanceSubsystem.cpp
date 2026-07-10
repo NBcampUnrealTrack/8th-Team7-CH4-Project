@@ -310,7 +310,7 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
 
     Sessions->OnJoinSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnJoinSessionComplete);
     // Index에 들어온 값에따라 방 참가
-    Sessions->JoinSession(Index, NAME_GameSession, Result);
+    Sessions->JoinSession(0, NAME_GameSession, Result);
 }
 
 void UMainGameInstanceSubsystem::JoinPrivateRoomByName(const FString& InRoomName, const FString& InRoomPassword)
