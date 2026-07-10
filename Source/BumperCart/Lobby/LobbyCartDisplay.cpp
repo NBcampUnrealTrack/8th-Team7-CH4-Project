@@ -4,9 +4,11 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameInstance/MainGameInstance.h"
+#include "GameState/LobbyGameState.h"
 #include "DataAsset/CharacterSelectionConfig.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
 ALobbyCartDisplay::ALobbyCartDisplay()
@@ -35,18 +37,50 @@ ALobbyCartDisplay::ALobbyCartDisplay()
 	}
 }
 
-//캐릭터 색을 전 슬롯 MID로 적용 (인게임 카트와 동일 방식, 파라미터 없는 슬롯은 무동작)
 void ALobbyCartDisplay::BeginPlay()
 {
 	Super::BeginPlay();
 
+	//빈 슬롯 복원용 기본색 캐시 (MID 만들기 전 원본 머티리얼에서)
+	if (const UMaterialInterface* BaseMaterial = CartMesh->GetMaterial(0))
+	{
+		BaseMaterial->GetVectorParameterValue(FHashedMaterialParameterInfo(FName("CartColor")), DefaultColor);
+	}
+
+	BindLobbyState();
+}
+
+//LobbyGameState 변경 델리게이트에 바인딩 — 클라는 GameState 복제 전일 수 있어 잡힐 때까지 재시도
+void ALobbyCartDisplay::BindLobbyState()
+{
+	ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
+	if (!GS)
+	{
+		GetWorldTimerManager().SetTimer(BindRetryHandle, this, &ALobbyCartDisplay::BindLobbyState, 0.2f, false);
+		return;
+	}
+
+	GS->OnLobbyPlayersChanged.AddDynamic(this, &ALobbyCartDisplay::RefreshColor);
+	RefreshColor();
+}
+
+//슬롯 플레이어의 선택 색으로 전 슬롯 MID 갱신 (빈 슬롯/미선택이면 기본색)
+void ALobbyCartDisplay::RefreshColor()
+{
+	const ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
 	const UMainGameInstance* GI = GetGameInstance<UMainGameInstance>();
-	if (!GI || !GI->CharacterSelectionConfig)
+	if (!GS || !GI || !GI->CharacterSelectionConfig)
 	{
 		return;
 	}
 
-	const FLinearColor Color = GI->CharacterSelectionConfig->GetColor(CharacterIndex);
+	FLinearColor Color = DefaultColor;
+	const TArray<FLobbyPlayerInfo>& Infos = GS->GetReplicatedPlayerInfos();
+	if (Infos.IsValidIndex(PlayerSlotIndex) && Infos[PlayerSlotIndex].SelectedCharacterIndex != INDEX_NONE)
+	{
+		Color = GI->CharacterSelectionConfig->GetColor(Infos[PlayerSlotIndex].SelectedCharacterIndex);
+	}
+
 	const int32 NumMaterials = CartMesh->GetNumMaterials();
 	for (int32 i = 0; i < NumMaterials; ++i)
 	{

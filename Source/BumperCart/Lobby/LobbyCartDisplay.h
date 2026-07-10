@@ -1,5 +1,5 @@
 //BumperCart - B(카트/플레이어 조작) 파트
-//로비 전시용 카트 — 캐릭터 색을 입혀 보여주는 장식 액터 (레벨 배치 후 CharacterIndex만 지정)
+//로비 전시용 카트 — 슬롯 플레이어가 선택한 캐릭터 색을 실시간 표시 (레벨 배치 후 PlayerSlotIndex만 지정)
 
 #pragma once
 
@@ -24,7 +24,20 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Lobby")
 	TObjectPtr<UStaticMeshComponent> CartMesh;
 
-	//이 전시 카트가 나타내는 캐릭터 번호 — CharacterSelectionConfig의 색을 입힘
+	//이 전시 카트가 나타내는 플레이어 슬롯(입장 순서). 그 플레이어의 선택 색을 표시
 	UPROPERTY(EditAnywhere, Category = "Lobby")
-	int32 CharacterIndex = 0;
+	int32 PlayerSlotIndex = 0;
+
+private:
+	//LobbyGameState의 변경 델리게이트에 바인딩 (GameState 복제 전이면 타이머로 재시도)
+	void BindLobbyState();
+
+	//슬롯 플레이어의 선택 색으로 갱신 (빈 슬롯/미선택이면 기본색)
+	UFUNCTION()
+	void RefreshColor();
+
+	//머티리얼 원래 CartColor (빈 슬롯 복원용, BeginPlay에서 캐시)
+	FLinearColor DefaultColor = FLinearColor::White;
+
+	FTimerHandle BindRetryHandle;
 };
