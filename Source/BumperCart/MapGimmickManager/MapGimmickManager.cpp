@@ -10,6 +10,8 @@
 #include "Components/DecalComponent.h"
 #include "MapGimmickManager/NPCRushGimmick/NPCRushWarningArea.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "NavigationSystem.h"
+#include "Customer/CustomerAI.h"
 
 AMapGimmickManager::AMapGimmickManager()
 {
@@ -296,4 +298,63 @@ void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, float Radius)
     }
 
     WaitingNpcRush();
+}
+
+void AMapGimmickManager::SpawnCustomerAI()
+{
+    if (!HasAuthority())
+    {
+        UE_LOG(LogTemp, Log, TEXT("[맵 기믹 매니저] 서버 아님"));
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("손님 스폰 시작"));
+
+    UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetNavigationSystem(GetWorld());
+
+    if (!NavigationSystem)
+    {
+        UE_LOG(LogTemp, Log, TEXT("네비 메쉬 없음"));
+        return;
+    }
+
+    FVector CentorLocation = GetActorLocation();
+    float SearchRadius = 5000.0f;
+    FNavLocation RandomNavLocation;
+
+    for (int32 i = 0; i > SpawnCustomerAICount; i++)
+    {
+        int32 RandomIndex = FMath::RandRange(0, CustomerAIList.Num() - 1);
+        TSubclassOf<ACustomerAI> CustomerAI = CustomerAIList[RandomIndex];
+
+        UE_LOG(LogTemp, Log, TEXT("손님 선택"));
+
+        if (NavigationSystem->GetRandomPointInNavigableRadius(CentorLocation, SearchRadius, RandomNavLocation))
+        {
+            UE_LOG(LogTemp, Log, TEXT("스폰 위치 확인"));
+
+            FVector SpawnLocation = RandomNavLocation.Location;
+
+            FRotator SpawnRotation = FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f);
+
+            FActorSpawnParameters SpawnParams;
+            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+            ACustomerAI* SpawnedCustomer = GetWorld()->SpawnActor<ACustomerAI>(CustomerAI, SpawnLocation, SpawnRotation, SpawnParams);
+
+            if (SpawnedCustomer)
+            {
+                UE_LOG(LogTemp, Log, TEXT("손님 스폰 완료"));
+            }
+            else
+            {
+                UE_LOG(LogTemp, Log, TEXT("손님 스폰 실패"));
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Log, TEXT("위치 못찾음"));
+        }
+    }
+    
 }
