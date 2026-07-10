@@ -20,6 +20,12 @@ public:
     UFUNCTION(Server, Reliable)
     void ServerRPCSetDisplayName(const FString& DisplayName);
 
+    UFUNCTION(Client, Reliable)
+    void Client_NotifyHostIsLeaving();
+
+    UFUNCTION(Server, Reliable)
+    void Server_AckLeftSession();
+
 protected:
     // 에디터에서 어떤 위젯 블루프린트를 띄울지 지정
     UPROPERTY(EditDefaultsOnly, Category = "Lobby|UI")
