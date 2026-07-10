@@ -18,6 +18,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundBase.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -61,10 +63,10 @@ ACheckoutZone::ACheckoutZone()
     CheckoutProcessingAudio->SetupAttachment(SceneRoot);
     CheckoutProcessingAudio->bAutoActivate = false;
 
-    OpenStateNiagara = CreateDefaultSubobject<UNiagaraComponent>(TEXT("OpenStateNiagara"));
-    OpenStateNiagara->SetupAttachment(CheckoutZoneVisual);
-    OpenStateNiagara->SetAutoActivate(false);
-    OpenStateNiagara->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
+    OpenStateEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("OpenStateEffect"));
+    OpenStateEffect->SetupAttachment(CheckoutZoneVisual);
+    OpenStateEffect->SetAutoActivate(false);
+    OpenStateEffect->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
 }
 
 void ACheckoutZone::BeginPlay()
@@ -78,9 +80,9 @@ void ACheckoutZone::BeginPlay()
 
     InitializeCheckoutZoneMaterials();
 
-    if (IsValid(OpenStateNiagara))
+    if (IsValid(OpenStateEffect))
     {
-        OpenStateNiagara->DeactivateImmediate();
+        OpenStateEffect->DeactivateImmediate();
     }
 
     OnRep_CurrentCheckoutZoneState();
@@ -185,7 +187,7 @@ void ACheckoutZone::InitializeCheckoutZoneMaterials()
 
 void ACheckoutZone::UpdateCheckoutZoneVisual()
 {
-    UpdateCheckoutNiagara();
+    UpdateCheckoutEffect();
 
     if (!IsValid(CheckoutZoneVisual))
     {
@@ -275,9 +277,9 @@ void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
     UE_LOG(LogTemp, Warning, TEXT("계산대 오픈"));
 }
 
-void ACheckoutZone::UpdateCheckoutNiagara()
+void ACheckoutZone::UpdateCheckoutEffect()
 {
-    if (!IsValid(OpenStateNiagara))
+    if (!IsValid(OpenStateEffect))
     {
         return;
     }
@@ -287,18 +289,40 @@ void ACheckoutZone::UpdateCheckoutNiagara()
 
     if (bShouldPlayOpenNiagara)
     {
-        if (!OpenStateNiagara->IsActive())
+        if (!OpenStateEffect->IsActive())
         {
-            OpenStateNiagara->Activate(true);
+            OpenStateEffect->Activate(true);
         }
 
         return;
     }
 
-    if (OpenStateNiagara->IsActive())
+    if (OpenStateEffect->IsActive())
     {
-        OpenStateNiagara->DeactivateImmediate();
+        OpenStateEffect->DeactivateImmediate();
     }
+}
+
+void ACheckoutZone::MulticastPlayCheckoutCompleteEffect_Implementation(ACartPawn* CompletedPlayer)
+{
+    if (!IsValid(CompletedPlayer))
+    {
+        return;
+    }
+
+    if (!IsValid(CheckoutCompleteEffect))
+    {
+        return;
+    }
+
+    const FVector SpawnLocation = CompletedPlayer->GetActorLocation() + FVector(0.0f, 0.0f, 80.0f);
+
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        this,
+        CheckoutCompleteEffect,
+        SpawnLocation,
+        CompletedPlayer->GetActorRotation()
+    );
 }
 
 
@@ -1139,6 +1163,7 @@ void ACheckoutZone::CompleteCheckout()
     MainPlayerState->AddPlayerScore(LastCheckoutScore);
     MainPlayerState->AddCheckoutCount(1);
 
+    MulticastPlayCheckoutCompleteEffect(CompletedPlayer);
     MulticastPlayCheckoutCompleteSound();
 
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
