@@ -11,7 +11,10 @@
 #include "InputMappingContext.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/GameStateBase.h"
 #include "Net/UnrealNetwork.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 
 UCartItemInventoryComponent::UCartItemInventoryComponent()
 {
@@ -26,6 +29,9 @@ void UCartItemInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimePro
 
     DOREPLIFETIME(UCartItemInventoryComponent, CurrentItemData);
     DOREPLIFETIME(UCartItemInventoryComponent, CurrentItemCount);
+
+    // 클라이언트만 복제
+    DOREPLIFETIME_CONDITION(UCartItemInventoryComponent, ItemCooldownEndTime, COND_OwnerOnly);
 }
 
 void UCartItemInventoryComponent::SetupInput()
@@ -103,6 +109,8 @@ bool UCartItemInventoryComponent::AcquireItem(UItemDataAsset* NewItemData)
         return false;
     }
 
+    const bool bItemChanged = CurrentItemData != NewItemData;
+
     // 최대 보유 가능 아이템 수
     const int32 MaxStackCount = FMath::Max(1, NewItemData->MaxStackCount);
 
@@ -110,8 +118,16 @@ bool UCartItemInventoryComponent::AcquireItem(UItemDataAsset* NewItemData)
     CurrentItemData = NewItemData;
     CurrentItemCount = MaxStackCount;
 
+    // 아이템이 교체될 경우 쿨타임 초기화
+    if (bItemChanged)
+    {
+        ResetItemCooldown();
+    }
+
     HandleItemChanged();
     OwnerActor->ForceNetUpdate();
+
+    ClientPlayAcquireItemSound();
 
     return true;
 }
@@ -165,6 +181,13 @@ void UCartItemInventoryComponent::UseItem()
         return;
     }
 
+    // 쿨타임 검사
+    if (IsItemOnCooldown())
+    {
+        return;
+    }
+
+
     // 실행할 Action 클래스가 존재하는지
     if (!CurrentItemData->ActionClass)
     {
@@ -189,6 +212,9 @@ void UCartItemInventoryComponent::UseItem()
     const bool bExecuted = ItemAction->Execute(PlayerCharacter);
     if (bExecuted)
     {
+        // 쿨타임 적용
+        StartItemCooldown();
+
         // 수량 1개 소모
         CurrentItemCount = FMath::Max(0, CurrentItemCount - 1);
 
@@ -225,9 +251,78 @@ void UCartItemInventoryComponent::ClearItem()
     CurrentItemData = nullptr;
     CurrentItemCount = 0;
 
-    HandleItemChanged();
+    // 쿨타임 제거
+    ResetItemCooldown();
 
+    HandleItemChanged();
     OwnerActor->ForceNetUpdate();
+}
+
+// ------------------------------------------------------------
+// 아이템 쿨타임
+// ------------------------------------------------------------
+
+bool UCartItemInventoryComponent::IsItemOnCooldown() const
+{
+    return GetItemCooldownRemaining() > KINDA_SMALL_NUMBER;
+}
+
+float UCartItemInventoryComponent::GetItemCooldownRemaining() const
+{
+    return FMath::Max(0.0f, ItemCooldownEndTime - GetCurrentTimeSeconds());
+}
+
+float UCartItemInventoryComponent::GetItemCooldownPercent() const
+{
+    if (!IsValid(CurrentItemData))
+    {
+        return 0.0f;
+    }
+
+    const float CooldownDuration = (0.0f, CurrentItemData->CooldownDuration);
+
+    if (CooldownDuration <= KINDA_SMALL_NUMBER)
+    {
+        return 0.0f;
+    }
+
+    return FMath::Clamp(GetItemCooldownRemaining() / CooldownDuration, 0.0f, 1.0f);
+}
+
+void UCartItemInventoryComponent::StartItemCooldown()
+{
+    if (!IsValid(CurrentItemData))
+    {
+        return;
+    }
+
+    const float CooldownDuration =  FMath::Max(0.0f, CurrentItemData->CooldownDuration);
+
+    ItemCooldownEndTime = GetCurrentTimeSeconds() + CooldownDuration;
+}
+
+void UCartItemInventoryComponent::ResetItemCooldown()
+{
+    ItemCooldownEndTime = 0.0f;
+}
+
+float UCartItemInventoryComponent::GetCurrentTimeSeconds() const
+{
+    const UWorld* World = GetWorld();
+
+    if (!IsValid(World))
+    {
+        return 0.0f;
+    }
+
+    const AGameStateBase* GameState = World->GetGameState();
+
+    if (IsValid(GameState))
+    {
+        return GameState->GetServerWorldTimeSeconds();
+    }
+
+    return World->GetTimeSeconds();
 }
 
 
@@ -272,5 +367,19 @@ void UCartItemInventoryComponent::HandleItemChanged()
 void UCartItemInventoryComponent::OnRep_ItemInventory()
 {
     HandleItemChanged();
+}
+
+// ------------------------------------------------------------
+// 사운드
+// ------------------------------------------------------------
+
+void UCartItemInventoryComponent::ClientPlayAcquireItemSound_Implementation()
+{
+    if (!IsValid(AcquireItemSound))
+    {
+        return;
+    }
+
+    UGameplayStatics::PlaySound2D(this, AcquireItemSound);
 }
 
