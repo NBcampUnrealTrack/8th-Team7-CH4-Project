@@ -41,6 +41,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsSlipping() const { return bIsSlipping; }
 
+	//아이템으로 부스트 발동 (서버 전용, BoostItemAction 진입점). 실패 시 false => 아이템 미소비
+	bool ActivateBoostFromItem();
+
 	//현재 적재율(0~1). SetLoadRatio로 갱신
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	float GetLoadRatio() const { return LoadRatio; }
@@ -131,9 +134,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* BrakeAction; //Space
 
-	UPROPERTY(EditAnywhere, Category = "Input")
-	UInputAction* BoostAction; //Shift
-
 	//---------- 전후진 ----------
 	//기본 전진 최고 속도(cm/s). 부스트 속도 = 이 값 * BoostSpeedMultiplier 로 자동 계산됨. (BeginPlay에서 이동 컴포넌트에 적용)
 	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0"))
@@ -184,9 +184,6 @@ protected:
 	//부스트 지속 시간(초). 아이템화로 사용 기회가 줄어드는 만큼 길게 (B13 밸런싱)
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
 	float BoostDuration = 2.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
-	float BoostCooldown = 1.0f;
 
 
     //---------- 카메라 속도감 연출 ----------
@@ -406,10 +403,14 @@ protected:
 	void OnSteerReleased(const FInputActionValue& Value);
 	void OnBrakeStart(const FInputActionValue& Value);
 	void OnBrakeStop(const FInputActionValue& Value);
-	void OnBoost(const FInputActionValue& Value);
 
+	//부스트 시작 핵심 (상태+런치+지속 타이머). 사운드 없음 — 서버·소유클라 각자 호출
+	void StartBoost();
 	void EndBoost();
-	void ResetBoostCooldown();
+
+	//아이템 부스트를 소유 클라에 적용 (예측 시작 + 사운드)
+	UFUNCTION(Client, Reliable)
+	void ClientStartBoostFX();
 
 	//스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청
 	void RequestSpill(float Impulse, EDropCollisionRole DropRole);
@@ -447,14 +448,12 @@ private:
 	//부스터 상태 (bIsBoosting: 충돌 역할 판정 위해 서버 통지 + 타 클라 복제)
 	UPROPERTY(Replicated)
 	bool bIsBoosting = false;
-	bool bBoostOnCooldown = false;
 
 	//기본값 백업(부스터/브레이크 후 복구용)
 	float DefaultMaxWalkSpeed = 0.f;
 	float DefaultBrakingDeceleration = 0.f;
 
 	FTimerHandle BoostTimerHandle;
-	FTimerHandle BoostCooldownTimerHandle;
 
 	//정산 취소 상태인지
 	bool bIsCancelCheckoutState = false;
