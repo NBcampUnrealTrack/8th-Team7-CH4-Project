@@ -19,7 +19,7 @@ public class BumperCart : ModuleRules
 			"GameplayStateTreeModule",
 			"UMG",
 			"Slate",
-            "OnlineSubsystemEOS",
+            "OnlineSubsystemSteam",
             "OnlineSubsystem",
             "OnlineSubsystemUtils",
             "SlateCore",

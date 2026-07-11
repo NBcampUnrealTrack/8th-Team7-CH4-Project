@@ -34,14 +34,18 @@
 		},
 		{
 			"Name": "EOSOverlayInputProvider",
-			"Enabled": true
+			"Enabled": false
 		},
 		{
 			"Name": "OnlineSubsystemEOS",
-			"Enabled": true
+			"Enabled": false
 		},
 		{
 			"Name": "SocketSubsystemEOS",
+			"Enabled": false
+		},
+		{
+			"Name": "OnlineSubsystemSteam",
 			"Enabled": true
 		},
         {

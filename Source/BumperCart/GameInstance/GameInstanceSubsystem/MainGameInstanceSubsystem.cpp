@@ -2,7 +2,10 @@
 
 #include "GameInstance/GameInstanceSubsystem/MainGameInstanceSubsystem.h"
 #include "OnlineSubsystem.h"
+#include "OnlineSubsystemModule.h"
+#include "OnlineSubsystemNames.h"
 #include "OnlineSubsystemUtils.h"
+#include "Modules/ModuleManager.h"
 #include "OnlineSessionSettings.h"
 #include "Online/OnlineSessionNames.h"
 #include "Engine/GameInstance.h"
@@ -12,6 +15,8 @@
 #include "Engine/Engine.h"
 #include "GameInstance/MainGameInstance.h"
 #include "PlayerController/LobbyPlayerController.h"
+#include "HAL/PlatformProcess.h"
+#include "Misc/CoreMisc.h"
 
 
 IOnlineSessionPtr UMainGameInstanceSubsystem::GetSessionInterface() const
@@ -19,7 +24,7 @@ IOnlineSessionPtr UMainGameInstanceSubsystem::GetSessionInterface() const
     IOnlineSubsystem* OnlineSub = Online::GetSubsystem(GetWorld());
     if (!OnlineSub)
     {
-        UE_LOG(LogTemp, Error, TEXT("[EOS] OnlineSubsystem을 찾을 수 없습니다."));
+        UE_LOG(LogTemp, Error, TEXT("[Steam] OnlineSubsystem을 찾을 수 없습니다."));
         return nullptr;
     }
     return OnlineSub->GetSessionInterface();
@@ -30,60 +35,50 @@ IOnlineIdentityPtr UMainGameInstanceSubsystem::GetIdentityInterface() const
     IOnlineSubsystem* OnlineSub = Online::GetSubsystem(GetWorld());
     if (!OnlineSub)
     {
-        UE_LOG(LogTemp, Error, TEXT("[EOS] OnlineSubsystem을 찾을 수 없습니다."));
+        UE_LOG(LogTemp, Error, TEXT("[Steam] OnlineSubsystem을 찾을 수 없습니다."));
         return nullptr;
     }
     return OnlineSub->GetIdentityInterface();
 }
 
 
-// 로그인
+// 로그인 — Steam은 로그인 상태를 Steam 클라이언트가 관리 (CredentialName 미사용, 시그니처는 UI 호환용 유지)
 void UMainGameInstanceSubsystem::Login(const FString& CredentialName)
 {
-    IOnlineIdentityPtr Identity = GetIdentityInterface();
-    if (!Identity.IsValid()) return;
-
-    if (Identity->GetLoginStatus(0) == ELoginStatus::LoggedIn)
+    //패키지 실행인데 Steam을 못 잡은 경우(클라 미실행/미로그인) — 에디터(PIE)의 Null 폴백은 로컬 LAN 테스트용이라 통과
+    if (IsUsingNullFallback() && IsRunningGame())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 이미 로그인되어 있습니다."));
+        //그 사이 Steam 클라이언트에 로그인했을 수 있으니 서브시스템 재생성 후 재판정 (타이틀 시점이라 안전)
+        FModuleManager::GetModuleChecked<FOnlineSubsystemModule>("OnlineSubsystem").ReloadDefaultSubsystem();
+        if (IsUsingNullFallback())
+        {
+            //여전히 실패 => Steam 클라이언트 실행을 띄워주고 안내. 로그인 후 Login 버튼 재시도 가능
+            FPlatformProcess::LaunchURL(TEXT("steam://open/main"), nullptr, nullptr);
+            OnLoginResult.Broadcast(false, TEXT("Steam 로그인이 필요합니다. Steam 로그인 후 다시 시도해주세요."));
+            return;
+        }
+    }
+
+    IOnlineIdentityPtr Identity = GetIdentityInterface();
+    if (!Identity.IsValid())
+    {
+        OnLoginResult.Broadcast(false, TEXT("Steam OnlineSubsystem을 찾을 수 없습니다. Steam 클라이언트 실행을 확인하세요."));
         return;
     }
 
-    FOnlineAccountCredentials Credentials;
-    //개발자 테스트용
-    /*
-    Credentials.Type = TEXT("Developer");
-    Credentials.Id = TEXT("Localhost:7777");
-    Credentials.Token = CredentialName;
+    //Steam 클라이언트에 이미 로그인되어 있으면 바로 성공 처리
+    if (Identity->GetLoginStatus(0) == ELoginStatus::LoggedIn)
+    {
+        CachedDisplayName = Identity->GetPlayerNickname(0);
+        UE_LOG(LogTemp, Log, TEXT("[Steam] 로그인 확인. 닉네임: %s"), *CachedDisplayName);
+        OnLoginResult.Broadcast(true, CachedDisplayName);
+        return;
+    }
 
-
-    //패키징 테스트용
-
-    Credentials.Type = TEXT("AccountPortal");
-    Credentials.Id = TEXT("");
-    Credentials.Token = TEXT("");
-    */
-
-
-
-    // 에디터(PIE) 환경 - DevAuthTool을 이용한 개발자 테스트용 로그인
-    Credentials.Type  = TEXT("Developer");
-    Credentials.Id    = TEXT("Localhost:7777");
-    Credentials.Token = CredentialName;
-
-    UE_LOG(LogTemp, Log, TEXT("[EOS] (Editor) Developer 로그인 시도 - Credential: %s"), *CredentialName);
-    /*
-    // 배포 빌드 - AccountPortal을 통한 실제 로그인 (Id/Token은 EOS가 자동 처리)
-    Credentials.Type  = TEXT("AccountPortal");
-    Credentials.Id    = TEXT("");
-    Credentials.Token = TEXT("");
-    */
-    UE_LOG(LogTemp, Log, TEXT("[EOS] (Build) AccountPortal 로그인 시도"));
-
-
+    //미로그인 상태 => 자동 로그인 시도 (자격증명은 Steam 클라이언트가 처리)
     Identity->ClearOnLoginCompleteDelegates(0, this);
     Identity->OnLoginCompleteDelegates[0].AddUObject(this, &UMainGameInstanceSubsystem::OnLoginComplete);
-    Identity->Login(0, Credentials);
+    Identity->Login(0, FOnlineAccountCredentials());
 }
 
 void UMainGameInstanceSubsystem::OnLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error)
@@ -96,22 +91,18 @@ void UMainGameInstanceSubsystem::OnLoginComplete(int32 LocalUserNum, bool bWasSu
 
     if (bWasSuccessful)
     {
-        UE_LOG(LogTemp, Log, TEXT("[EOS] 로그인 성공. UserId: %s"), *UserId.ToString());
+        UE_LOG(LogTemp, Log, TEXT("[Steam] 로그인 성공. UserId: %s"), *UserId.ToString());
 
         if (Identity.IsValid())
         {
-            TSharedPtr<FUserOnlineAccount> Account = Identity->GetUserAccount(UserId);
-            if (Account.IsValid())
-            {
-                CachedDisplayName = Account->GetDisplayName();
-            }
+            CachedDisplayName = Identity->GetPlayerNickname(LocalUserNum); //Steam 닉네임
         }
 
         OnLoginResult.Broadcast(true, CachedDisplayName);
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 로그인 실패: %s"), *Error);
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 로그인 실패: %s"), *Error);
         OnLoginResult.Broadcast(false, Error);
     }
 }
@@ -138,6 +129,13 @@ void UMainGameInstanceSubsystem::HostListenServer(const FString& InRoomName, con
     CreateSessionInternal();
 }
 
+//Steam을 못 잡아 Null로 폴백된 상태인지 (에디터 PIE 등) => LAN 모드로 로컬 멀티 테스트 가능하게
+bool UMainGameInstanceSubsystem::IsUsingNullFallback() const
+{
+    IOnlineSubsystem* OnlineSub = Online::GetSubsystem(GetWorld());
+    return OnlineSub && OnlineSub->GetSubsystemName() == NULL_SUBSYSTEM;
+}
+
 void UMainGameInstanceSubsystem::CreateSessionInternal()
 {
     IOnlineSessionPtr Sessions = GetSessionInterface();
@@ -146,12 +144,13 @@ void UMainGameInstanceSubsystem::CreateSessionInternal()
     //세션 세팅
     FOnlineSessionSettings SessionSettings;
     SessionSettings.bIsDedicated          = false;  // 리슨 서버
-    SessionSettings.bIsLANMatch           = false;
+    SessionSettings.bIsLANMatch           = IsUsingNullFallback(); //PIE(Null 폴백)에선 LAN 세션
     SessionSettings.bShouldAdvertise      = true;   // 검색 가능
     SessionSettings.bAllowJoinInProgress  = true;
-    SessionSettings.bUsesPresence         = false;  // 친구 목록 보고 게임 참가 가능 여부
+    SessionSettings.bUsesPresence         = true;   // Steam 로비 검색/참가에 필요
     SessionSettings.bAllowInvites         = true; // 친구 초대 여부
-    SessionSettings.bUseLobbiesIfAvailable= true;   // EOS Lobby 사용
+    SessionSettings.bAllowJoinViaPresence = true;
+    SessionSettings.bUseLobbiesIfAvailable= true;   // Steam Lobby 사용
     SessionSettings.NumPublicConnections  = 4;      // 최대 인원 수
     SessionSettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineDataAdvertisementType::ViaOnlineService);
 
@@ -176,11 +175,11 @@ void UMainGameInstanceSubsystem::OnCreateSessionComplete(FName SessionName, bool
 
     if (!bWasSuccessful)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 세션 생성 실패: %s"), *SessionName.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 세션 생성 실패: %s"), *SessionName.ToString());
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 생성 성공: %s"), *SessionName.ToString());
+    UE_LOG(LogTemp, Log, TEXT("[Steam] 세션 생성 성공: %s"), *SessionName.ToString());
 
     UMainGameInstance* MainGI = Cast<UMainGameInstance>(GetGameInstance());
     if (!MainGI) return;
@@ -210,7 +209,7 @@ void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, boo
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 기존 세션 제거 실패: %s"), *SessionName.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 기존 세션 제거 실패: %s"), *SessionName.ToString());
     }
 }
 
@@ -219,8 +218,8 @@ void UMainGameInstanceSubsystem::CreateSearchSettings()
 {
     SearchSettings = MakeShareable(new FOnlineSessionSearch());
     SearchSettings->MaxSearchResults = 50;
-    SearchSettings->bIsLanQuery = false;
-    SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+    SearchSettings->bIsLanQuery = IsUsingNullFallback(); //PIE(Null 폴백)에선 LAN 검색
+    SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals); //Steam 로비 검색
     SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString(TEXT("MyRoom")), EOnlineComparisonOp::Equals);
 }
 
@@ -249,7 +248,7 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
 
     if (!bWasSuccessful || !SearchSettings.IsValid())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 세션 검색 실패"));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 세션 검색 실패"));
         return;
     }
 
@@ -268,7 +267,7 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
         FilteredResults.Add(SearchResult);
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] 전체 세션 %d개 발견, 필터링 후 %d개"),
+    UE_LOG(LogTemp, Log, TEXT("[Steam] 전체 세션 %d개 발견, 필터링 후 %d개"),
     SearchSettings->SearchResults.Num(),
     FilteredResults.Num());
 
@@ -287,7 +286,7 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
 
     if (!SearchSettings->SearchResults.IsValidIndex(Index))
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 잘못된 세션 인덱스: %d"), Index);
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 잘못된 세션 인덱스: %d"), Index);
         return;
     }
 
@@ -300,7 +299,7 @@ void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& In
     // 비밀번호가 비어있으면 그냥 입장 가능
     if (!CurrentRoomPassword.IsEmpty() && CurrentRoomPassword != InputPassWord)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비밀번호가 일치하지 않습니다. (Index: %d)"), Index);
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 비밀번호가 일치하지 않습니다. (Index: %d)"), Index);
         OnJoinPasswordIncorrect.Broadcast();
         return;
     }
@@ -339,7 +338,7 @@ void UMainGameInstanceSubsystem::OnPrivateJoinFindSessionComplete(bool bWasSucce
 
     if (!bWasSuccessful || !SearchSettings.IsValid())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비공개 방 참가: 세션 검색 실패"));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 비공개 방 참가: 세션 검색 실패"));
         OnPrivateRoomNotFound.Broadcast();
         return;
     }
@@ -352,7 +351,7 @@ void UMainGameInstanceSubsystem::TryJoinPrivateSession()
 {
     if (!SearchSettings.IsValid())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비공개 방 참가: 검색 결과가 없습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 비공개 방 참가: 검색 결과가 없습니다."));
         OnPrivateRoomNotFound.Broadcast();
         return;
     }
@@ -380,12 +379,12 @@ void UMainGameInstanceSubsystem::TryJoinPrivateSession()
 
     if (FoundIndex == INDEX_NONE)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 비공개 방 참가: '%s' 방을 찾을 수 없습니다."), *PrivateRoomName);
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 비공개 방 참가: '%s' 방을 찾을 수 없습니다."), *PrivateRoomName);
         OnPrivateRoomNotFound.Broadcast();
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] 비공개 방 참가: Index %d 방 발견, 참가 시도"), FoundIndex);
+    UE_LOG(LogTemp, Log, TEXT("[Steam] 비공개 방 참가: Index %d 방 발견, 참가 시도"), FoundIndex);
 
     //비밀번호 확인은 해당 함수에서 확인
     JoinFoundSession(FoundIndex, PrivateRoomPassword);
@@ -420,7 +419,7 @@ void UMainGameInstanceSubsystem::OnQuickMatchFindSessionComplete(bool bWasSucces
 
     if (!bWasSuccessful || !SearchSettings.IsValid())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 퀵매치: 세션 검색 실패"));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 퀵매치: 세션 검색 실패"));
         OnQuickMatchNoSessionFound.Broadcast();
         return;
     }
@@ -471,12 +470,12 @@ void UMainGameInstanceSubsystem::TryJoinQuickMatchSession()
         // 비밀번호가 없는 방 존재 X
         if (BestIndex == INDEX_NONE)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[EOS] 퀵매치: 참가 가능한(비밀번호 없는) 방을 찾지 못했습니다."));
+            UE_LOG(LogTemp, Warning, TEXT("[Steam] 퀵매치: 참가 가능한(비밀번호 없는) 방을 찾지 못했습니다."));
             OnQuickMatchNoSessionFound.Broadcast();
             return;
         }
 
-        UE_LOG(LogTemp, Log, TEXT("[EOS] 퀵매치: Index %d 방 참가 시도 (Ping: %d ms)"), BestIndex, BestPing);
+        UE_LOG(LogTemp, Log, TEXT("[Steam] 퀵매치: Index %d 방 참가 시도 (Ping: %d ms)"), BestIndex, BestPing);
 
         JoinFoundSession(BestIndex, TEXT(""));
     }
@@ -492,7 +491,7 @@ void UMainGameInstanceSubsystem::LeaveSession()
     if (!Sessions.IsValid() || !Sessions->GetNamedSession(NAME_GameSession))
     {
         //나갈 세션이 존재하지 않으므로 바로 타이틀로 이동 안전코드
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 나갈 세션이 없습니다. 타이틀로 이동"));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 나갈 세션이 없습니다. 타이틀로 이동"));
         ReturnToTitle();
         return;
     }
@@ -501,7 +500,7 @@ void UMainGameInstanceSubsystem::LeaveSession()
     const ENetMode CurrentNetMode = World ? World->GetNetMode() : NM_MAX;
     if (CurrentNetMode == NM_ListenServer)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 호스트 나가기 시작: 클라이언트 우선 퇴장"));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 호스트 나가기 시작: 클라이언트 우선 퇴장"));
 
         NotifyClientsToLeaveBeforeHostDestroy();
 
@@ -548,7 +547,7 @@ void UMainGameInstanceSubsystem::NotifyClientsToLeaveBeforeHostDestroy()
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] %d명의 클라이언트 ACK 대기 시작"), PendingHostLeaveAcks.Num());
+    UE_LOG(LogTemp, Log, TEXT("[Steam] %d명의 클라이언트 ACK 대기 시작"), PendingHostLeaveAcks.Num());
 
     // 전원 ACK을 못 받는 이상 상황(클라 응답 없음 등)을 대비한 안전장치
     World->GetTimerManager().SetTimer(HostLeaveWaitTimerHandle,this, &UMainGameInstanceSubsystem::DestroyHostSession,3,false);
@@ -564,7 +563,7 @@ void UMainGameInstanceSubsystem::OnClientAckLeftSession(APlayerController* FromP
         FromPC->OnDestroyed.RemoveDynamic(this, &UMainGameInstanceSubsystem::OnNotifiedClientDestroyed);
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] 클라이언트 퇴장 ACK 수신 (남은 대상: %d)"), PendingHostLeaveAcks.Num());
+    UE_LOG(LogTemp, Log, TEXT("[Steam] 클라이언트 퇴장 ACK 수신 (남은 대상: %d)"), PendingHostLeaveAcks.Num());
 
     // 모든 클라이언트 퇴장 완료 시
     if (PendingHostLeaveAcks.Num() == 0)
@@ -581,7 +580,7 @@ void UMainGameInstanceSubsystem::OnNotifiedClientDestroyed(AActor* DestroyedActo
 
     if (PendingHostLeaveAcks.Remove(PC) > 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] ACK 없이 클라이언트 연결 종료 감지, 대기 목록에서 제거 (남은 대상: %d)"), PendingHostLeaveAcks.Num());
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] ACK 없이 클라이언트 연결 종료 감지, 대기 목록에서 제거 (남은 대상: %d)"), PendingHostLeaveAcks.Num());
 
         if (PendingHostLeaveAcks.Num() == 0)
         {
@@ -607,13 +606,13 @@ void UMainGameInstanceSubsystem::DestroyHostSession()
     IOnlineSessionPtr Sessions = GetSessionInterface();
     if (!Sessions.IsValid() || !Sessions->GetNamedSession(NAME_GameSession))
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 호스트 세션 파괴 시점에 세션이 이미 없습니다. 타이틀로 이동"));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 호스트 세션 파괴 시점에 세션이 이미 없습니다. 타이틀로 이동"));
         bHostDestroyInProgress = false;
         ReturnToTitle();
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[EOS] 클라이언트 퇴장 확인 완료. 호스트 세션 파괴 시도"));
+    UE_LOG(LogTemp, Log, TEXT("[Steam] 클라이언트 퇴장 확인 완료. 호스트 세션 파괴 시도"));
 
     Sessions->ClearOnDestroySessionCompleteDelegates(this);
     Sessions->OnDestroySessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnLeaveSessionComplete);
@@ -637,11 +636,11 @@ void UMainGameInstanceSubsystem::OnLeaveSessionComplete(FName SessionName, bool 
     //세션 파괴 실패해도 타이틀로 이동 다만 로그로 확인
     if (bWasSuccessful)
     {
-        UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 나가기 성공: %s"), *SessionName.ToString());
+        UE_LOG(LogTemp, Log, TEXT("[Steam] 세션 나가기 성공: %s"), *SessionName.ToString());
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 세션 나가기(파괴) 실패: %s - 그래도 타이틀로 이동합니다."), *SessionName.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 세션 나가기(파괴) 실패: %s - 그래도 타이틀로 이동합니다."), *SessionName.ToString());
     }
 
     //방 정보 초기화
@@ -680,7 +679,7 @@ void UMainGameInstanceSubsystem::ReturnToTitle()
     const ENetMode CurrentNetMode = World->GetNetMode();
     if (CurrentNetMode == NM_ListenServer )
     {
-        UE_LOG(LogTemp, Log, TEXT("[EOS] 호스트: 타이틀 이동 "));
+        UE_LOG(LogTemp, Log, TEXT("[Steam] 호스트: 타이틀 이동 "));
         World->ServerTravel(LevelPath, true);
     }
     else if (CurrentNetMode == NM_Client)
@@ -688,12 +687,12 @@ void UMainGameInstanceSubsystem::ReturnToTitle()
         APlayerController* PC = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController(GetWorld()) : nullptr;
         if (PC)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[EOS] 참가자 타이틀로 이동"));
+            UE_LOG(LogTemp, Warning, TEXT("[Steam] 참가자 타이틀로 이동"));
             PC->ClientTravel(LevelPath, TRAVEL_Absolute);
         }
         else
         {
-            UE_LOG(LogTemp, Warning, TEXT("[EOS] PlayerController를 찾을 수 없어 타이틀로 이동할 수 없습니다."));
+            UE_LOG(LogTemp, Warning, TEXT("[Steam] PlayerController를 찾을 수 없어 타이틀로 이동할 수 없습니다."));
         }
     }
 }
@@ -716,47 +715,31 @@ void UMainGameInstanceSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoi
                 APlayerController* PC = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController(GetWorld()) : nullptr;
                 if (PC)
                 {
-                    // 만약 주소가 EOS: 로 시작하는데 언리얼 엔진이 드라이버 매핑을 못 다룬다면,
-                    // 주소 앞에 명시적으로 프로토콜 포맷(bIsUsingP2PSockets에 대응하는 포맷)을 강제해 봅니다.
-                    if (!ConnectString.StartsWith(TEXT("EOS:")))
-                    {
-                        // 일반적인 경우
-                        UE_LOG(LogTemp, Log, TEXT("[EOS] 세션 접속 시도: %s"), *ConnectString);
-                        PC->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
-                    }
-                    else
-                    {
-                        // 언리얼 엔진의 NetDriverEOS가 주소를 명확히 인지하도록
-                        // 에디터/플러그인 버그 방지용 강제 파싱 포맷 적용
-                        FString ForcedEOSURL = ConnectString;
-
-                        // 주소 체계가 "EOS:계정ID/레벨경로" 형태로 들어오는 경우
-                        // 엔진 내부 드라이버 채택을 유도하기 위해 URL을 재정리하거나 그대로 태웁니다.
-                        UE_LOG(LogTemp, Log, TEXT("[EOS-Forced] 강제 URL 접속 시도: %s"), *ForcedEOSURL);
-                        PC->ClientTravel(ForcedEOSURL, ETravelType::TRAVEL_Absolute);
-                    }
+                    //Steam P2P 주소(steam.<SteamID64>)는 SteamNetDriver가 그대로 처리
+                    UE_LOG(LogTemp, Log, TEXT("[Steam] 세션 접속 시도: %s"), *ConnectString);
+                    PC->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
                 }
             }
             else
             {
-                UE_LOG(LogTemp, Warning, TEXT("[EOS] 접속 주소를 가져오지 못했습니다."));
+                UE_LOG(LogTemp, Warning, TEXT("[Steam] 접속 주소를 가져오지 못했습니다."));
             }
             break;
         }
     case EOnJoinSessionCompleteResult::SessionIsFull:
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 세션이 가득 찼습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 세션이 가득 찼습니다."));
         break;
     case EOnJoinSessionCompleteResult::SessionDoesNotExist:
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 세션이 더 이상 존재하지 않습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 세션이 더 이상 존재하지 않습니다."));
         break;
     case EOnJoinSessionCompleteResult::CouldNotRetrieveAddress:
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 호스트 주소를 가져오지 못했습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 호스트 주소를 가져오지 못했습니다."));
         break;
     case EOnJoinSessionCompleteResult::AlreadyInSession:
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 이미 해당 세션에 참여 중입니다."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 이미 해당 세션에 참여 중입니다."));
         break;
     default:
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 알 수 없는 오류로 조인 실패."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 알 수 없는 오류로 조인 실패."));
         break;
     }
 }
@@ -801,7 +784,7 @@ void UMainGameInstanceSubsystem::UpdateRoomDifficulty(bool bHardMode)
     const ENetMode CurrentNetMode = GetWorld() ? GetWorld()->GetNetMode() : NM_MAX;
     if (CurrentNetMode != NM_ListenServer && CurrentNetMode != NM_Standalone)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 방장(호스트)만 난이도를 변경할 수 있습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 방장(호스트)만 난이도를 변경할 수 있습니다."));
         return;
     }
 
@@ -815,7 +798,7 @@ FString UMainGameInstanceSubsystem::GetLevelPath(const TSoftObjectPtr<UWorld>& L
 {
     if (Level.IsNull())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[EOS] 에디터에서 레벨이 설정되지 않았습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 에디터에서 레벨이 설정되지 않았습니다."));
         return FString();
     }
 
