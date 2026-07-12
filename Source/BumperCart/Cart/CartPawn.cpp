@@ -23,6 +23,8 @@
 #include "Component/CartGrabComponent.h"
 #include "Component/CartScreenFXComponent.h"
 #include "Component/CartItemInventoryComponent.h"
+#include "Component/CartCameraComponent.h"
+#include "Component/CartBumpComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
@@ -75,10 +77,7 @@ ACartPawn::ACartPawn()
 	//적재 컴포넌트(C 상품 시스템) 부착. 적재율 연동은 BeginPlay에서 이벤트 바인딩
 	LoadComponent = CreateDefaultSubobject<UCartLoadComponent>(TEXT("CartLoadComponent"));
 
-    //임시 효과음 기본값 (정식 사운드 작업 때 교체)
-    static ConstructorHelpers::FObjectFinder<USoundBase> BumpSoundFinder(TEXT("/Game/Developers/dbals/Audio/Bump.Bump"));
-    if (BumpSoundFinder.Succeeded()) { BumpSound = BumpSoundFinder.Object; }
-
+    //임시 효과음 기본값 (정식 사운드 작업 때 교체. 충돌음은 CartBumpComponent)
     static ConstructorHelpers::FObjectFinder<USoundBase> BoostSoundFinder(TEXT("/Game/Developers/dbals/Audio/Boost2.Boost2"));
     if (BoostSoundFinder.Succeeded()) { BoostSound = BoostSoundFinder.Object; }
 
@@ -93,6 +92,12 @@ ACartPawn::ACartPawn()
 
     //연출(FX) 전담 컴포넌트 — 화면 스피드라인·바닥 리본·브레이크 스파크. 에셋·소켓은 BP의 이 컴포넌트에서 지정
     ScreenFXComponent = CreateDefaultSubobject<UCartScreenFXComponent>(TEXT("CartScreenFXComponent"));
+
+    //카메라 연출 컴포넌트 — 속도 줌/FOV·카메라 충돌 (튜닝은 컴포넌트 프로퍼티)
+    CameraComponent = CreateDefaultSubobject<UCartCameraComponent>(TEXT("CartCameraComponent"));
+
+    //충돌 컴포넌트 — 판정·넉백·리액션·무적 전담 (NotifyHit에서 위임)
+    BumpComponent = CreateDefaultSubobject<UCartBumpComponent>(TEXT("CartBumpComponent"));
 }
 
 void ACartPawn::BeginPlay()
@@ -218,81 +223,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 		}
 	}
 
-	//--- 충돌 리액션(몸통 들썩·기울임): 슬립 아닐 때만, 스프링으로 기준값 복귀 ---
-	if (bBumpReactionActive && !bIsSlipping && SlipSpinMesh)
-	{
-		auto SpringStep = [&](float& X, float& V, float MaxAbs)
-		{
-		    //프레임 드랍 시 dt 폭주로 발산 방지 — 0.02초 고정 스텝으로 서브스텝
-		    float Remaining = DeltaSeconds;
-		    while (Remaining > 0.f)
-		    {
-		        const float Step = FMath::Min(Remaining, 0.02f);
-		        Remaining -= Step;
-
-		        const float Accel = -BumpReactionStiffness * X - BumpReactionDamping * V;
-		        V += Accel * Step;
-		        V = FMath::Clamp(V, -10000.f, 10000.f);
-		        X += V * Step;
-		    }
-		    X = FMath::Clamp(X, -MaxAbs, MaxAbs);
-		};
-		SpringStep(BumpTiltPitch, BumpTiltPitchVel, BumpTiltMaxAngle);
-		SpringStep(BumpTiltRoll, BumpTiltRollVel, BumpTiltMaxAngle);
-		SpringStep(BumpHopOffsetZ, BumpHopVel, BumpHopMaxHeight);
-
-		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot + FRotator(BumpTiltPitch, 0.f, BumpTiltRoll));
-		SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc + FVector(0.f, 0.f, BumpHopOffsetZ));
-
-		//충분히 잦아들면 기준값 스냅 후 비활성화
-		if (FMath::Abs(BumpTiltPitch) < 0.05f && FMath::Abs(BumpTiltPitchVel) < 0.5f &&
-			FMath::Abs(BumpTiltRoll) < 0.05f && FMath::Abs(BumpTiltRollVel) < 0.5f &&
-			FMath::Abs(BumpHopOffsetZ) < 0.05f && FMath::Abs(BumpHopVel) < 0.5f)
-		{
-			BumpTiltPitch = BumpTiltRoll = BumpHopOffsetZ = 0.f;
-			BumpTiltPitchVel = BumpTiltRollVel = BumpHopVel = 0.f;
-			SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
-			SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
-			bBumpReactionActive = false;
-		}
-	}
-
-	//--- 충돌 후 무적: 서버는 시간 카운트다운, 모든 클라는 몸통 깜빡 ---
-	if (HasAuthority() && bBumpInvincible)
-	{
-		BumpInvincibleTimeRemaining -= DeltaSeconds;
-		if (BumpInvincibleTimeRemaining <= 0.f)
-		{
-			bBumpInvincible = false;
-		}
-	}
-	if (SlipSpinMesh)
-	{
-		if (bBumpInvincible)
-		{
-			BumpBlinkAccum += DeltaSeconds;
-			if (BumpBlinkAccum >= BumpBlinkInterval)
-			{
-				BumpBlinkAccum = 0.f;
-				SlipSpinMesh->SetVisibility(!SlipSpinMesh->GetVisibleFlag(), false);
-
-                if (IsValid(LoadComponent))
-                {
-                    //토글 후 플래그는 이미 새 값 => 그대로 넘겨야 몸통과 같은 위상으로 깜빡임
-                    LoadComponent->SetLoadDummyBlinkVisible(SlipSpinMesh->GetVisibleFlag());
-                }
-			}
-		}
-		else if (!SlipSpinMesh->GetVisibleFlag())
-		{
-			SlipSpinMesh->SetVisibility(true, false); //무적 끝 => 확실히 보이게
-            if (IsValid(LoadComponent))
-            {
-                LoadComponent->UpdateLoadVisual();
-            }
-			BumpBlinkAccum = 0.f;
-		}
-	}
+	//(충돌 리액션 스프링·무적 깜빡 => CartBumpComponent로 분리)
 
 	//게임 시작 전(대기 페이즈) 동안엔 조작 잠금 (스로틀·조향·부스트 차단)
 	const bool bCanMove = CanPlayerMove();
@@ -382,53 +313,7 @@ void ACartPawn::Tick(float DeltaSeconds)
 	}
 
 	//(부스터 오용 스필 제거됨 — 부스터 아이템화 밸런싱: 급브레이크/급회전 패널티 없음)
-
-    //--- 카메라 속도감 연출 ---
-    if (IsLocallyControlled() && CameraBoom && FollowCamera)
-    {
-        //속도 기반 알파 (0=저속, 1=고속)
-        const float SpeedAlpha = FMath::Clamp(Move->Velocity.Size2D() / FMath::Max(SpeedZoomFullSpeed, 1.f), 0.f, 1.f);
-
-        //속도로 FOV·암길이 보간
-        float TargetArm = FMath::Lerp(CameraArmMin, CameraArmMax, SpeedAlpha);
-        float TargetFov = FMath::Lerp(CameraFovMin, CameraFovMax, SpeedAlpha);
-        if (bIsBoosting)
-        {
-            TargetArm += BoostExtraArm;
-            TargetFov += BoostExtraFov;
-        }
-
-        //--- 커스텀 카메라 충돌: 카트 본체에서 원하는 카메라 위치까지 구 스윕 => 막히면 그 거리로 암 제한 ---
-        //카트 본체에서 카메라까지로 검사
-        float SafeArm = TargetArm;
-        if (UWorld* World = GetWorld())
-        {
-            const FVector BoomOrigin = CameraBoom->GetComponentLocation();
-            const FRotator BoomRot   = CameraBoom->GetComponentRotation();
-            const FVector ArmDir      = BoomRot.RotateVector(FVector(-1.f, 0.f, 0.f)); //암이 뻗는 방향(뒤·아래), 단위벡터
-            const FVector DesiredCamPos = BoomOrigin + ArmDir * TargetArm;
-
-            //트레이스 시작은 카트 본체
-            const FVector TraceStart = GetActorLocation();
-
-            FHitResult Hit;
-            FCollisionQueryParams Params(SCENE_QUERY_STAT(CartCameraCollision), false, this);
-            if (World->SweepSingleByChannel(Hit, TraceStart, DesiredCamPos, FQuat::Identity, ECC_Camera,
-                    FCollisionShape::MakeSphere(CameraCollisionProbeSize), Params))
-            {
-                //막힌 지점을 붐 원점 기준 암 길이로 환산(암 방향에 투영) 후, 최소 암 이하로는 안 당김
-                const float BlockedArm = FVector::DotProduct(Hit.Location - BoomOrigin, ArmDir);
-                SafeArm = FMath::Clamp(BlockedArm, CameraCollisionMinArm, TargetArm);
-            }
-        }
-
-        //충돌 결과를 향해 비대칭 보간(당길 땐 빠르게 관통 최소화, 풀 땐 천천히 출렁임 방지) + FOV는 기존 줌 속도
-        const bool bPullingIn = SafeArm < CameraBoom->TargetArmLength;
-        const float ArmInterpSpeed = bPullingIn ? CameraCollisionPullInSpeed : CameraCollisionPullOutSpeed;
-        CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, SafeArm, DeltaSeconds, ArmInterpSpeed);
-        FollowCamera->FieldOfView   = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFov, DeltaSeconds, CameraZoomInterpSpeed);
-
-    }
+	//(카메라 속도감 연출/충돌 => CartCameraComponent로 분리)
 
 	//연속 이동 시간 추적 (출발 그레이스 판정용) — 거의 정지면 리셋
 	if (Move->Velocity.Size2D() > 50.f)
@@ -655,9 +540,7 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	DOREPLIFETIME_CONDITION(ACartPawn, bIsBraking, COND_SkipOwner);
 	//회전 yaw: 소유자는 로컬 회전을 쓰므로 제외, 비소유(타 클라)만 복제받아 보간
 	DOREPLIFETIME_CONDITION(ACartPawn, ReplicatedYaw, COND_SkipOwner);
-	//충돌 무적: 모든 클라가 몸통 깜빡 연출을 해야 하므로 소유자 포함 전체 복제
-	DOREPLIFETIME(ACartPawn, bBumpInvincible);
-	//카트 색상: 모든 클라가 몸통 색을 그려야 하므로 전체 복제
+	//카트 색상: 모든 클라가 몸통 색을 그려야 하므로 전체 복제 (충돌 무적은 CartBumpComponent가 복제)
 	DOREPLIFETIME(ACartPawn, CartColor);
 }
 
@@ -721,9 +604,10 @@ void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
 	else
 	{
 		//슬립이 몸통 회전 점유 => 범프 리액션 초기화 후 기준 자세로
-		BumpTiltPitch = BumpTiltRoll = BumpHopOffsetZ = 0.f;
-		BumpTiltPitchVel = BumpTiltRollVel = BumpHopVel = 0.f;
-		bBumpReactionActive = false;
+		if (BumpComponent)
+		{
+			BumpComponent->ResetReaction();
+		}
 		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
 		SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
 	}
@@ -792,172 +676,14 @@ void ACartPawn::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadI
 	}
 }
 
-//카트끼리 부딪히면 충격 세기만큼 상품을 쏟는다
-//카트가 IBumpable 대상(다른 카트·차단벽·장애물)에 부딪히면 충격 세기만큼 상품을 쏟는다
+//카트가 무언가에 부딪히면 충돌 컴포넌트에 위임 (판정·페어 해결·서버 필터 전부 컴포넌트 담당)
 void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit)
 {
 	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
 
-	//충돌은 서버가 판정 (NotifyHit은 서버·소유클라 양쪽에서 떠서, 안 막으면 더블 드롭)
-	if (!HasAuthority())
+	if (BumpComponent)
 	{
-		return;
-	}
-
-	if (!Other || Other == this)
-	{
-		return;
-	}
-
-	//IBumpable(퍼블릭 상속/BP 인터페이스 추가)을 구현한 대상에만 충돌 연출+드롭. 그 외(일반 벽 등)는 그냥 막힘
-	if (!Other->GetClass()->ImplementsInterface(UBumpable::StaticClass()))
-	{
-		//일반 벽 등 판정 밖 대상: 정면으로 박았으면 부스트만 끊김 (스침은 유지)
-		if (FVector::DotProduct(PreviousVelocity, -HitNormal) > MinBumpSpeed)
-		{
-			CancelBoost();
-		}
-		return;
-	}
-
-	//상대가 카트면 그 카트의 '충돌 직전' 속도를, 아니면(차단벽·장애물 등 정적) 0으로
-	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
-
-	//무적 중이면(나 또는 상대) 이 충돌은 완전 무시 — 넉백·틸트·효과음·드롭 전부 skip
-	if (bBumpInvincible || (OtherCart && OtherCart->bBumpInvincible))
-	{
-		//판정은 무시해도 정면으로 박은 부스트는 끊김 (무적 상대 밀어붙이기 방지)
-		if (FVector::DotProduct(PreviousVelocity, -HitNormal) > MinBumpSpeed)
-		{
-			CancelBoost();
-		}
-		return;
-	}
-
-	const FVector OtherVel = OtherCart ? OtherCart->PreviousVelocity : FVector::ZeroVector;
-	const FVector RelativeVelocity = PreviousVelocity - OtherVel;
-
-	//두 액터 중심을 잇는 선 방향(수평면) — 접근 중(충돌)인지 판정에만 사용
-	const FVector ToOther = (Other->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-	const float Approach = FVector::DotProduct(RelativeVelocity, ToOther);
-	if (Approach <= 0.f)
-	{
-		return; //서로 멀어지는 중이면 충돌로 치지 않음
-	}
-
-	//충돌 세기 = 상대속도 크기(2D). 부딪힌 각도와 무관하게 일관됨
-	const float ClosingSpeed = RelativeVelocity.Size2D();
-	if (ClosingSpeed < MinBumpSpeed)
-	{
-		return; //약하게 스치는 접촉은 무시
-	}
-
-	//충돌 시 정산 취소 (차단벽 정산 중 충돌 시 잠깐 정산 불가)
-    if (IsValid(OtherCart))
-    {
-        OtherCart->CancelCheckout(0.5f);
-    }
-
-	//출발 그레이스: 막 움직이기 시작한(부스트 아님) 카트가 단독으로 만든 충돌은 무효 — 바로 앞 카트 밀기 오판정 방지
-	//'정당한 돌진자'(상대 쪽으로 실제 이동 중 + 그레이스 지남 or 부스트)가 한 명도 없으면 충돌로 안 침
-	const float MyToward = FVector::DotProduct(PreviousVelocity, ToOther);
-	const float OtherToward = OtherCart ? FVector::DotProduct(OtherVel, -ToOther) : 0.f;
-	const bool bMyChargeLegit = MyToward > 50.f && (bIsBoosting || TimeSinceMoveStart >= BumpStartGraceTime);
-	const bool bOtherChargeLegit = OtherCart && OtherToward > 50.f && (OtherCart->bIsBoosting || OtherCart->TimeSinceMoveStart >= BumpStartGraceTime);
-	if (!bMyChargeLegit && !bOtherChargeLegit)
-	{
-		return;
-	}
-
-	//--- 충돌 확정: 첫 NotifyHit이 나+상대를 전부 해결 ---
-	//아래서 양쪽에 무적이 걸리면 상대 쪽 NotifyHit은 위 무적 체크에서 무효화되므로,
-	//사운드·셰이크·넉백·리액션·드롭을 여기서 양쪽 다 처리해야 피해자 쪽이 누락되지 않는다
-
-	//셰이크·충돌음 — 나 + 상대 (세기는 접근속도 비례, 동일 적용)
-	const float ShakeScale = FMath::GetMappedRangeValueClamped(
-		FVector2D(MinBumpSpeed, BumpShakeFullSpeed),
-		FVector2D(BumpShakeScale, BumpShakeMaxScale),
-		ClosingSpeed);
-	ClientPlayCameraShake(BumpCameraShakeClass, ShakeScale);
-	ClientPlayBumpSound();
-	if (OtherCart)
-	{
-		OtherCart->ClientPlayCameraShake(nullptr, ShakeScale); //nullptr => 상대 기본 셰이크
-		OtherCart->ClientPlayBumpSound();
-	}
-
-	//드롭 역할 + 넉백 세기 (일반=양쪽 다 속도 비례로 살짝, 부스트=박힌 쪽만 멀리)
-	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
-	EDropCollisionRole OtherDropRole = EDropCollisionRole::Normal;
-	const float NormalKnock = FMath::Min(ClosingSpeed * NormalKnockbackScale, NormalKnockbackMax);
-	float OtherKnockStrength = NormalKnock;
-	float MyKnockStrength = OtherCart ? NormalKnock : 0.f; //벽·장애물은 나를 안 밀어냄
-	if (bIsBoosting)
-	{
-		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터로 박음 => 덜 흘림
-		OtherDropRole = EDropCollisionRole::BoostedTarget;
-		OtherKnockStrength = BoostKnockbackStrength; //부스터에 박힌 쪽은 더 멀리 (부스트 비비기 방지)
-		MyKnockStrength = 0.f;                       //부스터 본인은 안 밀림
-	}
-	else if (OtherCart && OtherCart->bIsBoosting)
-	{
-		DropRole = EDropCollisionRole::BoostedTarget; //부스터한테 박힘 => 더 흘림
-		OtherDropRole = EDropCollisionRole::BoosterInstigator;
-		OtherKnockStrength = 0.f;
-		MyKnockStrength = BoostKnockbackStrength;
-	}
-
-	//넉백 — ApplyExternalKnockback이 넉백+몸통 리액션 공용 처리. 안 밀리는 쪽도 리액션은 재생
-	const float ReactionIntensity = FMath::GetMappedRangeValueClamped(
-		FVector2D(MinBumpSpeed, BumpShakeFullSpeed), FVector2D(0.25f, 1.f), ClosingSpeed);
-	if (OtherCart)
-	{
-		if (OtherKnockStrength > 0.f)
-		{
-			OtherCart->ApplyExternalKnockback(ToOther, OtherKnockStrength);
-		}
-		else
-		{
-			OtherCart->MulticastPlayBumpReaction(ToOther, ReactionIntensity); //부스터 본인(안 밀림)
-		}
-	}
-	if (MyKnockStrength > 0.f)
-	{
-		ApplyExternalKnockback(-ToOther, MyKnockStrength);
-	}
-	else
-	{
-		MulticastPlayBumpReaction(-ToOther, ReactionIntensity); //벽 충돌·부스터 본인(안 밀림)
-	}
-
-	//드롭 — 나 + 상대
-	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
-	if (OtherCart)
-	{
-		OtherCart->RequestSpill(ClosingSpeed * OtherCart->BumpImpulseScale, OtherDropRole);
-	}
-
-	//부딪히면 부스트 끊김 — 충돌한 양쪽 모두 (역할·넉백 판정엔 위에서 이미 반영됨)
-	CancelBoost();
-	if (OtherCart)
-	{
-		OtherCart->CancelBoost();
-	}
-
-	//충돌 성립 => 잠깐 무적 (연타/비비기 방지, 그동안 깜빡)
-	StartBumpInvincibility();
-	if (OtherCart)
-	{
-		OtherCart->StartBumpInvincibility();
-	}
-}
-
-//충돌음을 소유 클라에서 재생 (BumpSound 비어있으면 무음)
-void ACartPawn::ClientPlayBumpSound_Implementation()
-{
-	if (BumpSound)
-	{
-		UGameplayStatics::PlaySound2D(this, BumpSound);
+		BumpComponent->HandleHit(Other, HitNormal);
 	}
 }
 
@@ -995,85 +721,13 @@ void ACartPawn::ClientApplyTomatoScreenBlock_Implementation(float Duration)
 	ScreenFXComponent->ApplyTomatoScreenBlock(Duration);
 }
 
-//스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청 (충돌·부스터오용 공용)
-void ACartPawn::RequestSpill(float Impulse, EDropCollisionRole DropRole)
-{
-	if (!LoadComponent)
-	{
-		return;
-	}
-
-	//모든 스필 공통 쿨다운
-	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	if (Now - LastBumpDropTime < BumpDropCooldown)
-	{
-		return;
-	}
-	LastBumpDropTime = Now;
-
-	//B5확인용 - 검증 후 제거
-	UE_LOG(LogBumperCart, Log, TEXT("Spill role=%d impulse=%.0f"), (int32)DropRole, Impulse);
-
-	//C가 개수 판정 + 실제 드롭 (서버=즉시, 클라=서버 RPC)
-	LoadComponent->RequestDropProduct(Impulse, DropRole);
-}
-
-//외부에서 카트를 강제로 밀어내기
+//외부에서 카트를 강제로 밀어내기 (거대카트·체크아웃존 등 공용 진입점) — 컴포넌트에 위임
 void ACartPawn::ApplyExternalKnockback(const FVector& Direction, float Strength)
 {
-    if (!HasAuthority())
+    if (BumpComponent)
     {
-        return;
+        BumpComponent->ApplyKnockback(Direction, Strength);
     }
-
-    if (Strength <= 0.0f)
-    {
-        return;
-    }
-
-    const FVector KnockbackDirection = Direction.GetSafeNormal2D();
-    if (KnockbackDirection.IsNearlyZero())
-    {
-        return;
-    }
-
-    const FVector LaunchVelocity = KnockbackDirection * Strength;
-    LaunchCharacter(LaunchVelocity, true, false);
-
-    //충돌 판정 나는 기믹(거대카트 등)에 밀리면 부스트 끊김
-    CancelBoost();
-
-    //넉백과 함께 몸통 리액션도 재생 (외부 시스템 공용). 세기는 Strength/기준값
-    const float ReactionIntensity = FMath::Clamp(Strength / BumpReactionKnockbackRef, 0.25f, 1.f);
-    MulticastPlayBumpReaction(KnockbackDirection, ReactionIntensity);
-}
-
-//충돌 리액션(몸통 들썩·기울임)을 로컬에서 재생
-void ACartPawn::MulticastPlayBumpReaction_Implementation(FVector WorldPushDir, float Intensity)
-{
-    //슬립 중엔 몸통 스핀이 우선 => 범프 틸트 생략
-    if (Intensity <= 0.f || bIsSlipping)
-    {
-        return;
-    }
-
-    EnsureBodyMeshResolved();
-    if (!SlipSpinMesh)
-    {
-        return; //몸통 메시 없으면 연출만 생략
-    }
-
-    //밀리는 방향을 로컬로 변환 => 부딪힌 쪽(반대쪽)이 들리게 pitch/roll 충격
-    const FVector LocalPush = GetActorTransform().InverseTransformVectorNoScale(WorldPushDir.GetSafeNormal2D());
-    const float StruckFwd = -LocalPush.X;   //+면 앞에서 맞음 => 앞이 들림(nose up)
-    const float StruckRight = -LocalPush.Y; //+면 오른쪽에서 맞음 => 오른쪽이 들림
-    const float Amt = FMath::Clamp(Intensity, 0.f, 1.f);
-
-    //스프링 속도에 충격 누적 (부호 반대로 보이면 아래 두 줄 뒤집기)
-    BumpTiltPitchVel += StruckFwd * BumpTiltStrength * Amt;
-    BumpTiltRollVel += StruckRight * BumpTiltStrength * Amt;
-    BumpHopVel += BumpHopStrength * Amt; //위로 들썩
-    bBumpReactionActive = true;
 }
 
 //몸통 메시 탐색 + 기준 상대회전/위치 1회 캡처 (슬립·범프 공용)
@@ -1128,17 +782,6 @@ void ACartPawn::ApplyCartColor()
 			MID->SetVectorParameterValue(FName("CartColor"), CartColor);
 		}
 	}
-}
-
-//충돌 후 무적 시작 (서버) — 지속시간 동안 추가 충돌 무시. bBumpInvincible 복제로 전 클라가 몸통 깜빡
-void ACartPawn::StartBumpInvincibility()
-{
-    if (!HasAuthority())
-    {
-        return;
-    }
-    bBumpInvincible = true;
-    BumpInvincibleTimeRemaining = BumpInvincibleDuration;
 }
 
 //게임 시작 전 대기 페이즈 동안 조작 가능 여부 — MainGameState가 없으면(테스트 레벨 등) 허용
