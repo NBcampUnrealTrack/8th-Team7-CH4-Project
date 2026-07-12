@@ -17,6 +17,8 @@ struct FInputActionValue;
 class UCartGrabComponent;
 class UCartScreenFXComponent;
 class UCartItemInventoryComponent;
+class UCartCameraComponent;
+class UCartBumpComponent;
 class UStaticMeshComponent;
 
 UCLASS(abstract)
@@ -64,6 +66,28 @@ public:
     UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Cart|Camera")
     void ClientPlayCameraShake(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale);
 
+    //카메라 연출 컴포넌트(CartCameraComponent)용 접근자
+    USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+    UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+    //---------- 충돌 컴포넌트(CartBumpComponent) 연동 접근자 ----------
+    UCartBumpComponent* GetBumpComponent() const { return BumpComponent; }
+    UCartLoadComponent* GetLoadComponent() const { return LoadComponent; }
+
+    //충돌 직전 프레임 속도 (NotifyHit 시점 속도는 깎여서 신뢰 불가 => Tick 캐시값)
+    FVector GetPreviousVelocity() const { return PreviousVelocity; }
+
+    //연속 이동 시간(초) — 출발 그레이스 판정용
+    float GetTimeSinceMoveStart() const { return TimeSinceMoveStart; }
+
+    //몸통 메시 + 기준 상대회전/위치 (슬립·범프·색상 공용) — 필요 시 1회 탐색
+    UStaticMeshComponent* GetBodyMesh() { EnsureBodyMeshResolved(); return SlipSpinMesh; }
+    FRotator GetBodyMeshBaseRelRot() const { return SlipSpinMeshBaseRelRot; }
+    FVector GetBodyMeshBaseRelLoc() const { return SlipSpinMeshBaseRelLoc; }
+
+    //부스트 강제 종료 (서버) — 충돌·기믹 넉백 시 호출. 소유 클라에도 전파
+    void CancelBoost();
+
     //---------- 충돌 시 정산 취소 상태 반영 ----------
     //정산 취소 상태인지
     bool IsCancelCheckoutState() const;
@@ -94,14 +118,6 @@ protected:
 	//미끄럼 효과를 모든 인스턴스에 전파해 각자 로컬 적용 (소유 클라의 예측 이동에도 반영)
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastApplySlip(float Duration, float SpinAngleDeg);
-
-	//충돌음을 소유 클라에서 재생 (서버 NotifyHit에서 호출 — 쉐이크와 동일 패턴, 멀티캐스트 중복재생 회피)
-	UFUNCTION(Client, Unreliable)
-	void ClientPlayBumpSound();
-
-	//충돌 리액션(몸통 들썩·기울임)을 모든 클라에 재생. 서버에서만 호출
-	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastPlayBumpReaction(FVector WorldPushDir, float Intensity);
 
     //Yaw 서버에 전달
     UFUNCTION(Server, Unreliable)
@@ -191,51 +207,10 @@ protected:
 	float BoostCooldown = 5.0f;
 
 
-    //---------- 카메라 속도감 연출 ----------
-    //이 속도(cm/s)에서 줌이 최대에 도달 (0~이 값 사이를 보간). 기본 최고 속도(BaseMaxWalkSpeed)에 맞춤
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1"))
-    float SpeedZoomFullSpeed = 1050.f;
-
-    //저속/고속 카메라 암길이
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float CameraArmMin = 800.f;
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float CameraArmMax = 850.f;
-
-    //저속/고속 FOV (폭을 작게 — 가감속 반복 시 FOV 출렁임/멀미 완화)
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
-    float CameraFovMin = 90.f;
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "1", ClampMax = "170"))
-    float CameraFovMax = 105.f;
-
-    //부스트 시 추가 빼기/넓히기
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float BoostExtraArm = 20.f;
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float BoostExtraFov = 10.f;
-
-    //FOV/줌 보간 속도 (낮을수록 부드럽게 — 가감속 시 FOV가 천천히 반응해 멀미 완화)
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
-    float CameraZoomInterpSpeed = 3.f;
-
-    //---------- 카메라 충돌(벽/진열대 관통 방지) ----------
-    //직접 스윕으로 카메라 암을 당긴다 — 스프링암 기본 충돌은 즉시 스냅이라 가판대 스칠 때 시점이 튀어서 커스텀 스무딩 사용
-    //충돌 탐지 구 반경 (클수록 벽에서 더 여유 두고 당김)
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float CameraCollisionProbeSize = 12.f;
-
-    //당겨올 때(장애물 감지) 보간 속도 — 빠르게(관통 최소화). 스냅은 아니라 어지럼 방지
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
-    float CameraCollisionPullInSpeed = 12.f;
-
-    //카메라가 당겨질 수 있는 최소 암 길이 — 이 이하로는 안 당기고 차라리 살짝 걸치게 둠 (극단적 클로즈업으로 시점 망침 방지)
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0"))
-    float CameraCollisionMinArm = 400.f;
-
-    //풀어줄 때(장애물 벗어남) 보간 속도 — 천천히(가판대 사이 스칠 때 출렁임 방지)
-    UPROPERTY(EditAnywhere, Category = "Cart|Camera", meta = (ClampMin = "0.1"))
-    float CameraCollisionPullOutSpeed = 4.f;
-
+    //---------- 카메라 연출 컴포넌트 ----------
+    //속도 줌/FOV·카메라 충돌 전담 (튜닝 프로퍼티는 컴포넌트로 이동)
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Camera")
+    UCartCameraComponent* CameraComponent;
 
     //---------- 연출 (FX) ----------
     //카트 연출 전담 컴포넌트 — 화면 스피드라인(부스트)·바닥 리본·브레이크 스파크 (에셋·소켓은 BP에서 지정)
@@ -278,87 +253,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
 	float LoadBrakeScale = 0.45f;
 
-	//---------- 충돌/스필 드롭 (B4/B5) ----------
-	//충격속도(cm/s)를 C 드롭 충격량으로 환산하는 배율 (충돌용)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpImpulseScale = 2.0f;
+	//---------- 충돌 ----------
+	//충돌 판정·넉백·리액션·무적 전담 컴포넌트 (판정/튜닝 프로퍼티는 컴포넌트로 이동)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Bump")
+	UCartBumpComponent* BumpComponent;
 
-	//이 접근속도(cm/s) 미만의 약한 접촉은 충돌로 안 침
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float MinBumpSpeed = 600.f;
-
-	//출발 그레이스(초) — 정지에서 움직이기 시작한 지 이 시간 안에 만든 충돌은 무효 (바로 앞 카트 밀기 오판정 방지). 부스트는 예외
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpStartGraceTime = 0.5f;
-
-	//충돌 판정 후 무적 지속(초) — 이 동안 추가 충돌 완전 무시 + 몸통 깜빡 (연타/비비기 방지)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpInvincibleDuration = 1.f;
-
-	//무적 중 몸통 깜빡임 간격(초)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0.01"))
-	float BumpBlinkInterval = 0.08f;
-
-	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초) — 모든 스필(충돌·부스터오용) 공통
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpDropCooldown = 0.5f;
-
-	//충돌 시 재생할 카메라 쉐이크 (BP_CartPawn에 BP_CartBumpShake 지정). 비어있으면 흔들지 않음
+	//충돌 시 재생할 카메라 쉐이크 (BP_CartPawn에 BP_CartBumpShake 지정). 비어있으면 흔들지 않음. ClientPlayCameraShake의 기본값
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump")
 	TSubclassOf<UCameraShakeBase> BumpCameraShakeClass;
-
-	//충돌 카메라 쉐이크 세기: 약한 충돌(MinBumpSpeed 부근)일 때의 배율
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpShakeScale = 0.4f;
-
-	//충돌 카메라 쉐이크 세기: 강한 충돌(BumpShakeFullSpeed 이상)일 때의 배율 — 셀수록 더 세게
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpShakeMaxScale = 0.8f;
-
-	//이 접근속도(cm/s)에서 쉐이크가 최대 세기에 도달 (MinBumpSpeed~이 값 사이를 보간)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpShakeFullSpeed = 900.f;
-
-	//---------- 충돌 넉백 + 리액션(몸통 들썩·기울임) ----------
-	//부스트로 상대 카트를 박았을 때 상대를 밀어내는 세기 (B: 부스트 비비기 방지). LaunchCharacter 속도
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BoostKnockbackStrength = 1500.f;
-
-	//일반 충돌(부스트 아님) 시 상대를 밀어내는 세기 = 접근속도 × 이 배율 (살짝만)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float NormalKnockbackScale = 0.55f;
-
-	//일반 충돌 넉백 상한 (접근속도가 커도 이 이상은 안 밀림)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float NormalKnockbackMax = 700.f;
-
-	//리액션 스프링 강성(높을수록 빨리 제자리로). 감쇠와 함께 '덜컹' 리듬 결정
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "1"))
-	float BumpReactionStiffness = 220.f;
-
-	//리액션 스프링 감쇠(낮을수록 여러 번 덜컹거림)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpReactionDamping = 14.f;
-
-	//세기 1일 때 기울기 각충격량 — 부딪힌 쪽이 들리는 정도
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpTiltStrength = 220.f;
-
-	//기울기 최대 각도(도) 클램프
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpTiltMaxAngle = 20.f;
-
-	//세기 1일 때 수직 들썩 충격량 (0이면 들썩 없이 기울기만)
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpHopStrength = 90.f;
-
-	//수직 들썩 최대 높이(cm) 클램프
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BumpHopMaxHeight = 8.f;
-
-	//외부 넉백(거대카트·체크아웃존 등)에서 리액션 세기 환산 기준 — 이 넉백 강도면 세기 1.0
-	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "1"))
-	float BumpReactionKnockbackRef = 800.f;
 
 	//---------- 미끄럼 (F 맵 기믹 연동: 물웅덩이 등) ----------
 	//미끄럼 중 지면 마찰 (낮을수록 더 미끄러짐)
@@ -383,11 +285,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Slip")
 	FName SlipSpinMeshName = TEXT("Cart");
 
-	//---------- 효과음 (SFX) — BP_CartPawn에서 사운드 지정. 비어있으면 무음 ----------
-	//충돌(범프) 시 효과음
-	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
-	USoundBase* BumpSound;
-
+	//---------- 효과음 (SFX) — BP_CartPawn에서 사운드 지정. 비어있으면 무음 (충돌음은 CartBumpComponent) ----------
 	//부스터 발동 시 효과음
 	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
 	USoundBase* BoostSound;
@@ -415,15 +313,9 @@ protected:
 	void EndBoost();
 	void ResetBoostCooldown();
 
-	//부스트 강제 종료 (서버) — 충돌·기믹 넉백 시 호출. 소유 클라에도 전파
-	void CancelBoost();
-
 	//부스트 강제 종료를 소유 클라에 적용 (타이머 정리 + 쿨다운 시작)
 	UFUNCTION(Client, Reliable)
 	void ClientCancelBoost();
-
-	//스필(드롭) 공통 진입점 — 쿨다운 적용 후 C에 낙하 요청
-	void RequestSpill(float Impulse, EDropCollisionRole DropRole);
 
 	//미끄럼 시작/종료 (로컬 적용) — MulticastApplySlip에서 호출
 	void StartSlip(float Duration, float SpinAngleDeg);
@@ -431,9 +323,6 @@ protected:
 
 	//몸통 메시(SlipSpinMeshName) 탐색 + 기준 상대회전/위치 캡처 (슬립·범프 리액션 공용, 최초 1회)
 	void EnsureBodyMeshResolved();
-
-	//충돌 후 무적 시작 (서버) — 지속시간 동안 추가 충돌 무시, 복제되어 전 클라 깜빡
-	void StartBumpInvincibility();
 
 	//게임 시작 전 대기 페이즈 동안 조작 가능 여부 (MainGameState 질의). GameState 없으면 true
 	bool CanPlayerMove() const;
@@ -472,9 +361,6 @@ private:
 	//정산 취소 시간
 	FTimerHandle CancelCheckoutTimerHandle;
 
-	//마지막으로 스필(드롭)을 요청한 시각 — BumpDropCooldown 공통 적용
-	float LastBumpDropTime = -1000.f;
-
 	//충돌 직전 프레임의 속도 (NotifyHit 시점엔 비물리라 속도가 0으로 깎여 신뢰 불가 => Tick에서 매 프레임 캐시)
 	FVector PreviousVelocity = FVector::ZeroVector;
 
@@ -505,20 +391,6 @@ private:
 	FRotator SlipSpinMeshBaseRelRot = FRotator::ZeroRotator;
 	FVector SlipSpinMeshBaseRelLoc = FVector::ZeroVector; //몸통 메시 원래 상대 위치(들썩 복구용)
 	bool bBodyMeshResolved = false;                       //몸통 메시 탐색·기준값 캡처 완료
-
-	//---------- 충돌 리액션 스프링 상태 (로컬 연출, 복제 안 함) ----------
-	//몸통 메시 상대 pitch/roll(도) 오프셋 + 각 속도, 수직 들썩(cm) 오프셋 + 속도. 스프링으로 0(기준)에 복귀
-	float BumpTiltPitch = 0.f;    float BumpTiltPitchVel = 0.f;
-	float BumpTiltRoll = 0.f;     float BumpTiltRollVel = 0.f;
-	float BumpHopOffsetZ = 0.f;   float BumpHopVel = 0.f;
-	bool bBumpReactionActive = false; //스프링이 움직이는 중일 때만 Tick에서 메시 갱신
-
-	//---------- 충돌 후 무적 상태 ----------
-	//무적 여부 (복제: 모든 클라가 몸통 깜빡). 서버가 시간 관리
-	UPROPERTY(Replicated)
-	bool bBumpInvincible = false;
-	float BumpInvincibleTimeRemaining = 0.f; //서버 카운트다운
-	float BumpBlinkAccum = 0.f;              //로컬 깜빡 타이머
 
 	//---------- 카트 색상 (로비 캐릭터 선택 연동) ----------
 	//서버가 빙의 시 로비 선택(GameInstance)으로 결정 => 전 클라 복제
