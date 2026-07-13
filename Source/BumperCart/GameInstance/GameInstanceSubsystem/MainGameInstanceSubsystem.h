@@ -128,6 +128,8 @@ private:
     void TryJoinQuickMatchSession();
     // 비공개 방 참가 시도
     void TryJoinPrivateSession();
+    // 세션 참가 공통 처리 (비밀번호 검증 + JoinSession) — UI 조인/퀵매치/비공개방 공용
+    void JoinSessionInternal(const FOnlineSessionSearchResult& Result, const FString& InputPassword);
 
 
     // 호스트 나가지 전, 클라이어트에게 먼저 나가라고 알림
