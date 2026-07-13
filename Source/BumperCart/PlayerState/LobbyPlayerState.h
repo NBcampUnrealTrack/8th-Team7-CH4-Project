@@ -21,7 +21,7 @@ public:
 
     // 플레이어가 캐릭터 선택
     UFUNCTION(BlueprintCallable, Category = "Lobby|Character")
-    void SelectCharacter(int32 CharacterIndex);
+    int32 SelectCharacter(int32 CharacterIndex);
 
     // 플레이어가 선택한 캐릭터 index 조회
     UFUNCTION(BlueprintCallable, Category = "Lobby|Character")
