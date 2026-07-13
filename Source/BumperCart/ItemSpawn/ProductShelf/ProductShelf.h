@@ -69,7 +69,7 @@ public:
     AProductBase* SpawnRandomProduct();
 
     // 제품 스폰
-    AProductBase* SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass);
+    AProductBase* SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass, bool bOnSale = false);
 
     FVector GetRandomPointInVolume() const;
 

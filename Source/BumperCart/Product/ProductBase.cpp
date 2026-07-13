@@ -11,7 +11,7 @@
 #include "ProductShelfSubsystem/ProductShelfSubsystem.h"
 #include "GameFramework/GameState.h"
 #include "NiagaraComponent.h"
-#include "ProductValueVisualConfig.h"
+#include "ProductValueGradeConfig.h"
 #include "Components/DecalComponent.h"
 
 AProductBase::AProductBase()
@@ -52,6 +52,7 @@ AProductBase::AProductBase()
     GroundAuraComponent->SetFadeScreenSize(0.001f);
 
     bOnSale = false;
+    BaseValue = 0;
 
     ElapsedTime = 0.f;
     HeightOffset = 120.f;
@@ -104,6 +105,8 @@ void AProductBase::PostInitializeComponents()
 
     BaseMeshLocation = Mesh->GetRelativeLocation();
     BaseMeshRotation = Mesh->GetRelativeRotation();
+
+    DecideRandomValue();
 }
 
 void AProductBase::BeginPlay()
@@ -149,6 +152,8 @@ void AProductBase::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& O
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ThisClass, ProductState);
+    DOREPLIFETIME(ThisClass, BaseValue);
+    DOREPLIFETIME(ThisClass, bOnSale);
 }
 
 void AProductBase::ApplyDataAsset()
@@ -159,10 +164,6 @@ void AProductBase::ApplyDataAsset()
     {
         Mesh->SetStaticMesh(ProductDataAsset->ProductMesh);
     }
-
-    ApplyValueOverlay();
-    ApplyValueAura();
-    ApplyGroundAura();
 }
 
 void AProductBase::ApplyProductState()
@@ -331,14 +332,12 @@ int32 AProductBase::GetWeight() const
 {
     if (!ProductDataAsset) return 0;
 
-    return ProductDataAsset->ProductData.Weight;
+    return ProductDataAsset->Weight;
 }
 
 int32 AProductBase::GetBaseValue() const
 {
-    if (!ProductDataAsset) return 0;
-
-    return ProductDataAsset->ProductData.Value;
+    return BaseValue;
 }
 
 int32 AProductBase::GetFinalValue() const
@@ -374,9 +373,17 @@ UStaticMesh* AProductBase::GetProductMesh() const
     return IsValid(Mesh) ? Mesh->GetStaticMesh() : nullptr;
 }
 
+FName AProductBase::GetProductId() const
+{
+    return IsValid(ProductDataAsset) ? ProductDataAsset->ProductId : NAME_None;
+}
+
 void AProductBase::SetOnSale(bool NewValue)
 {
-    bOnSale = NewValue;
+    if (HasAuthority())
+    {
+        bOnSale = NewValue;
+    }
 }
 
 bool AProductBase::IsOnSale() const
@@ -623,13 +630,13 @@ void AProductBase::ApplyValueOverlay()
 
 FLinearColor AProductBase::GetValueOverlayColor() const
 {
-    if (!IsValid(ValueVisualConfig))
+    if (!IsValid(ValueGradeConfig))
     {
         return FLinearColor::White;
     }
 
-    const FProductValueVisualRule* Rule = FindValueVisualRule();
-    return Rule ? Rule->OverlayColor : ValueVisualConfig->DefaultColor;
+    const FProductValueGradeRule* Rule = FindValueGradeRule();
+    return Rule ? Rule->OverlayColor : ValueGradeConfig->DefaultColor;
 }
 
 void AProductBase::ApplyValueAura()
@@ -674,20 +681,20 @@ void AProductBase::RefreshAuraActive()
     }
 }
 
-const FProductValueVisualRule* AProductBase::FindValueVisualRule() const
+const FProductValueGradeRule* AProductBase::FindValueGradeRule() const
 {
-    if (!IsValid(ValueVisualConfig)) return nullptr;
+    if (!IsValid(ValueGradeConfig)) return nullptr;
 
     int32 Value = GetFinalValue();
 
-    const FProductValueVisualRule* SelectedRule = nullptr;
+    const FProductValueGradeRule* SelectedRule = nullptr;
 
-    for (const FProductValueVisualRule& Rule : ValueVisualConfig->Rules)
+    for (const FProductValueGradeRule& Rule : ValueGradeConfig->Rules)
     {
-        if (Value >= Rule.MinValue)
+        if (Value >= Rule.Value)
         {
             // 규칙을 적용하지 않았거나, 현재 규칙보다 가치가 클 경우 선택
-            if (!SelectedRule || Rule.MinValue > SelectedRule->MinValue)
+            if (!SelectedRule || Rule.Value > SelectedRule->Value)
             {
                 SelectedRule = &Rule;
             }
@@ -717,6 +724,66 @@ void AProductBase::ApplyGroundAura()
     }
 
     GroundAuraMID->SetVectorParameterValue(TEXT("AuraColor"), GetValueOverlayColor());
+}
 
-    UE_LOG(LogTemp, Warning, TEXT("Test"));
+void AProductBase::DecideRandomValue()
+{
+    if (!HasAuthority()) return;
+    if (!ValueGradeConfig) return;
+
+    int32 MaxChance = 0;
+
+    // 모든 합 더하기
+    for (const FProductValueGradeRule& Rule : ValueGradeConfig->Rules)
+    {
+        if (Rule.Chance > 0)
+        {
+            MaxChance += Rule.Chance;
+        }
+    }
+    if (MaxChance <= 0)
+    {
+        // 확률을 작성하지 않거나 잘못 작성해서 최대 확률이 0이하면 에러
+        UE_LOG(LogTemp, Error, TEXT("상품 확률을 정해주세요!!"));
+        return;
+    }
+
+    int32 Num = FMath::RandRange(1, MaxChance);
+    int32 Sum = 0;
+
+    const FProductValueGradeRule* SelectedRule = nullptr;
+
+    // 누적합으로 등급 정하기
+    for (const FProductValueGradeRule& Rule : ValueGradeConfig->Rules)
+    {
+        if (Rule.Chance <= 0) continue;
+
+        Sum += Rule.Chance;
+
+        if (Num <= Sum)
+        {
+            SelectedRule = &Rule;
+            break;
+        }
+    }
+
+    if (SelectedRule)
+    {
+        BaseValue = SelectedRule->Value;
+    }
+
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        ApplyValueOverlay();
+        ApplyValueAura();
+        ApplyGroundAura();
+    }
+    ForceNetUpdate();
+}
+
+void AProductBase::OnRep_BaseValue()
+{
+    ApplyValueOverlay();
+    ApplyValueAura();
+    ApplyGroundAura();
 }
