@@ -68,15 +68,17 @@ void ALobbyPlayerState::OnRep_IsReady()
 }
 
 
-void ALobbyPlayerState::SelectCharacter(int32 CharacterIndex)
+int32 ALobbyPlayerState::SelectCharacter(int32 CharacterIndex)
 {
     if (HasAuthority())
     {
         ApplySelectCharacter(CharacterIndex);
+        return SelectedCharacterIndex;
     }
     else
     {
         Server_SelectCharacter(CharacterIndex);
+        return SelectedCharacterIndex;
     }
 }
 
@@ -89,15 +91,22 @@ void ALobbyPlayerState::ApplySelectCharacter(int32 CharacterIndex)
 {
     //서버 플레이어만 호출 가능
     if (!HasAuthority()) return;
-    //if (bIsReady) return;
 
     ALobbyGameState* GS = GetWorld() ? GetWorld()->GetGameState<ALobbyGameState>() : nullptr;
     if (!GS) return;
 
+    int32 AvailableNum = GS->GetAvailableCharacters().Num();
+    if (AvailableNum <=0) return;
+
     //다른 플레이어가 선택한 캐릭터인지 체크
-    if (GS->IsCharacterIndexSelectedByOtherPlayer(CharacterIndex, this)) return;
+    while (GS->IsCharacterIndexSelectedByOtherPlayer(CharacterIndex, this))
+    {
+        CharacterIndex = (CharacterIndex + 1) % AvailableNum;
+    }
+
 
     if (SelectedCharacterIndex == CharacterIndex) return;
+
 
     SelectedCharacterIndex = CharacterIndex;
     GS->RefreshPlayerInfos();
@@ -106,6 +115,7 @@ void ALobbyPlayerState::ApplySelectCharacter(int32 CharacterIndex)
     {
         MainGI->SetPlayerCharacter(GetUniqueId(), SelectedCharacterIndex);
     }
+
 
     // 정상작동 확인 로그
     FString CharacterName = TEXT("Unknown");
