@@ -29,8 +29,6 @@ public:
 
     virtual void Destroyed() override;
 
-    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
     UFUNCTION(BlueprintCallable)
     void StartSpawn(const FVector& StartLocation, const FVector& EndLocation, AActor* IgnoreActor);
 
@@ -82,6 +80,16 @@ protected:
     virtual void OnConstruction(const FTransform& Transform) override;
 
     virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+    UFUNCTION()
+    void OnProductBeginOverlap(
+        UPrimitiveComponent* OverlappedComponent,
+        AActor* OtherActor,
+        UPrimitiveComponent* OtherComp,
+        int32 OtherBodyIndex,
+        bool bFromSweep,
+        const FHitResult& SweepResult
+    );
 
     // 데이터 에셋을 적용하는 함수
     void ApplyDataAsset();

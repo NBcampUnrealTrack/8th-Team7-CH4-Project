@@ -22,7 +22,7 @@ UCartLoadComponent::UCartLoadComponent()
     WeightScaling = 0.5f;
 
     BoosterInstigatorDropMultiplier = 0.f; //부스터 사용 중 충돌 시 드롭 없음 (부스터 아이템화 밸런싱 — 방어 겸용)
-    BoostedTargetDropMultiplier = 1.4f;
+    BoostedTargetDropMultiplier = 100.f; // 부스터 피해자는 전부 떨어뜨리게 배율 크게 적용
 
     // 드롭 개수 규칙 지정
     DropCountRules.Add({ 300.f, 0, 1, 0.5f });
@@ -30,6 +30,7 @@ UCartLoadComponent::UCartLoadComponent()
     DropCountRules.Add({ 1200.f, 2, 3, 1.f });
     DropCountRules.Add({ 1800.f, 3, 4, 1.f });
     DropCountRules.Add({ 2500.f, 4, 5, 1.f });
+    DropCountRules.Add({ 20000.f, 99, 99, 1.f });
 
     // 소켓 이름 지정
     for (int32 i = 1; i <= 6; ++i)
