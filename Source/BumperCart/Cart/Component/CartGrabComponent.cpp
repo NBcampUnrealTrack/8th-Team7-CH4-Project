@@ -83,7 +83,7 @@ UCartGrabComponent::UCartGrabComponent()
     // 로봇손 밸런스 관련
     GrabSpeed = 1400.f;
     GrabRange = 500.f;
-    GrabRadius = 20.f;
+    GrabRadius = 25.f;
     bGrabExtended = false;
     SocketName = TEXT("ProductSocket");
     bGrabDisabledByCheckout = false;
