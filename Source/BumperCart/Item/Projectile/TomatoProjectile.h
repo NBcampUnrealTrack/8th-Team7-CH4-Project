@@ -82,13 +82,20 @@ private:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
     float MaxLifeTime = 3.0f;
 
+    // 한 번 이상 충돌 했는지
+    bool bHasHit = false;
+
 // ------------------------------------------------------------
-// 화면 가림 UI 적용
+// 토마토 효과 적용
 // ------------------------------------------------------------
 private:
-    // 가려질 시간
+    // 화면 가림 시간
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Effect", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
     float ScreenBlockDuration = 3.0f;
+
+    // 토마토 피격 시 충격 강도
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Effect", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
+    float ProductDropStrength = 1500.0f;
 
 // ------------------------------------------------------------
 // 궤적 이펙트
