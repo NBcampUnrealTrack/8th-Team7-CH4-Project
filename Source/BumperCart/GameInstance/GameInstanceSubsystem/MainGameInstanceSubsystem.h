@@ -26,80 +26,80 @@ class BUMPERCART_API UMainGameInstanceSubsystem : public UGameInstanceSubsystem
 
 public:
     // 플레이어 로그인
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void Login(const FString& CredentialName);
 
     // 호스트가 되어 방 생성
     // 방 제목은 필수, 방 비밀번호는 선택
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void HostListenServer(const FString& InRoomName, const FString& InRoomPassword = TEXT(""));
 
     // 생성된 방 검색
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void FindSessions(const FString& RoomNameFilter = TEXT(""));
 
     // 검색된 방 참가
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void JoinFoundSession(int32 Index, const FString& InputPassword);
 
     // 비공개 방 참가
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void JoinPrivateRoomByName(const FString& InRoomName, const FString& InRoomPassword);
 
     // 방 나가기
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void LeaveSession();
 
     // 퀵 매치
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void QuickMatch();
 
     // 세션 검색 처리 결과
-    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    UPROPERTY(BlueprintAssignable, Category = "Online|Session")
     FOnSessionsFoundSignature OnSessionsFound;
 
     // 로그인 결과 나올 시 브로드 캐스트
-    UPROPERTY(BlueprintAssignable, Category = "EOS")
+    UPROPERTY(BlueprintAssignable, Category = "Online")
     FOnLoginResult OnLoginResult;
 
     // 방 참가 시 비밀번호 오입력 시 브로드 캐스트
-    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    UPROPERTY(BlueprintAssignable, Category = "Online|Session")
     FOnJoinPasswordIncorrect OnJoinPasswordIncorrect;
 
     // 세션 나가기 성공했을 때 브로드캐스트
-    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    UPROPERTY(BlueprintAssignable, Category = "Online|Session")
     FOnLeaveSessionResult OnLeaveSessionResult;
 
     // 퀵매치 시 참가 가능한 방이 없을 때 브로드캐스트
-    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    UPROPERTY(BlueprintAssignable, Category = "Online|Session")
     FOnQuickMatchNoSessionFound OnQuickMatchNoSessionFound;
 
     // 비공개 방 참가 시 해당 방 제목의 방을 찾지 못했을 때 브로드캐스트
-    UPROPERTY(BlueprintAssignable, Category = "EOS|Session")
+    UPROPERTY(BlueprintAssignable, Category = "Online|Session")
     FOnPrivateRoomNotFound OnPrivateRoomNotFound;
 
     // 로그인된 유저 이름/ID를 UI에서 바로 가져다 쓸 수 있게 캐싱
-    UPROPERTY(BlueprintReadOnly, Category = "EOS")
+    UPROPERTY(BlueprintReadOnly, Category = "Online")
     FString CachedDisplayName;
 
     // 검색 결과 인덱스에 해당하는 방 제목 조회
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     FString GetFoundSessionRoomName(int32 Index) const;
 
     // 검색 결과 인덱스에 해당하는 방 소유자 이름 조회
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     FString GetFoundSessionOwnerName(int32 Index) const;
 
     // 비공개 방인지 아닌지 조회
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     bool GetFoundSessionIsPrivate(int32 Index) const;
 
     // 검색 결과 개수 조회
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     int32 GetFoundSessionCount() const;
 
     // 현재 참가한 방의 이름 조회
-    UFUNCTION(BlueprintCallable, Category = "EOS|Session")
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
     FString GetRoomName() const { return RoomName; }
 
     // 클라이언트가 호스트한테 나가라라는 알림을 받았을 때 해당 PlayerController 호출
@@ -153,6 +153,9 @@ private:
     TSharedPtr<FOnlineSessionSearch> SearchSettings;
     IOnlineSessionPtr GetSessionInterface() const;
     IOnlineIdentityPtr GetIdentityInterface() const;
+
+    // Steam을 못 잡아 Null로 폴백된 상태인지 (에디터 PIE 등 => LAN 모드로 로컬 테스트)
+    bool IsUsingNullFallback() const;
 
     // 방 생성 시 사용되는 이름 및 비밀번호
     FString RoomName;

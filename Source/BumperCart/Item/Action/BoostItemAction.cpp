@@ -19,7 +19,6 @@ bool UBoostItemAction::Execute(ACartPawn* PlayerCharacter)
         return false;
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("%s: 부스트 아이템 사용"), *GetNameSafe(PlayerCharacter));
-
-    return true;
+    //부스터 상시화로 아이템 사용 없음 — 클래스/DA_Boost 정리 예정
+    return false;
 }

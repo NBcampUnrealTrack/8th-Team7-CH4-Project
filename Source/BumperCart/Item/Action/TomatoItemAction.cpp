@@ -76,13 +76,16 @@ bool UTomatoItemAction::Execute(ACartPawn* PlayerCharacter)
         SpawnParams
     );
 
-    if (!IsValid(TomatoProjectile))
-    {
-        return false;
-    }
+    //// 토마토 생성 실패한 경우만 False
+    //if (TomatoProjectile == nullptr)
+    //{
+    //    return false;
+    //}
 
-    // 방향대로 투사체 발사
-    TomatoProjectile->FireInDirection(FireDirection);
+    if (IsValid(TomatoProjectile))
+    {
+        TomatoProjectile->FireInDirection(FireDirection);
+    }
 
     UE_LOG(LogTemp, Warning, TEXT("%s: 토마토 아이템 사용"), *GetNameSafe(PlayerCharacter));
 
