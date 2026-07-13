@@ -38,8 +38,11 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Component")
     TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
 
-    UPROPERTY(EditAnywhere, Category = "Gimmick | NPC Rush")
+    UPROPERTY(EditAnywhere, Category = "Compoonent | Naiagara")
     TObjectPtr<UNiagaraComponent> NPCRushFX;
+
+    UPROPERTY(VisibleAnywhere, Category = "Component | Sound")
+    TObjectPtr<UAudioComponent> NPCRushAudioComponent;
 
 #pragma endregion
 
@@ -50,6 +53,12 @@ private:
     float LastHitTime = 0.0f;
 
 protected:
+    UPROPERTY(EditAnywhere, Category = "Sound | Spawn")
+    USoundBase* SpawnSound;
+
+    UPROPERTY(EditAnywhere, Category = "Sound | Knokback")
+    USoundBase* KnockbackSound;
+
     UFUNCTION()
     void OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
