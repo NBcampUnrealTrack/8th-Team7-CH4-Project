@@ -13,6 +13,8 @@
 #include "NiagaraComponent.h"
 #include "ProductValueGradeConfig.h"
 #include "Components/DecalComponent.h"
+#include "Cart/CartPawn.h"
+#include "Cart/Component/CartLoadComponent.h"
 
 AProductBase::AProductBase()
 {
@@ -27,7 +29,7 @@ AProductBase::AProductBase()
     ProductCollision = CreateDefaultSubobject<USphereComponent>(TEXT("Root"));
     ProductCollision->SetSphereRadius(40.f);
     ProductCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    ProductCollision->SetGenerateOverlapEvents(false);
+    ProductCollision->SetGenerateOverlapEvents(true);
     ProductCollision->SetCollisionProfileName(TEXT("ProductCollision"));
     SetRootComponent(ProductCollision);
 
@@ -67,6 +69,8 @@ AProductBase::AProductBase()
 
     SpawningDuration = 1.1f;
     SpawningHeight = 250.f;
+
+    ProductCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnProductBeginOverlap);
 }
 
 void AProductBase::Destroyed()
@@ -81,22 +85,6 @@ void AProductBase::Destroyed()
     }
 
     Super::Destroyed();
-}
-
-void AProductBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-    Super::EndPlay(EndPlayReason);
-
-    switch (EndPlayReason)
-    {
-    case EEndPlayReason::Destroyed:
-        UE_LOG(LogTemp, Warning, TEXT("%s 상품 파괴"), *GetName());
-        break;
-
-    case EEndPlayReason::RemovedFromWorld:
-        UE_LOG(LogTemp, Warning, TEXT("%s 상품 월드에서 제거"), *GetName());
-        break;
-    }
 }
 
 void AProductBase::PostInitializeComponents()
@@ -154,6 +142,19 @@ void AProductBase::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& O
     DOREPLIFETIME(ThisClass, ProductState);
     DOREPLIFETIME(ThisClass, BaseValue);
     DOREPLIFETIME(ThisClass, bOnSale);
+}
+
+void AProductBase::OnProductBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+    if (!HasAuthority()) return;
+
+    ACartPawn* Cart = Cast<ACartPawn>(OtherActor);
+    if (!IsValid(Cart)) return;
+
+    UCartLoadComponent* LoadComp = Cart->FindComponentByClass<UCartLoadComponent>();
+    if (!IsValid(LoadComp)) return;
+
+    LoadComp->TryAddProduct(this);
 }
 
 void AProductBase::ApplyDataAsset()
@@ -402,7 +403,8 @@ void AProductBase::ResetBaseMeshTransform()
 
 bool AProductBase::CanLoad() const
 {
-    return ProductState.State == EProductState::Grabbed;
+    return ProductState.State == EProductState::Grabbed
+        || ProductState.State == EProductState::Display;
 }
 
 bool AProductBase::CanGrab() const
