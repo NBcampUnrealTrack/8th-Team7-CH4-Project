@@ -154,13 +154,10 @@ void AProductShelfManager::SaleProductSpawn(TSubclassOf<AProductBase> SaleProduc
     {
         if (IsValid(SaleShelf))
         {
-            AProductBase* SpawnedProduct = SaleShelf->SpawnSpecificItem(SaleProduct);
+            AProductBase* SpawnedProduct = SaleShelf->SpawnSpecificItem(SaleProduct, true);
 
             if (IsValid(SpawnedProduct))
             {
-                // 세일 아이템 체크
-                SpawnedProduct->SetOnSale(true);
-
                 CurrentProductCount++;
                 UE_LOG(LogTemp, Log, TEXT("[ProductShelfManager] 세일 제품 스폰 및 체크 완료."));
 

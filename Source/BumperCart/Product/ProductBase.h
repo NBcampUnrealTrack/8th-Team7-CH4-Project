@@ -15,7 +15,7 @@ class UNiagaraComponent;
 class UNiagaraSystem;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
-class UProductValueVisualConfig;
+class UProductValueGradeConfig;
 class UDecalComponent;
 
 
@@ -62,6 +62,9 @@ public:
     FLoadedProductInfo GetLoadedProductInfo() const;
 
     UStaticMesh* GetProductMesh() const;
+
+    UFUNCTION(BlueprintPure)
+    FName GetProductId() const;
 
     UFUNCTION(BlueprintCallable)
     void SetOnSale(bool NewValue);
@@ -125,7 +128,7 @@ protected:
 
     // 가치에 따라 이펙트 적용을 어떻게 할지 정리된 규칙
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product|Visual")
-    TObjectPtr<UProductValueVisualConfig> ValueVisualConfig;
+    TObjectPtr<UProductValueGradeConfig> ValueGradeConfig;
 
 
     /* Product 기본 변수 */
@@ -138,8 +141,12 @@ protected:
     UPROPERTY(ReplicatedUsing = OnRep_ProductState, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     FProductRepState ProductState;
 
+    // 기본 가치
+    UPROPERTY(ReplicatedUsing = OnRep_BaseValue, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
+    int32 BaseValue;
+
     // 이벤트 대상 상품인지 확인하는 변수
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Product")
+    UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Product")
     bool bOnSale;
 
 
@@ -255,8 +262,14 @@ private:
     // 오라 이펙트 On/Off 처리
     void RefreshAuraActive();
 
-    const FProductValueVisualRule* FindValueVisualRule() const;
+    const FProductValueGradeRule* FindValueGradeRule() const;
 
     // 바닥 오라 적용하는 함수
     void ApplyGroundAura();
+
+    // 랜덤한 기본값을 정하는 함수
+    void DecideRandomValue();
+
+    UFUNCTION()
+    void OnRep_BaseValue();
 };

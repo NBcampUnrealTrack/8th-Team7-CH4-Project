@@ -144,13 +144,10 @@ void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProd
     {
         if (IsValid(SaleShelf))
         {
-            AProductBase* SpawnedProduct = SaleShelf->SpawnSpecificItem(SaleProduct);
+            AProductBase* SpawnedProduct = SaleShelf->SpawnSpecificItem(SaleProduct, true);
 
             if (IsValid(SpawnedProduct))
             {
-                // 세일 아이템 체크
-                SpawnedProduct->SetOnSale(true);
-
                 CurrentProductCount++;
                 UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 세일 제품 스폰 및 체크 완료."));
             }

@@ -4,19 +4,6 @@
 #include "ProductTypes.generated.h"
 
 USTRUCT(BlueprintType)
-struct FProductData
-{
-    GENERATED_BODY()
-
-public:
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
-    int32 Value = 10;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Product")
-    int32 Weight = 1;
-};
-
-USTRUCT(BlueprintType)
 struct FLoadedProductInfo
 {
     GENERATED_BODY();
@@ -80,18 +67,21 @@ public:
     float LaunchServerStartTime = 0.f;
 };
 
-
 USTRUCT(BlueprintType)
-struct FProductValueVisualRule
+struct FProductValueGradeRule
 {
     GENERATED_BODY()
 
 public:
-    // 규칙을 적용하기 위한 최소 가치
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    int32 MinValue = 0;
-
     // 적용할 외곽선 + 오라 색상
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FLinearColor OverlayColor = FLinearColor::White;
+
+    // 가치
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 Value = 0;
+
+    // 확률
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 Chance = 0;
 };
