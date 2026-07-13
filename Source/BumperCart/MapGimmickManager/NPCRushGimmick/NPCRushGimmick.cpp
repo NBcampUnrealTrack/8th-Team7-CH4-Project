@@ -95,6 +95,12 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
 
     if (!PlayerCart) return;
 
+
+    if (KnockbackSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(GetWorld(), KnockbackSound, GetActorLocation());
+    }
+
     FVector CartForward = GetActorForwardVector().GetSafeNormal2D();
     FVector CartRight = GetActorRightVector().GetSafeNormal2D();
 
