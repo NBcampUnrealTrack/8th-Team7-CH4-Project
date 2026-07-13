@@ -280,35 +280,37 @@ void UMainGameInstanceSubsystem::OnFindSessionComplete(bool bWasSuccessful)
 
 void UMainGameInstanceSubsystem::JoinFoundSession(int32 Index, const FString& InputPassWord)
 {
-    IOnlineSessionPtr Sessions = GetSessionInterface();
-
-    if (!Sessions.IsValid() || !SearchSettings.IsValid()) return;
-
-    if (!SearchSettings->SearchResults.IsValidIndex(Index))
+    // UI 목록은 FilteredResults 기준 => 인덱스도 같은 배열로 조회 (SearchResults 원본과 순서가 다를 수 있음)
+    if (!FilteredResults.IsValidIndex(Index))
     {
         UE_LOG(LogTemp, Warning, TEXT("[Steam] 잘못된 세션 인덱스: %d"), Index);
         return;
     }
 
-    const FOnlineSessionSearchResult& Result = SearchSettings->SearchResults[Index];
+    JoinSessionInternal(FilteredResults[Index], InputPassWord);
+}
+
+// 세션 참가 공통 처리 — 비밀번호 검증 후 JoinSession
+void UMainGameInstanceSubsystem::JoinSessionInternal(const FOnlineSessionSearchResult& Result, const FString& InputPassword)
+{
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid()) return;
 
     // 방에 설정된 비밀번호와 입력값 비교
     FString CurrentRoomPassword;
     Result.Session.SessionSettings.Get(SETTING_ROOMPASSWORD, CurrentRoomPassword);
 
     // 비밀번호가 비어있으면 그냥 입장 가능
-    if (!CurrentRoomPassword.IsEmpty() && CurrentRoomPassword != InputPassWord)
+    if (!CurrentRoomPassword.IsEmpty() && CurrentRoomPassword != InputPassword)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Steam] 비밀번호가 일치하지 않습니다. (Index: %d)"), Index);
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 비밀번호가 일치하지 않습니다."));
         OnJoinPasswordIncorrect.Broadcast();
         return;
     }
 
-
     Result.Session.SessionSettings.Get(SETTING_ROOMNAME, RoomName);
 
     Sessions->OnJoinSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnJoinSessionComplete);
-    // Index에 들어온 값에따라 방 참가
     Sessions->JoinSession(0, NAME_GameSession, Result);
 }
 
@@ -386,8 +388,8 @@ void UMainGameInstanceSubsystem::TryJoinPrivateSession()
 
     UE_LOG(LogTemp, Log, TEXT("[Steam] 비공개 방 참가: Index %d 방 발견, 참가 시도"), FoundIndex);
 
-    //비밀번호 확인은 해당 함수에서 확인
-    JoinFoundSession(FoundIndex, PrivateRoomPassword);
+    //비밀번호 확인은 공통 처리에서 (FoundIndex는 SearchResults 기준이라 결과를 직접 전달)
+    JoinSessionInternal(Results[FoundIndex], PrivateRoomPassword);
 }
 
 void UMainGameInstanceSubsystem::QuickMatch()
@@ -466,19 +468,19 @@ void UMainGameInstanceSubsystem::TryJoinQuickMatchSession()
             BestPing = Result.PingInMs;
             BestIndex = i;
         }
-
-        // 비밀번호가 없는 방 존재 X
-        if (BestIndex == INDEX_NONE)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[Steam] 퀵매치: 참가 가능한(비밀번호 없는) 방을 찾지 못했습니다."));
-            OnQuickMatchNoSessionFound.Broadcast();
-            return;
-        }
-
-        UE_LOG(LogTemp, Log, TEXT("[Steam] 퀵매치: Index %d 방 참가 시도 (Ping: %d ms)"), BestIndex, BestPing);
-
-        JoinFoundSession(BestIndex, TEXT(""));
     }
+
+    // 비밀번호가 없는 방 존재 X (루프 안에서 첫 방에 바로 참가하던 것 => 전체 비교 후 최저 핑 방 선택, 없으면 브로드캐스트)
+    if (BestIndex == INDEX_NONE)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 퀵매치: 참가 가능한(비밀번호 없는) 방을 찾지 못했습니다."));
+        OnQuickMatchNoSessionFound.Broadcast();
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[Steam] 퀵매치: Index %d 방 참가 시도 (Ping: %d ms)"), BestIndex, BestPing);
+
+    JoinSessionInternal(Results[BestIndex], TEXT(""));
 }
 
 // 세션 나가기
