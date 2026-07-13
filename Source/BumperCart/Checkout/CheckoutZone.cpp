@@ -801,7 +801,7 @@ void ACheckoutZone::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& L
 
     if (!bIsCheckoutInProgress)
     {
-        if (CurrentLoadedProductCount > 0)
+        if (CurrentLoadedProductCount >= MinimumCheckoutProductCount)
         {
             TryStartCheckout();
         }
@@ -914,7 +914,10 @@ bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
         return false;
     }
 
-    if (CartLoadComponent->GetCurrentLoadedCount() <= 0)
+    // 최소 개수
+    const int32 LoadedProductCount =  FMath::Max(CartLoadComponent->GetCurrentLoadedCount(), 0);
+
+    if (LoadedProductCount < MinimumCheckoutProductCount)
     {
         return false;
     }

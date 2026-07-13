@@ -386,6 +386,9 @@ private:
     UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_CheckoutSession, Category = " Checkout|Condition")
     bool bIsCheckoutInProgress = false;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Condition", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
+    int32 MinimumCheckoutProductCount = 3;
+
 // ------------------------------------------------------------
 // 계산 진행
 // ------------------------------------------------------------

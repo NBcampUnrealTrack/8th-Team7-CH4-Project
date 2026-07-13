@@ -38,6 +38,14 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")
     int32 LastCheckoutBonusScore = 0;
 
+    // 상품 개수에 따른 추가 점수
+    UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")
+    int32 ComboBonusScore = 0;
+
+    // 상품 개수에 따른 추가 배율
+    UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")
+    float ComboMultiplier = 1.0f;
+
     // 최종 점수
     UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")
     int32 TotalScore = 0;
@@ -53,6 +61,10 @@ public:
     // 마지막에 계산한 상품인지
     UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")
     bool bIsLastCheckoutBonusApplied = false;
+
+    // 상품 개수 콤보 보너스 적용 여부
+    UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")
+    bool bIsComboBonusApplied = false;
 
     // 정산 완료했는지
     UPROPERTY(BlueprintReadOnly, Category = "Checkout|Score")

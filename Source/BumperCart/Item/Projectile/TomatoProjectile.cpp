@@ -1,6 +1,8 @@
 ﻿#include "Item/Projectile/TomatoProjectile.h"
 
 #include "Cart/CartPawn.h"
+#include "Cart/CartLoadTypes.h"
+#include "Cart/Component/CartLoadComponent.h"
 #include "Cart/Component/CartScreenFXComponent.h"
 
 #include "Components/SphereComponent.h"
@@ -28,7 +30,7 @@ ATomatoProjectile::ATomatoProjectile()
     CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     CollisionComponent->SetGenerateOverlapEvents(true);
 
-    CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+    CollisionComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
     CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Overlap);
 
@@ -96,16 +98,23 @@ void ATomatoProjectile::OnProjectileBeginOverlap(UPrimitiveComponent* Overlapped
         return;
     }
 
+    if (bHasHit)
+    {
+        return;
+    }
+
     if (!IsValid(OtherActor))
     {
         return;
     }
 
     // 플레이어 자신은 충돌 무시
-    if (OtherActor == GetOwner())
+    if (OtherActor == this || OtherActor == GetOwner())
     {
         return;
     }
+
+    bHasHit = true;
 
     // 다른 플레이어와 충돌 시
     ACartPawn* HitPlayer = Cast<ACartPawn>(OtherActor);
@@ -160,6 +169,12 @@ void ATomatoProjectile::HandleHitCart(ACartPawn* HitPlayer)
 
     // 토마토 화면 가림 적용
     HitPlayer->ClientApplyTomatoScreenBlock(ScreenBlockDuration);
+
+    //UCartLoadComponent* LoadComponent = HitPlayer->GetLoadComponent();
+    //if (IsValid(LoadComponent))
+    //{
+    //    LoadComponent->DropProducts(ProductDropStrength, EDropCollisionRole::Normal);
+    //}
 
     Destroy();
 }
