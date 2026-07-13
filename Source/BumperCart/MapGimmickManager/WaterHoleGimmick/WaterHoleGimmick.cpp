@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Cart/CartPawn.h"
+#include "Kismet/GameplayStatics.h"
 
 AWaterHoleGimmick::AWaterHoleGimmick()
 {
@@ -19,8 +20,6 @@ AWaterHoleGimmick::AWaterHoleGimmick()
 
     WaterHoleMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WaterHoleMesh"));
     WaterHoleMesh->SetupAttachment(BoxCollision);
-
-    SpinningCharacter = nullptr;
 }
 
 void AWaterHoleGimmick::BeginPlay()
@@ -38,6 +37,11 @@ void AWaterHoleGimmick::OnWaterHoleBeginOverlap(UPrimitiveComponent* OverlappedC
     if(!OtherActor || !OtherActor->Implements<USlideAffectable>())
     {
         return;
+    }
+
+    if (WaterHoleSound)
+    {
+        UGameplayStatics::PlaySound2D(GetWorld(), WaterHoleSound);
     }
 
     const float Yaw = FMath::RandBool() ? 60.f : -60.f;

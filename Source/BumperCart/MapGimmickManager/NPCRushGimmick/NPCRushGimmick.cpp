@@ -8,6 +8,8 @@
 #include "Cart/CartPawn.h"
 #include "Cart/CartLoadTypes.h"
 #include "Cart/Component/CartLoadComponent.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 ANPCRushGimmick::ANPCRushGimmick()
 {
@@ -27,6 +29,9 @@ ANPCRushGimmick::ANPCRushGimmick()
 
     ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
 
+    NPCRushAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("NPCRushAudio"));
+    NPCRushAudioComponent->SetupAttachment(RootComponent);
+
     if (IsValid(ProjectileMovement))
     {
         ProjectileMovement->InitialSpeed =1000.0f;
@@ -34,11 +39,22 @@ ANPCRushGimmick::ANPCRushGimmick()
         ProjectileMovement->ProjectileGravityScale = 0.0f;
     }
 
+    NPCRushAudioComponent->bAutoActivate = true;
 }
 
 void ANPCRushGimmick::BeginPlay()
 {
 	Super::BeginPlay();
+
+    if (SpawnSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(GetWorld(), SpawnSound, GetActorLocation());
+    }
+
+    if (NPCRushAudioComponent && NPCRushAudioComponent->IsActive())
+    {
+
+    }
 
     if (HasAuthority() && BoxCollision)
     {
@@ -78,6 +94,12 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
     if (!HasAuthority()) return;
 
     if (!PlayerCart) return;
+
+
+    if (KnockbackSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(GetWorld(), KnockbackSound, GetActorLocation());
+    }
 
     FVector CartForward = GetActorForwardVector().GetSafeNormal2D();
     FVector CartRight = GetActorRightVector().GetSafeNormal2D();

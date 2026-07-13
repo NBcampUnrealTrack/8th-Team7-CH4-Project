@@ -55,30 +55,15 @@ protected:
                                int32 OtherBodyIndex);
 #pragma endregion
 
-#pragma region Spin
+#pragma region WaterHole
 private:
-    // 회전 중인 캐릭터 기억
-    TObjectPtr<ACharacter> SpinningCharacter;
-
-    // 회전 지속시간
-    UPROPERTY(EditAnywhere, Category = "Spin")
-    float SpinDuration = 0.25f;
-
     // 효과 지속시간
     UPROPERTY(EditAnywhere, Category = "Spin")
     float EffectDuration = 0.8f;
 
-    float TimerInterval = 0.01f;
-
-    // 지속 시간 체크용
-    float SpinElapsed = 0.0f;
-
-    FTimerHandle SpinTimerHandle;
-
-    // 플레이어의 원래 마찰력 값 저장 (복구용)
-    float OriginalGroundFriction;
-    float OriginalBrakingDeceleration;
-    FRotator TargetRotation;
+protected:
+    UPROPERTY(EditAnywhere, Category = "WaterHole | Sound")
+    USoundBase* WaterHoleSound;
 
 #pragma endregion
 
