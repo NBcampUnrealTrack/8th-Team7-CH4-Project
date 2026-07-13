@@ -77,7 +77,7 @@ void AMapGimmickManager::SpawnObstacles()
         return;
     }
 
-    for (int32 i = GimmickSpawnPointList.Num() - 1; i > 0; --i)
+    for (int32 i = GimmickSpawnPointList.Num() - 1; i >= 0; --i)
     {
         int32 RandomIndex = FMath::RandRange(0, i);
         if (i != RandomIndex)
@@ -142,7 +142,6 @@ void AMapGimmickManager::RespawnObstacles()
 
     SpawnObstacles();
 
-    // 테스트용
     StartNPCRush();
 }
 
@@ -164,7 +163,7 @@ void AMapGimmickManager::StartNPCRush()
     }
 
     // 타겟 포인트 목록 섞고 하나 랜덤 선택
-    for (int32 i = NPCRushStartPointList.Num() - 1; i > 0; --i)
+    for (int32 i = NPCRushStartPointList.Num() - 1; i >= 0; --i)
     {
         int32 RandomIndex = FMath::RandRange(0, i);
         if (i != RandomIndex)
