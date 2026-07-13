@@ -61,25 +61,30 @@ AProductBase* AProductShelf::SpawnRandomProduct()
     return SpawnSpecificItem(RandomProduct);
 }
 
-AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass)
+AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass, bool bOnSale)
 {
     if (!HasAuthority() || !ItemClass) return nullptr;
 
     // 처음 스폰되는 곳
     FVector SpawnStartLocation = LaunchPoints->GetComponentLocation();
-    FRotator SpawnStartRoation = LaunchPoints->GetComponentRotation();    
+    FRotator SpawnStartRotation = LaunchPoints->GetComponentRotation();    
+
+    FTransform SpawnTransform(SpawnStartRotation, SpawnStartLocation);
 
     // 스폰시 충돌 처리 규칙
     // 강제 스폰
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
     // 제품 스폰
-    AProductBase* SpawnedProduct = GetWorld()->SpawnActor<AProductBase>(ItemClass, SpawnStartLocation, SpawnStartRoation, SpawnParams);
+    AProductBase* SpawnedProduct = GetWorld()->SpawnActorDeferred<AProductBase>(ItemClass, SpawnTransform, this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
     // 제품 스폰 성공
     if (SpawnedProduct)
     {
+        // OnSale를 먼저 지정하고 스폰 완료 처리
+        SpawnedProduct->SetOnSale(bOnSale);
+
+        SpawnedProduct->FinishSpawning(SpawnTransform);
+
+
         // 스폰 후 날아가는 위치
         FVector SpawnEndLocation = GetRandomPointInVolume();
 
@@ -99,7 +104,7 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
                         World,
                         SpawnFX,
                         SpawnStartLocation,
-                        SpawnStartRoation,
+                        SpawnStartRotation,
                         FVector(1.0f),
                         true,
                         true
