@@ -162,20 +162,20 @@ protected:
 
 	//후진 최고 속도 = 전진 최고 속도 * MaxReverseSpeedRatio (쇼핑카트는 후진이 느리다)
 	UPROPERTY(EditAnywhere, Category = "Cart|Throttle", meta = (ClampMin = "0", ClampMax = "1"))
-	float MaxReverseSpeedRatio = 0.5f;
+	float MaxReverseSpeedRatio = 0.6f;
 
 	//---------- 조향 튜닝 ----------
 	//초당 회전 각도(도)
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0"))
-	float TurnRateDegPerSec = 145.f;
+	float TurnRateDegPerSec = 165.f;
 
 	//정지 상태에서의 최소 조향 배율
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0", ClampMax = "1"))
-	float MinSteerSpeedFactor = 0.55f;
+	float MinSteerSpeedFactor = 0.65f;
 
-	//조향 입력을 따라가는 속도. 낮을수록 묵직하게 늦게 먹는다(회전 지연)
+	//조향 입력을 따라가는 속도. 낮을수록 묵직하게 늦게 먹는다(회전 지연) — 조준(충돌 성공률) 위해 상향
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "0.1"))
-	float SteerInterpSpeed = 5.f;
+	float SteerInterpSpeed = 7.f;
 
 	//원격(타 클라·서버)에서 이 카트를 복제된 yaw로 따라잡는 보간 속도. 낮으면 회전이 느리게 돌고, 너무 높으면 각지게 튄다
 	UPROPERTY(EditAnywhere, Category = "Cart|Steering", meta = (ClampMin = "1"))
@@ -232,18 +232,26 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
 	UCartLoadComponent* LoadComponent;
 
-	//---------- 적재 무게감 ----------
-	//현재 적재율. 0~1 = 가벼움~무거움, 1 초과 = 과적(무게가 MaxWeight를 넘음)
+	//---------- 적재 무게감 (갯수 기반) ----------
+	//현재 적재율 = 갯수/FullLoadCount. 0~1 = 가벼움~무거움, 1 초과 = 과적. 1개 단위로 연속 => 갯수 다르면 속도도 다름 (추격 수렴)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "2"))
 	float LoadRatio = 0.f;
 
-	//무거움(적재율 1.0=무게 MaxWeight)일 때 최고 속도 배율 (낮을수록 무거우면 느림). 무거움의 '그나마 움직이는' 바닥 속도
+	//적재율 1.0이 되는 기준 갯수 — 이 갯수에서 속도 배율 최저, 초과부터 과적
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "1"))
+	int32 FullLoadCount = 18;
+
+	//무거움(적재율 1.0=기준 갯수)일 때 최고 속도 배율 (낮을수록 무거우면 느림). 무거움의 '그나마 움직이는' 바닥 속도
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
 	float LoadMaxSpeedScale = 0.6f;
 
-	//과적(적재율 1.0 초과) 시 속도 배율 — 담는 양과 무관하게 고정. 무거움(0.6)보다 확 느려 답답하게(과유불급)
+	//속도 감속 커브 지수 — 1=선형, 1 미만이면 초반 적재(1~5개)부터 감속이 크게 체감
+	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0.1", ClampMax = "2"))
+	float LoadSpeedCurveExp = 0.7f;
+
+	//과적(기준 갯수 초과) 시 속도 배율 — 담는 양과 무관하게 고정. 무거움(0.6)보다 느리되 움직일 만하게(과유불급)
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))
-	float OverloadSpeedScale = 0.3f;
+	float OverloadSpeedScale = 0.45f;
 
 	//가득 실었을 때 회전 배율
 	UPROPERTY(EditAnywhere, Category = "Cart|Load", meta = (ClampMin = "0", ClampMax = "1"))

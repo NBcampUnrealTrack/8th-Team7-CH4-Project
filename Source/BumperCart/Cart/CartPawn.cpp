@@ -166,7 +166,9 @@ void ACartPawn::Tick(float DeltaSeconds)
 	//속도: 무거움까지는 무게 비례(1.0=>0.6), 과적(적재율 1.0 초과)이면 담는 양 무관하게 고정 배율(0.3)로 뚝 떨어져 답답하게
 	//회전·브레이크: 과적 페널티 없음 => 적재율을 1.0로 클램프해 무거움 수준 유지
 	const float ClampedLoad = FMath::Min(LoadRatio, 1.f);
-	const float LoadSpeedMul = (LoadRatio > 1.f) ? OverloadSpeedScale : FMath::Lerp(1.f, LoadMaxSpeedScale, LoadRatio);
+	//지수 커브(<1) => 초반 몇 개부터 감속 체감, 뒤로 갈수록 완만 (갯수당 속도 차이는 전 구간 유지)
+	const float LoadSpeedAlpha = FMath::Pow(ClampedLoad, LoadSpeedCurveExp);
+	const float LoadSpeedMul = (LoadRatio > 1.f) ? OverloadSpeedScale : FMath::Lerp(1.f, LoadMaxSpeedScale, LoadSpeedAlpha);
 	const float LoadTurnMul = FMath::Lerp(1.f, LoadTurnScale, ClampedLoad);
 	const float LoadBrakeMul = FMath::Lerp(1.f, LoadBrakeScale, ClampedLoad);
 
@@ -669,11 +671,8 @@ void ACartPawn::SetLoadRatio(float InLoadRatio)
 //적재 변경 델리게이트 핸들러
 void ACartPawn::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& LoadInfo)
 {
-	//계산한 적재율(현재무게/최대무게)을 그대로 카트에 반영
-	if (LoadComponent)
-	{
-		SetLoadRatio(LoadComponent->GetLoadRatio());
-	}
+	//갯수/기준갯수 => 연속 적재율 (무게 미사용 — 무게 폐지 대비, 갯수 1개 차이도 속도에 반영)
+	SetLoadRatio((float)LoadInfo.CurrentLoadedCount / FMath::Max(FullLoadCount, 1));
 }
 
 //카트가 무언가에 부딪히면 충돌 컴포넌트에 위임 (판정·페어 해결·서버 필터 전부 컴포넌트 담당)
