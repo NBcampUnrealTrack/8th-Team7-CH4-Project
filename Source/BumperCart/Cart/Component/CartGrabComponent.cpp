@@ -88,6 +88,7 @@ UCartGrabComponent::UCartGrabComponent()
     SocketName = TEXT("ProductSocket");
     bGrabDisabledByCheckout = false;
     bGrabDisabledBySlip = false;
+    bGrabEnabledByItem = false;
 
     static ConstructorHelpers::FObjectFinder<USoundBase> GrabSuccessSoundFinder(
         TEXT("/Game/Developers/dongh/Audio/GrabSuccess.GrabSuccess")
@@ -189,6 +190,18 @@ void UCartGrabComponent::SetGrabDisabledBySlip(bool bShouldDisable)
     }
 }
 
+void UCartGrabComponent::SetGrabEnabledByItem(bool bShouldEnable)
+{
+    if (bGrabEnabledByItem == bShouldEnable) return;
+
+    bGrabEnabledByItem = bShouldEnable;
+
+    if (AActor* OwnerActor = GetOwner())
+    {
+        OwnerActor->ForceNetUpdate();
+    }
+}
+
 void UCartGrabComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     UWorld* World = GetWorld();
@@ -283,7 +296,8 @@ bool UCartGrabComponent::CanShowAimVisual() const
     return IsLocallyControlled()
         && VisualState == EGrabVisualState::None
         && !bGrabDisabledByCheckout
-        && !bGrabDisabledBySlip;
+        && !bGrabDisabledBySlip
+        && bGrabEnabledByItem;
 }
 
 void UCartGrabComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -343,6 +357,7 @@ void UCartGrabComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProper
 
     DOREPLIFETIME_CONDITION(ThisClass, bGrabDisabledByCheckout, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(ThisClass, bGrabDisabledBySlip, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(ThisClass, bGrabEnabledByItem, COND_OwnerOnly);
 }
 
 void UCartGrabComponent::StopAimVisual()
@@ -462,7 +477,8 @@ bool UCartGrabComponent::CanGrab() const
 {
     return !bGrabExtended
         && !bGrabDisabledByCheckout
-        && !bGrabDisabledBySlip;
+        && !bGrabDisabledBySlip
+        && bGrabEnabledByItem;
 }
 
 void UCartGrabComponent::RequestGrab()
