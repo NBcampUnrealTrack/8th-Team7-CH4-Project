@@ -386,8 +386,13 @@ private:
     UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_CheckoutSession, Category = " Checkout|Condition")
     bool bIsCheckoutInProgress = false;
 
+    // 최소 정산 가능한 상품 개수
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Condition", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
-    int32 MinimumCheckoutProductCount = 3;
+    int32 MinimumCheckoutProductCount = 1;
+
+    // 단일 상품 정산 여부
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Condition", meta = (AllowPrivateAccess = "true"))
+    bool bIsUseSingleCheckout = false;
 
 // ------------------------------------------------------------
 // 계산 진행
