@@ -49,7 +49,7 @@ public:
 
     // 선택 가능한 캐릭터 조회
     UFUNCTION(BlueprintPure, Category = "Lobby|Character")
-    const TArray<FCharacterData>& GetAvailableCharacters() const;
+    const TArray<FCharacterData> GetAvailableCharacters() const;
 
     // 다른 플레이어가 선택한 캐릭터인지 확인
     bool IsCharacterIndexSelectedByOtherPlayer(int32 CharacterIndex, const APlayerState* PS) const;
