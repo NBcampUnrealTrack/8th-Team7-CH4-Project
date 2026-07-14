@@ -38,6 +38,7 @@ ACheckoutZone::ACheckoutZone()
 
     CheckoutZoneMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneMesh"));
     CheckoutZoneMesh->SetupAttachment(SceneRoot);
+    CheckoutZoneMesh->SetMobility(EComponentMobility::Static);
 
     CheckoutTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("CheckoutTrigger"));
     CheckoutTrigger->SetupAttachment(SceneRoot);
