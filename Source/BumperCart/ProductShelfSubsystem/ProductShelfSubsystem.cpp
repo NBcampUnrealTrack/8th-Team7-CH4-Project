@@ -149,7 +149,7 @@ void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProd
             if (IsValid(SpawnedProduct))
             {
                 CurrentProductCount++;
-                UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 세일 제품 스폰 및 체크 완료."));
+                //UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 세일 제품 스폰 및 체크 완료."));
             }
             else
             {
@@ -179,7 +179,7 @@ void UProductShelfSubsystem::LimitedProductSpawn(TSubclassOf<AProductBase> Limit
     {
         CurrentProductCount++;
 
-        UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 한정 제품 스폰 및 체크 완료."));
+        //UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 한정 제품 스폰 및 체크 완료."));
     }
     else
     {

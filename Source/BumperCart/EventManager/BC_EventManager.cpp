@@ -44,7 +44,7 @@ TSubclassOf<AProductBase> ABC_EventManager::SaleProductSelection()
     int32 RandomIndex = FMath::RandRange(0, SaleProductList.Num()-1);
     TSubclassOf<AProductBase> SaleProduct = SaleProductList[RandomIndex];
 
-    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 제품 : %s"), *SaleProduct->GetName());
+    //UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 세일 제품 : %s"), *SaleProduct->GetName());
 
     return SaleProduct;
 }
@@ -86,7 +86,7 @@ void ABC_EventManager::ExecuteRepeatSpawn()
     if (!HasAuthority() || !ProductShelfManager || !CurrentSaleProduct)   return;
 
     ProductShelfManager->SaleProductSpawn(CurrentSaleProduct);
-    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 호출 -> 세일제품 스폰 반복 호출"));
+    //UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 제품선반 매니저 호출 -> 세일제품 스폰 반복 호출"));
 }
 
 TSubclassOf<AProductBase> ABC_EventManager::LimitedProductSelection()
@@ -103,7 +103,7 @@ TSubclassOf<AProductBase> ABC_EventManager::LimitedProductSelection()
     int32 RandomIndex = FMath::RandRange(0, LimitedProductList.Num() - 1);
     TSubclassOf<AProductBase> LimitedProduct = LimitedProductList[RandomIndex];
 
-    UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 한정판 제품 : %s"), *LimitedProduct->GetName());
+    //UE_LOG(LogTemp, Log, TEXT("[BC_EventManager] 한정판 제품 : %s"), *LimitedProduct->GetName());
 
     return LimitedProduct;
 }

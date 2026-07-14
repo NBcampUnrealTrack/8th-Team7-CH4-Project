@@ -87,7 +87,7 @@ ACartPawn::ACartPawn()
     if (BrakeSoundFinder.Succeeded()) { BrakeSound = BrakeSoundFinder.Object; }
 
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩
-    GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
+    // GrabComponent = CreateDefaultSubobject<UCartGrabComponent>(TEXT("CartGrabComponent"));
 
     // 아이템 인벤토리 컴포넌트 부착, SetupPlayerInputComponent에서 아이템 사용 입력 바인딩
     ItemInventoryComponent = CreateDefaultSubobject<UCartItemInventoryComponent>(TEXT("ItemInventoryComponent"));
@@ -401,11 +401,11 @@ void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 		EIC->BindAction(UltimateAction, ETriggerEvent::Started, this, &ACartPawn::OnUltimate);
 	}
 
-    // 그랩 전용 IMC, IA 연결
-    if (IsValid(GrabComponent))
-    {
-        GrabComponent->SetupInput();
-    }
+    //// 그랩 전용 IMC, IA 연결
+    //if (IsValid(GrabComponent))
+    //{
+    //    GrabComponent->SetupInput();
+    //}
 
     // 아이템 사용 입력(Shift) 연결
     if (IsValid(ItemInventoryComponent))
@@ -747,10 +747,10 @@ void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
 		Move->GroundFriction = SlipGroundFriction;
 	}
 
-    if (IsValid(GrabComponent))
-    {
-        GrabComponent->SetGrabDisabledBySlip(true);
-    }
+    //if (IsValid(GrabComponent))
+    //{
+    //    GrabComponent->SetGrabDisabledBySlip(true);
+    //}
 }
 
 //미끄럼 종료 — 마찰·메시 회전 원복
@@ -770,10 +770,10 @@ void ACartPawn::EndSlip()
 		Move->GroundFriction = DefaultGroundFriction;
 	}
 
-    if (IsValid(GrabComponent))
-    {
-        GrabComponent->SetGrabDisabledBySlip(false);
-    }
+    //if (IsValid(GrabComponent))
+    //{
+    //    GrabComponent->SetGrabDisabledBySlip(false);
+    //}
 }
 
 void ACartPawn::SetLoadRatio(float InLoadRatio)

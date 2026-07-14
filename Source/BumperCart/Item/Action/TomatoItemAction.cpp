@@ -17,10 +17,10 @@ bool UTomatoItemAction::CanExecute(ACartPawn* PlayerCharacter) const
         return false;
     }
 
-    if (!TomatoProjectileClass)
-    {
-        return false;
-    }
+    //if (!TomatoProjectileClass)
+    //{
+    //    return false;
+    //}
 
     return true;
 }
@@ -55,10 +55,10 @@ bool UTomatoItemAction::Execute(ACartPawn* PlayerCharacter)
 
     // 투사체 생성
     // 카트 위치 + 
-    const FVector SpawnLocation =
-        PlayerCharacter->GetActorLocation()
-        + HorizontalDirection * SpawnForwardOffset
-        + FVector(0.0f, 0.0f, SpawnHeightOffset);
+    //const FVector SpawnLocation =
+    //    PlayerCharacter->GetActorLocation()
+    //    + HorizontalDirection * SpawnForwardOffset
+    //    + FVector(0.0f, 0.0f, SpawnHeightOffset);
 
     // 투사체가 발사 방향을 바라보도록
     const FRotator SpawnRotation = FireDirection.Rotation();
@@ -69,12 +69,12 @@ bool UTomatoItemAction::Execute(ACartPawn* PlayerCharacter)
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     // 서버에서 토마토 투사체 생성
-    ATomatoProjectile* TomatoProjectile = World->SpawnActor<ATomatoProjectile>(
-        TomatoProjectileClass,
-        SpawnLocation,
-        SpawnRotation,
-        SpawnParams
-    );
+    //ATomatoProjectile* TomatoProjectile = World->SpawnActor<ATomatoProjectile>(
+    //    TomatoProjectileClass,
+    //    SpawnLocation,
+    //    SpawnRotation,
+    //    SpawnParams
+    //);
 
     //// 토마토 생성 실패한 경우만 False
     //if (TomatoProjectile == nullptr)
@@ -82,10 +82,10 @@ bool UTomatoItemAction::Execute(ACartPawn* PlayerCharacter)
     //    return false;
     //}
 
-    if (IsValid(TomatoProjectile))
-    {
-        TomatoProjectile->FireInDirection(FireDirection);
-    }
+    //if (IsValid(TomatoProjectile))
+    //{
+    //    TomatoProjectile->FireInDirection(FireDirection);
+    //}
 
     UE_LOG(LogTemp, Warning, TEXT("%s: 토마토 아이템 사용"), *GetNameSafe(PlayerCharacter));
 

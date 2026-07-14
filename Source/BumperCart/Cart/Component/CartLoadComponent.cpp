@@ -23,6 +23,7 @@ UCartLoadComponent::UCartLoadComponent()
 
     BoosterInstigatorDropMultiplier = 0.f; //부스터 사용 중 충돌 시 드롭 없음 (부스터 아이템화 밸런싱 — 방어 겸용)
     BoostedTargetDropMultiplier = 100.f; // 부스터 피해자는 전부 떨어뜨리게 배율 크게 적용
+    GloveAttackedDropMultiplier = 1.7f;
 
     // 드롭 개수 규칙 지정
     DropCountRules.Add({ 300.f, 0, 1, 0.5f });
@@ -135,7 +136,10 @@ void UCartLoadComponent::DropProducts(float Impulse, EDropCollisionRole Role)
             if (IsValid(PS))
             {
                 // 충돌횟수는 1증가, 상품 떨어지는 횟수는 실제 떨어진 개수 증가
-                PS->AddCartBumpCount(1);
+                if (Role != EDropCollisionRole::GloveAttack)
+                {
+                    PS->AddCartBumpCount(1);
+                }
                 PS->AddDroppedItemCount(ActualDropCount);
             }
         }
@@ -310,6 +314,9 @@ float UCartLoadComponent::GetCollisionRoleMultiplier(EDropCollisionRole Role) co
 
     case EDropCollisionRole::BoostedTarget:
         return BoostedTargetDropMultiplier;
+
+    case EDropCollisionRole::GloveAttack:
+        return GloveAttackedDropMultiplier;
 
     case EDropCollisionRole::Normal:    // FallThrough
     default:

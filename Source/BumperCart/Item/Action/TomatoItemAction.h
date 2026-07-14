@@ -20,14 +20,14 @@ public:
 // ------------------------------------------------------------
 // 토마토 투사체
 // ------------------------------------------------------------
-private:
-    // 토마토 투사체 클래스
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Projectile", meta = (AllowPrivateAccess = "true"))
-    TSubclassOf<ATomatoProjectile> TomatoProjectileClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Projectile", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-    float SpawnForwardOffset = 150.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Projectile", meta = (AllowPrivateAccess = "true"))
-    float SpawnHeightOffset = 100.0f;
+//private:
+//    // 토마토 투사체 클래스
+//    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Projectile", meta = (AllowPrivateAccess = "true"))
+//    TSubclassOf<ATomatoProjectile> TomatoProjectileClass;
+//
+//    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Projectile", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+//    float SpawnForwardOffset = 150.0f;
+//
+//    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tomato|Projectile", meta = (AllowPrivateAccess = "true"))
+//    float SpawnHeightOffset = 100.0f;
 };

@@ -38,6 +38,7 @@ ACheckoutZone::ACheckoutZone()
 
     CheckoutZoneMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CheckoutZoneMesh"));
     CheckoutZoneMesh->SetupAttachment(SceneRoot);
+    CheckoutZoneMesh->SetMobility(EComponentMobility::Static);
 
     CheckoutTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("CheckoutTrigger"));
     CheckoutTrigger->SetupAttachment(SceneRoot);
@@ -1013,7 +1014,10 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     LastLoadedProductCount = ProductCount;
     if (bIsUseSingleCheckout)
     {
-        RequiredCheckoutTime = FMath::Max(BaseCheckoutTime, 0.5f);
+        // 마지막 라운드일 경우 제한 시간 다르게
+        RequiredCheckoutTime = RequiredCheckoutTime = bIsFinalPhase
+            ? FMath::Max(FinalPhaseCheckoutTime, 0.1f)
+            : FMath::Max(BaseCheckoutTime, 0.1f);
     }
     else
     {
@@ -1206,7 +1210,9 @@ void ACheckoutZone::CompleteCheckout()
     {
         CheckoutProgress = 0.0f;
         ElapsedCheckoutTime = 0.0f;
-        RequiredCheckoutTime = FMath::Max(BaseCheckoutTime, 0.1f);
+        RequiredCheckoutTime = bIsLastCheckoutBonusApplied
+            ? FMath::Max(FinalPhaseCheckoutTime, 0.1f)
+            : FMath::Max(BaseCheckoutTime, 0.1f);
 
         AGameStateBase* GameStateBase = GetWorld()->GetGameState<AGameStateBase>();
 
