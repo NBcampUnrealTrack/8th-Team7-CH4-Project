@@ -52,6 +52,10 @@ public:
     // bGrabDisabledBySlip 설정
     void SetGrabDisabledBySlip(bool bShouldDisable);
 
+    // bGrabEnabledByItem 설정
+    // 아이템 사용시 True, 끝나거나 취소 시 false
+    void SetGrabEnabledByItem(bool bShouldEnable);
+
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 protected:
@@ -370,6 +374,9 @@ private:
     UPROPERTY(ReplicatedUsing = OnRep_GrabDisableState)
     bool bGrabDisabledBySlip;
 
+    // 아이템 사용할때만 그랩 사용 가능하게 하는 변수
+    UPROPERTY(ReplicatedUsing = OnRep_GrabDisableState)
+    bool bGrabEnabledByItem;
 
     /* ---------------- 타이머 ---------------- */
 

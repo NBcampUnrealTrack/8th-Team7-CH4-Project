@@ -215,37 +215,27 @@ bool UCartLoadComponent::CheckoutSingleProduct(FLoadedProductInfo& OutProduct)
 {
     OutProduct = FLoadedProductInfo();
 
-    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority())
-    {
-        return false;
-    }
-
-    while (LoadedProducts.IsEmpty())
-    {
-        return false;
-    }
+    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority()) return false;
+    if (LoadedProducts.IsEmpty()) return false;
 
     for (int32 i = LoadedProducts.Num() - 1; i >= 0; --i)
     {
-        if (!IsValid(LoadedProducts[i]))
+        // 뒤에서부터 유효한 상품 하나를 찾고 return
+        if (IsValid(LoadedProducts[i]))
         {
-            continue;
+            OutProduct = LoadedProducts[i]->GetLoadedProductInfo();
+
+            LoadedProducts[i]->SetProductState(EProductState::Paid);
+
+            LoadedProducts[i]->SetLifeSpan(2.f);
+
+            LoadedProducts.RemoveAtSwap(i, EAllowShrinking::No);
+
+            UpdateLoadInfo();
+
+            return true;
         }
-
-        OutProduct = LoadedProducts[i]->GetLoadedProductInfo();
-
-        LoadedProducts[i]->SetProductState(EProductState::Paid);
-
-        LoadedProducts[i]->SetLifeSpan(2.f);
-
-        LoadedProducts.RemoveAt(i);
-
-        UpdateLoadInfo();
-
-        return true;
     }
-
-    UpdateLoadInfo();
 
     return false;
 }
