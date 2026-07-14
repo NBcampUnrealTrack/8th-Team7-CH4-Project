@@ -149,34 +149,13 @@ void AMainPlayerState::OnRep_DroppedItemCount()
 }
 
 // 칭호 부여 판단 로직
-void AMainPlayerState::SetTitle()
+void AMainPlayerState::SetTitle(ETitleType NewTitle)
 {
     if (!HasAuthority()) return;
 
-    ETitleType NewTitle = ETitleType::Default;
-
-  if (Rank == 1)
-  {
-      NewTitle = ETitleType::MartKing;
-  }
-  else if (BumpCartCount >= 15)
-  {
-    NewTitle = ETitleType::BumpKing;
-  }
-  else if (DroppedItemCount >= 8)
-  {
-      NewTitle = ETitleType::DestroyKing;
-  }
-  else if (CheckoutCount >= 4)
-  {
-      NewTitle = ETitleType::ReceiptCollector;
-  }
-  else if (BumpCartCount <= 2 && DroppedItemCount <= 2 && CheckoutCount >= 1)
-  {
-      NewTitle = ETitleType::SafeCart;
-  }
-
     if (Title == NewTitle) return;
+
+    Title = NewTitle;
 
     OnPlayerStatsChanged.Broadcast();
 }

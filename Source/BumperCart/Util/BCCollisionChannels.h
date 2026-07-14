@@ -7,4 +7,5 @@
 namespace BCCollisionChannel
 {
     constexpr ECollisionChannel RobotHandGrabTrace = ECC_GameTraceChannel2;
+    constexpr ECollisionChannel Cart = ECC_GameTraceChannel4;
 }

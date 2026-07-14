@@ -17,6 +17,7 @@ AProductShelf::AProductShelf()
 
     ShelfMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShelfMesh"));
     ShelfMesh->SetMobility(EComponentMobility::Static);
+    ShelfMesh->SetCollisionObjectType(ECollisionChannel::ECC_WorldStatic);
     RootComponent = ShelfMesh;
 
     LaunchPoints = CreateDefaultSubobject<USceneComponent>(TEXT("LaunchPoint"));
