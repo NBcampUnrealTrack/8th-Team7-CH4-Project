@@ -460,7 +460,7 @@ private:
 
     // 마지막 라운드 정산 시간
     UPROPERTY(EditAnywhere, Category = " Checkout|Time")
-    float FinalPhaseCheckoutTime = 1.0f;
+    float FinalPhaseCheckoutTime = 0.5f;
 
 // ------------------------------------------------------------
 // 최종 점수 계산
