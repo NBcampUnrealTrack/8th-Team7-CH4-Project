@@ -8,6 +8,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -28,6 +29,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
+#include "DrawDebugHelpers.h" //임시 디버그 - 필살기 게이지 출력 제거 시 함께 삭제
 
 ACartPawn::ACartPawn()
 {
@@ -128,6 +130,17 @@ void ACartPawn::BeginPlay()
 
 	//몸통 메시 기준 회전/위치 1회 캡처 (FX가 건드리기 전에)
 	EnsureBodyMeshResolved();
+
+	//필살기 크기 원복용 원본 캐시 (캡슐 + 몸통 메시)
+	if (UCapsuleComponent* Cap = GetCapsuleComponent())
+	{
+		DefaultCapsuleRadius = Cap->GetUnscaledCapsuleRadius();
+		DefaultCapsuleHalfHeight = Cap->GetUnscaledCapsuleHalfHeight();
+	}
+	if (SlipSpinMesh)
+	{
+		DefaultBodyMeshScale = SlipSpinMesh->GetRelativeScale3D();
+	}
 }
 
 //서버: 로비에서 확정한 캐릭터 색을 카트에 적용 (GameInstance 조회 => CartColor 복제)
@@ -178,6 +191,10 @@ void ACartPawn::Tick(float DeltaSeconds)
 	if (ThrottleInput < 0.f && ForwardSpeed < -10.f) //실제로 뒤로 가는 중이면 후진 속도로 제한
 	{
 		TargetMaxSpeed *= MaxReverseSpeedRatio;
+	}
+	if (bUltimateActive) //필살기: 적재 무게 무시, 일반보다 살짝 빠르게 (부스터가 있으면 아래서 덮어씀)
+	{
+		TargetMaxSpeed = DefaultMaxWalkSpeed * UltimateSpeedMultiplier;
 	}
 	if (bIsBoosting) //부스터가 최우선 — 무게 감속 무시(아이템, 굼뜬 카트의 풀스피드 탈출/공격)
 	{
@@ -329,6 +346,14 @@ void ACartPawn::Tick(float DeltaSeconds)
 
 	//충돌 세기 계산용: 이번 프레임 속도를 저장 (다음 프레임 NotifyHit에서 '충돌 직전' 속도로 사용)
 	PreviousVelocity = GetVelocity();
+
+	//임시 디버그 — 각 카트 머리 위에 게이지 표시 (테스트 후 제거: 이 블록 + include + UltimateStack 전체복제 되돌리기)
+	{
+		const FColor Col = bUltimateActive ? FColor::Yellow : (GetUltimateStack() >= UltimateRequiredStack ? FColor::Green : FColor::White);
+		DrawDebugString(GetWorld(), FVector(0.f, 0.f, 140.f),
+			FString::Printf(TEXT("ULT %d/%d%s"), GetUltimateStack(), UltimateRequiredStack, bUltimateActive ? TEXT(" ACT") : TEXT("")),
+			this, Col, 0.f, true);
+	}
 }
 
 void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -370,6 +395,10 @@ void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	if (BoostAction)
 	{
 		EIC->BindAction(BoostAction, ETriggerEvent::Started, this, &ACartPawn::OnBoost);
+	}
+	if (UltimateAction)
+	{
+		EIC->BindAction(UltimateAction, ETriggerEvent::Started, this, &ACartPawn::OnUltimate);
 	}
 
     // 그랩 전용 IMC, IA 연결
@@ -431,7 +460,7 @@ void ACartPawn::OnBrakeStop(const FInputActionValue& Value)
 //부스트 발동 (Shift 입력, 소유 클라) — 예측 시작 + 사운드 + 서버 통지
 void ACartPawn::OnBoost(const FInputActionValue& Value)
 {
-	if (bIsBoosting || bBoostOnCooldown || bIsSlipping || !CanPlayerMove()) //쿨타임·미끄럼·게임 시작 전 대기 중엔 발동 불가
+	if (bIsBoosting || bBoostOnCooldown || bIsSlipping || bUltimateActive || !CanPlayerMove()) //쿨타임·미끄럼·필살기·게임 시작 전 대기 중엔 발동 불가
 	{
 		return;
 	}
@@ -503,6 +532,89 @@ void ACartPawn::ClientCancelBoost_Implementation()
 	}
 }
 
+//필살기 발동 (Q 입력, 소유 클라) — 게이지 확인은 서버 권한이므로 서버에 요청만
+void ACartPawn::OnUltimate(const FInputActionValue& Value)
+{
+	if (bUltimateActive || bIsSlipping || !CanPlayerMove())
+	{
+		return;
+	}
+	ServerStartUltimate();
+}
+
+//필살기 발동 처리 (서버) — 게이지 충전 확인 후 상태·크기 세팅 + 지속 타이머
+void ACartPawn::ServerStartUltimate_Implementation()
+{
+	if (bUltimateActive || bIsSlipping || !CanPlayerMove())
+	{
+		return;
+	}
+	if (!BumpComponent || BumpComponent->GetUltimateStack() < UltimateRequiredStack)
+	{
+		return; //게이지 부족
+	}
+
+	bUltimateActive = true;
+	BumpComponent->ResetUltimateStack(); //발동하면 게이지 소진
+	ApplyUltimateScale(true);            //서버 로컬 (타 클라는 OnRep)
+
+	GetWorldTimerManager().SetTimer(UltimateTimerHandle, this, &ACartPawn::EndUltimate, UltimateDuration, false);
+}
+
+//현재 게이지 스택 (UI용) — 게이지는 BumpComponent가 보유
+int32 ACartPawn::GetUltimateStack() const
+{
+	return BumpComponent ? BumpComponent->GetUltimateStack() : 0;
+}
+
+//발동 가능 여부 (충전 완료 && 미발동)
+bool ACartPawn::IsUltimateReady() const
+{
+	return !bUltimateActive && GetUltimateStack() >= UltimateRequiredStack;
+}
+
+//필살기 종료 (서버 타이머) — 상태·크기 원복. 게이지는 여기서 다시 모으기 시작
+void ACartPawn::EndUltimate()
+{
+	bUltimateActive = false;
+	ApplyUltimateScale(false); //서버 로컬 (타 클라는 OnRep)
+}
+
+//필살기 상태 복제 => 각 클라가 크기 적용/원복
+void ACartPawn::OnRep_UltimateActive()
+{
+	ApplyUltimateScale(bUltimateActive);
+}
+
+//몸통 메시 + 캡슐(판정 범위) 배율 조정. 캡슐 높이 변화만큼 발 위치를 유지하도록 액터 Z 보정 => 부양/파묻힘 방지
+void ACartPawn::ApplyUltimateScale(bool bOn)
+{
+	const float S = bOn ? UltimateScale : 1.f;
+
+	//시각 — 몸통 메시 (전 클라). 오프셋도 배율 => 바퀴가 새 캡슐 바닥에 붙음 (부양 방지)
+	if (UStaticMeshComponent* Body = GetBodyMesh())
+	{
+		Body->SetRelativeScale3D(DefaultBodyMeshScale * S);
+		Body->SetRelativeLocation(GetBodyMeshBaseRelLoc());
+	}
+
+	//판정 — 캡슐 반경·높이 (전 클라, 로컬 물리 일치). 높이 변화분만큼 발 위치 유지
+	UCapsuleComponent* Cap = GetCapsuleComponent();
+	if (!Cap)
+	{
+		return;
+	}
+	const float NewHalfHeight = DefaultCapsuleHalfHeight * S;
+	const float DeltaHalf = NewHalfHeight - Cap->GetUnscaledCapsuleHalfHeight(); //커지면 +, 작아지면 -
+	Cap->SetCapsuleSize(DefaultCapsuleRadius * S, NewHalfHeight);
+
+	//발 위치(중심-높이) 유지 — 중심을 높이 증가분만큼 이동. 위치는 서버 권한만(RepMovement로 클라 복제)
+	if (HasAuthority() && !FMath::IsNearlyZero(DeltaHalf))
+	{
+		AddActorWorldOffset(FVector(0.f, 0.f, DeltaHalf), false, nullptr, ETeleportType::TeleportPhysics);
+	}
+}
+
 bool ACartPawn::IsCancelCheckoutState() const
 {
 	return bIsCancelCheckoutState;
@@ -544,6 +656,8 @@ void ACartPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetim
 	DOREPLIFETIME_CONDITION(ACartPawn, ReplicatedYaw, COND_SkipOwner);
 	//카트 색상: 모든 클라가 몸통 색을 그려야 하므로 전체 복제 (충돌 무적은 CartBumpComponent가 복제)
 	DOREPLIFETIME(ACartPawn, CartColor);
+	//필살기 발동: 모든 클라가 거대화·무적 연출을 해야 하므로 전체 복제
+	DOREPLIFETIME(ACartPawn, bUltimateActive);
 }
 
 //B5 : 부스터 상태를 서버에 통지 (클라 입력은 서버가 모르므로 RPC로 전달)
@@ -605,13 +719,13 @@ void ACartPawn::StartSlip(float Duration, float SpinAngleDeg)
 	}
 	else
 	{
-		//슬립이 몸통 회전 점유 => 범프 리액션 초기화 후 기준 자세로
+		//슬립이 몸통 회전 점유 => 범프 리액션 초기화 후 기준 자세로 (거대화 중엔 배율 오프셋 기준)
 		if (BumpComponent)
 		{
 			BumpComponent->ResetReaction();
 		}
 		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
-		SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
+		SlipSpinMesh->SetRelativeLocation(GetBodyMeshBaseRelLoc());
 	}
 
 	//미끄럼 효과음 — 내 카트는 2D(귀에 크게), 상대 카트는 위치 기반 3D (StartSlip은 멀티캐스트로 전 클라 실행)
@@ -648,7 +762,7 @@ void ACartPawn::EndSlip()
 	if (SlipSpinMesh)
 	{
 		SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot);
-		SlipSpinMesh->SetRelativeLocation(SlipSpinMeshBaseRelLoc);
+		SlipSpinMesh->SetRelativeLocation(GetBodyMeshBaseRelLoc()); //거대화 중엔 배율 오프셋 기준
 	}
 
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
