@@ -35,6 +35,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBoosting() const { return bIsBoosting; }
 
+	//필살기(돌진 모드) 발동 중인지 — 무적·거대화·부스터급 충격. 충돌 판정·연출에서 조회
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	bool IsUltimateActive() const { return bUltimateActive; }
+
+	//현재 필살기 게이지 스택 (UI 게이지 바용)
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	int32 GetUltimateStack() const;
+
+	//필살기 발동 가능 여부 (게이지 충전 완료 && 미발동) — UI 하이라이트용
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	bool IsUltimateReady() const;
+
 	//브레이크 중인지 (FX 등 연출용. 타 클라에도 복제됨)
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBraking() const { return bIsBraking; }
@@ -83,7 +95,8 @@ public:
     //몸통 메시 + 기준 상대회전/위치 (슬립·범프·색상 공용) — 필요 시 1회 탐색
     UStaticMeshComponent* GetBodyMesh() { EnsureBodyMeshResolved(); return SlipSpinMesh; }
     FRotator GetBodyMeshBaseRelRot() const { return SlipSpinMeshBaseRelRot; }
-    FVector GetBodyMeshBaseRelLoc() const { return SlipSpinMeshBaseRelLoc; }
+    //거대화 중엔 오프셋도 배율 — 커진 캡슐 바닥에 바퀴가 붙도록 (슬립·리액션 복귀 위치도 동일 기준)
+    FVector GetBodyMeshBaseRelLoc() const { return SlipSpinMeshBaseRelLoc * (bUltimateActive ? UltimateScale : 1.f); }
 
     //부스트 강제 종료 (서버) — 충돌·기믹 넉백 시 호출. 소유 클라에도 전파
     void CancelBoost();
@@ -206,6 +219,26 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Boost", meta = (ClampMin = "0"))
 	float BoostCooldown = 5.0f;
 
+	//---------- 필살기 (돌진 모드) ----------
+	//발동 입력 (BP_CartPawn에 IA_Ultimate=Q 지정)
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate")
+	UInputAction* UltimateAction;
+
+	//발동에 필요한 게이지 스택 수 (충돌 시 가해자만 +1, 이 수 도달 시 발동 가능)
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "1"))
+	int32 UltimateRequiredStack = 5;
+
+	//발동 지속 시간(초)
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "0"))
+	float UltimateDuration = 3.0f;
+
+	//발동 중 카트 크기 배율 (몸통 메시 + 캡슐 반경)
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "1"))
+	float UltimateScale = 2.0f;
+
+	//발동 중 최고 속도 배율 (일반보다 살짝 빠르게 — 부스터보다는 낮게)
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "1"))
+	float UltimateSpeedMultiplier = 1.15f;
 
     //---------- 카메라 연출 컴포넌트 ----------
     //속도 줌/FOV·카메라 충돌 전담 (튜닝 프로퍼티는 컴포넌트로 이동)
@@ -315,6 +348,7 @@ protected:
 	void OnBrakeStart(const FInputActionValue& Value);
 	void OnBrakeStop(const FInputActionValue& Value);
 	void OnBoost(const FInputActionValue& Value);
+	void OnUltimate(const FInputActionValue& Value);
 
 	//부스트 시작 핵심 (상태+런치+지속 타이머). 사운드 없음
 	void StartBoost();
@@ -324,6 +358,21 @@ protected:
 	//부스트 강제 종료를 소유 클라에 적용 (타이머 정리 + 쿨다운 시작)
 	UFUNCTION(Client, Reliable)
 	void ClientCancelBoost();
+
+	//---------- 필살기 (돌진 모드) ----------
+	//발동 요청 (소유 클라 => 서버). 게이지 확인은 서버 권한
+	UFUNCTION(Server, Reliable)
+	void ServerStartUltimate();
+
+	//발동 종료 (서버 타이머) — 상태·크기 원복
+	void EndUltimate();
+
+	//발동 상태 복제 시 크기 적용/원복 (전 클라 연출)
+	UFUNCTION()
+	void OnRep_UltimateActive();
+
+	//몸통 메시 + 캡슐 반경을 배율만큼 조정 (bOn=false면 원본 복귀)
+	void ApplyUltimateScale(bool bOn);
 
 	//미끄럼 시작/종료 (로컬 적용) — MulticastApplySlip에서 호출
 	void StartSlip(float Duration, float SpinAngleDeg);
@@ -356,6 +405,16 @@ private:
 	UPROPERTY(Replicated)
 	bool bIsBoosting = false;
 	bool bBoostOnCooldown = false;
+
+	//필살기 발동 상태 (무적·거대화·부스터급 충격). 서버가 관리, 전 클라 복제해 크기·판정 반영
+	UPROPERTY(ReplicatedUsing = OnRep_UltimateActive)
+	bool bUltimateActive = false;
+	FTimerHandle UltimateTimerHandle;
+
+	//크기 원복용 원본 캐시 (BeginPlay)
+	float DefaultCapsuleRadius = 0.f;
+	float DefaultCapsuleHalfHeight = 0.f;
+	FVector DefaultBodyMeshScale = FVector::OneVector;
 
 	//기본값 백업(부스터/브레이크 후 복구용)
 	float DefaultMaxWalkSpeed = 0.f;

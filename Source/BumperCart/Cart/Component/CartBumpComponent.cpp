@@ -40,6 +40,32 @@ void UCartBumpComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 	//충돌 무적: 모든 클라가 몸통 깜빡 연출을 해야 하므로 소유자 포함 전체 복제
 	DOREPLIFETIME(UCartBumpComponent, bBumpInvincible);
+	//필살기 게이지: UI 표시용 => 소유 클라만 (임시 디버그 테스트 중엔 전체 복제 — 배포 시 COND_OwnerOnly 복귀)
+	DOREPLIFETIME(UCartBumpComponent, UltimateStack);
+}
+
+//충돌 시 가해자 게이지 +1 (서버) — 발동 중이면 미획득, 상한 클램프
+void UCartBumpComponent::AddUltimateStack()
+{
+	if (!OwnerCart || !OwnerCart->HasAuthority() || OwnerCart->IsUltimateActive())
+	{
+		return;
+	}
+	UltimateStack = FMath::Min(UltimateStack + 1, UltimateMaxStack);
+}
+
+//발동 시 게이지 소진 (서버)
+void UCartBumpComponent::ResetUltimateStack()
+{
+	if (OwnerCart && OwnerCart->HasAuthority())
+	{
+		UltimateStack = 0;
+	}
+}
+
+//게이지 복제 시 — UI 갱신 훅 (지금은 자리만, UI팀이 델리게이트 연결)
+void UCartBumpComponent::OnRep_UltimateStack()
+{
 }
 
 void UCartBumpComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -102,7 +128,8 @@ void UCartBumpComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	if (BodyMesh)
 	{
 		UCartLoadComponent* Load = OwnerCart->GetLoadComponent();
-		if (bBumpInvincible)
+		//필살기 발동 중엔 깜빡 안 함 — 이미 상시 면역이라 깜빡 불필요 (발동 직전 걸린 무적이 남아도 커진 카트는 안 깜빡)
+		if (bBumpInvincible && !OwnerCart->IsUltimateActive())
 		{
 			BumpBlinkAccum += DeltaTime;
 			if (BumpBlinkAccum >= BumpBlinkInterval)
@@ -160,8 +187,15 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 	ACartPawn* OtherCart = Cast<ACartPawn>(Other);
 	UCartBumpComponent* OtherBump = OtherCart ? OtherCart->GetBumpComponent() : nullptr;
 
+	//거대 카트끼리는 충돌 판정 없음 — 둘 다 안 밀리는데 판정(셰이크·사운드)만 반복되는 스팸 방지. 물리로만 서로 막힘
+	if (OwnerCart->IsUltimateActive() && OtherCart && OtherCart->IsUltimateActive())
+	{
+		return;
+	}
+
 	//무적 중이면(나 또는 상대) 이 충돌은 완전 무시 — 넉백·틸트·효과음·드롭 전부 skip
-	if (bBumpInvincible || (OtherBump && OtherBump->bBumpInvincible))
+	//단 내가 필살기면 상대의 깜빡 무적을 뚫고 밀어버린다 (거대 카트가 무적 상대에 막혀 못 지나가는 문제 방지)
+	if (!OwnerCart->IsUltimateActive() && (bBumpInvincible || (OtherBump && OtherBump->bBumpInvincible)))
 	{
 		//판정은 무시해도 정면으로 박은 부스트는 끊김 (무적 상대 밀어붙이기 방지)
 		if (FVector::DotProduct(PreviousVelocity, -HitNormal) > MinBumpSpeed)
@@ -184,9 +218,9 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 
 	//충돌 세기 = 상대속도 크기(2D). 부딪힌 각도와 무관하게 일관됨
 	const float ClosingSpeed = RelativeVelocity.Size2D();
-	if (ClosingSpeed < MinBumpSpeed)
+	if (ClosingSpeed < MinBumpSpeed && !OwnerCart->IsUltimateActive())
 	{
-		return; //약하게 스치는 접촉은 무시
+		return; //약하게 스치는 접촉은 무시 (단 필살기는 붙어서 살짝 밀어도 발동 — 거대화로 가속 거리가 없어 못 미는 문제 방지)
 	}
 
 	//충돌 시 정산 취소 (차단벽 정산 중 충돌 시 잠깐 정산 불가)
@@ -197,10 +231,13 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 
 	//출발 그레이스: 막 움직이기 시작한(부스트 아님) 카트가 단독으로 만든 충돌은 무효 — 바로 앞 카트 밀기 오판정 방지
 	//'정당한 돌진자'(상대 쪽으로 실제 이동 중 + 그레이스 지남 or 부스트)가 한 명도 없으면 충돌로 안 침
+	//필살기는 그레이스 무시 + 상대 쪽으로 조금만 움직여도 정당한 돌진자 (거대 카트가 앞 상대를 못 미는 문제 방지)
 	const float MyToward = FVector::DotProduct(PreviousVelocity, ToOther);
 	const float OtherToward = OtherCart ? FVector::DotProduct(OtherVel, -ToOther) : 0.f;
-	const bool bMyChargeLegit = MyToward > 50.f && (OwnerCart->IsBoosting() || OwnerCart->GetTimeSinceMoveStart() >= BumpStartGraceTime);
-	const bool bOtherChargeLegit = OtherCart && OtherToward > 50.f && (OtherCart->IsBoosting() || OtherCart->GetTimeSinceMoveStart() >= BumpStartGraceTime);
+	const float MyTowardThreshold = OwnerCart->IsUltimateActive() ? 10.f : 50.f;
+	const bool bMyChargeLegit = MyToward > MyTowardThreshold && (OwnerCart->IsBoosting() || OwnerCart->IsUltimateActive() || OwnerCart->GetTimeSinceMoveStart() >= BumpStartGraceTime);
+	const float OtherTowardThreshold = (OtherCart && OtherCart->IsUltimateActive()) ? 10.f : 50.f;
+	const bool bOtherChargeLegit = OtherCart && OtherToward > OtherTowardThreshold && (OtherCart->IsBoosting() || OtherCart->IsUltimateActive() || OtherCart->GetTimeSinceMoveStart() >= BumpStartGraceTime);
 	if (!bMyChargeLegit && !bOtherChargeLegit)
 	{
 		return;
@@ -223,25 +260,37 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 		OtherBump->ClientPlayBumpSound();
 	}
 
-	//드롭 역할 + 넉백 세기 (일반=양쪽 다 속도 비례로 살짝, 부스트=박힌 쪽만 멀리)
+	//드롭 역할 + 넉백 세기 (일반=양쪽 다 속도 비례로 살짝, 부스트/필살기=박힌 쪽만 멀리)
+	//필살기는 부스터와 동일한 가해자 취급 + 절대 안 밀리는 완전 면역
+	const bool bIAggressor = OwnerCart->IsBoosting() || OwnerCart->IsUltimateActive();
+	const bool bOtherAggressor = OtherCart && (OtherCart->IsBoosting() || OtherCart->IsUltimateActive());
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 	EDropCollisionRole OtherDropRole = EDropCollisionRole::Normal;
 	const float NormalKnock = FMath::Min(ClosingSpeed * NormalKnockbackScale, NormalKnockbackMax);
 	float OtherKnockStrength = NormalKnock;
 	float MyKnockStrength = OtherCart ? NormalKnock : 0.f; //벽·장애물은 나를 안 밀어냄
-	if (OwnerCart->IsBoosting())
+	if (bIAggressor)
 	{
-		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터로 박음 => 덜 흘림
+		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터/필살기로 박음 => 덜 흘림
 		OtherDropRole = EDropCollisionRole::BoostedTarget;
-		OtherKnockStrength = BoostKnockbackStrength; //부스터에 박힌 쪽은 더 멀리 (부스트 비비기 방지)
-		MyKnockStrength = 0.f;                       //부스터 본인은 안 밀림
+		OtherKnockStrength = BoostKnockbackStrength; //박힌 쪽은 더 멀리 (비비기 방지)
+		MyKnockStrength = 0.f;                       //본인은 안 밀림
 	}
-	else if (OtherCart && OtherCart->IsBoosting())
+	else if (bOtherAggressor)
 	{
-		DropRole = EDropCollisionRole::BoostedTarget; //부스터한테 박힘 => 더 흘림
+		DropRole = EDropCollisionRole::BoostedTarget; //부스터/필살기한테 박힘 => 더 흘림
 		OtherDropRole = EDropCollisionRole::BoosterInstigator;
 		OtherKnockStrength = 0.f;
 		MyKnockStrength = BoostKnockbackStrength;
+	}
+	//필살기 완전 면역 — 가해자든 피해자든 절대 안 밀림
+	if (OwnerCart->IsUltimateActive())
+	{
+		MyKnockStrength = 0.f;
+	}
+	if (OtherCart && OtherCart->IsUltimateActive())
+	{
+		OtherKnockStrength = 0.f;
 	}
 
 	//넉백 — ApplyKnockback이 넉백+몸통 리액션 공용 처리. 안 밀리는 쪽도 리액션은 재생
@@ -267,23 +316,40 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 		MulticastPlayBumpReaction(-ToOther, ReactionIntensity); //벽 충돌·부스터 본인(안 밀림)
 	}
 
-	//드롭 — 나 + 상대
-	RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
-	if (OtherBump)
+	//드롭 — 나 + 상대 (필살기 발동자는 자기 상품 안 흘림)
+	if (!OwnerCart->IsUltimateActive())
+	{
+		RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
+	}
+	if (OtherBump && !(OtherCart && OtherCart->IsUltimateActive()))
 	{
 		OtherBump->RequestSpill(ClosingSpeed * OtherBump->BumpImpulseScale, OtherDropRole);
 	}
 
-	//부딪히면 부스트 끊김 — 충돌한 양쪽 모두 (역할·넉백 판정엔 위에서 이미 반영됨)
+	//부딪히면 부스트 끊김 — 충돌한 양쪽 모두 (역할·넉백 판정엔 위에서 이미 반영됨. 필살기는 CancelBoost 무관)
 	OwnerCart->CancelBoost();
 	if (OtherCart)
 	{
 		OtherCart->CancelBoost();
 	}
 
-	//충돌 성립 => 잠깐 무적 (연타/비비기 방지, 그동안 깜빡)
-	StartInvincibility();
-	if (OtherBump)
+	//필살기 게이지 — 정당한 돌진자(가해자)만 +1. 정면충돌은 양쪽 legit이라 둘 다 획득. 발동 중인 카트는 AddUltimateStack에서 자동 제외
+	if (bMyChargeLegit)
+	{
+		AddUltimateStack();
+	}
+	if (OtherBump && bOtherChargeLegit)
+	{
+		OtherBump->AddUltimateStack();
+	}
+
+	//충돌 성립 => 잠깐 무적 (연타/비비기 방지, 그동안 깜빡).
+	//필살기 발동자는 이미 상시 면역이라 깜빡 무적 안 걸음. 맞은 상대(일반)는 기존대로 깜빡 무적 부여
+	if (!OwnerCart->IsUltimateActive())
+	{
+		StartInvincibility();
+	}
+	if (OtherBump && !(OtherCart && OtherCart->IsUltimateActive()))
 	{
 		OtherBump->StartInvincibility();
 	}
@@ -295,6 +361,11 @@ void UCartBumpComponent::ApplyKnockback(const FVector& Direction, float Strength
 	if (!OwnerCart || !OwnerCart->HasAuthority())
 	{
 		return;
+	}
+
+	if (OwnerCart->IsUltimateActive())
+	{
+		return; //필살기 발동 중엔 외부 넉백(거대카트·체크아웃존 등)도 면역
 	}
 
 	if (Strength <= 0.0f)
