@@ -75,31 +75,6 @@ private:
     // 플레이어에게 칭호 부여
     void ApplyTitles();
 
-    // 보너스 점수 추가
-    void ApplyBonusScores();
-
-    // 칭호에 따른 보너스 점수 계산
-    float GetTitleBonusScore(ETitleType Title) const;
-
-
-    // 칭호별 보너스 점수
-    UPROPERTY(EditAnywhere, Category = "BonusScore")
-    float TitleBonus_MartKing;
-
-    UPROPERTY(EditAnywhere, Category = "BonusScore")
-    float TitleBonus_BumpKing;
-
-    UPROPERTY(EditAnywhere, Category = "BonusScore")
-    float TitleBonus_DestroyKing ;
-
-    UPROPERTY(EditAnywhere, Category = "BonusScore")
-    float TitleBonus_ReceiptCollector;
-
-    UPROPERTY(EditAnywhere, Category = "BonusScore")
-    float TitleBonus_SafeCart;
-
-    UPROPERTY(EditAnywhere, Category = "BonusScore")
-    float TitleBonus_Default;
 
     // 게임 시작 연출을 위한 대기 시간
     UPROPERTY(EditDefaultsOnly, Category = "Round Schedule")

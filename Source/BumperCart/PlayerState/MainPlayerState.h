@@ -15,8 +15,7 @@ enum class ETitleType : uint8
     MartKing UMETA(DisplayName = "마트 지배자"),
     BumpKing UMETA(DisplayName = "통로의 재앙"),
     DestroyKing UMETA(DisplayName = "파괴왕"),
-    ReceiptCollector UMETA(DisplayName = "영수증 컬렉터"),
-    SafeCart UMETA(DisplayName = "무사고 카트")
+    ReceiptCollector UMETA(DisplayName = "영수증 컬렉터")
 };
 
 UCLASS()
@@ -60,7 +59,7 @@ public:
     UFUNCTION(BlueprintPure, Category = "PlayerStats")
     ETitleType GetTitle() const;
 
-    void SetTitle();
+    void SetTitle(ETitleType NewTitle);
 
     //라운드 시작 시 통계 초기화
     void ResetStats();
