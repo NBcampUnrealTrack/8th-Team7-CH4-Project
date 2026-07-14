@@ -38,46 +38,12 @@ AMainGameMode::AMainGameMode()
     CheckoutManagerRef = nullptr;
     ItemSpawnManager = nullptr;
 
-
-    // 추가 점수 및 추가 점수 감소 초기화
-    TitleBonus_MartKing = 30.f;
-    TitleBonus_BumpKing = -20.f;
-    TitleBonus_DestroyKing = -15.f;
-    TitleBonus_ReceiptCollector = 15.f;
-    TitleBonus_SafeCart = 10.f;
-    TitleBonus_Default = 0.f;
-
     // 모든 플레이어 접속 확인
     PlayerLoadCheckInterval = 0.5f;
     PlayerLoadWaitTimeout = 15.f;
     PlayerLoadWait = 0.f;
 }
-/*
-UClass* AMainGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
-{
-    if (APlayerState* PS = InController ? InController->PlayerState : nullptr)
-    {
-        if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
-        {
-            const int32 CharacterIndex = GI->GetPlayerCharacter(PS->GetUniqueId());
 
-            if (GI->CharacterSelectionConfig && GI->CharacterSelectionConfig->CharacterDatas.IsValidIndex(CharacterIndex))
-            {
-                const FCharacterData& Data = GI->CharacterSelectionConfig->CharacterDatas[CharacterIndex];
-                if (TSubclassOf<APawn> SelectedPawnClass = GI->CharacterSelectionConfig->CharacterDatas[CharacterIndex].PawnClass)
-                {
-                    UE_LOG(LogMainGameMode, Warning, TEXT("[캐릭터 스폰 적용] 플레이어: %s / 적용된 캐릭터: %s (Index: %d)"),
-                     *PS->GetPlayerName(), *Data.DisplayName.ToString(), CharacterIndex);
-
-                    return *SelectedPawnClass;
-                }
-            }
-        }
-    }
-
-    return Super::GetDefaultPawnClassForController_Implementation(InController);
-}
-*/
 void AMainGameMode::BeginPlay()
 {
     Super::BeginPlay();
@@ -377,11 +343,6 @@ void AMainGameMode::EnterPhase(ERoundPhase NewPhase)
         // 칭호 적용
         ApplyTitles();
 
-        // 칭호에 맞추어 추가 점수 계산
-        ApplyBonusScores();
-
-        // 보너수 점수 계산 후 등수 집계
-        UpdateAllPlayerRanks();
 
         OnRoundResultsReady.Broadcast();
 
@@ -465,53 +426,86 @@ void AMainGameMode::ReturnAllPlayersToLobby()
     GetWorld()->ServerTravel(LevelPath);
 }
 
-// 라운드 종료 시 통계 기반 보너스 점수 정산
-void AMainGameMode::ApplyBonusScores()
-{
-    AMainGameState* GS = GetGameState<AMainGameState>();
-    if (!GS) return;
-
-    for (APlayerState* PS : GS->PlayerArray)
-    {
-        AMainPlayerState* MainPS = Cast<AMainPlayerState>(PS);
-        if (!MainPS) continue;
-
-        float BonusScore = GetTitleBonusScore(MainPS->GetTitle());
-
-        MainPS->AddPlayerScore(BonusScore);
-    }
-}
-
 void AMainGameMode::ApplyTitles()
 {
     AMainGameState* GS = GetGameState<AMainGameState>();
     if (!GS) return;
 
+    TArray<AMainPlayerState*> AllPlayers;
     for (APlayerState* PS : GS->PlayerArray)
     {
         if (AMainPlayerState* MainPS = Cast<AMainPlayerState>(PS))
         {
-            MainPS->SetTitle();
+            AllPlayers.Add(MainPS);
+        }
+    }
+
+    //  마트 지배자 칭호 부여
+    for (int32 i = 0; i < AllPlayers.Num(); ++i)
+    {
+        AMainPlayerState* MainPS = AllPlayers[i];
+        if (MainPS->GetRank() == 1)
+        {
+            MainPS->SetTitle(ETitleType::MartKing);
+            AllPlayers.RemoveAt(i);
+        }
+    }
+
+    // 통로의 재앙 칭호 부여
+    int32 BestBumpCount = -1;
+    for (AMainPlayerState* MainPS : AllPlayers)
+    {
+        if (MainPS->GetCartBumpCount() >= 15)
+        {
+            BestBumpCount = FMath::Max(BestBumpCount, MainPS->GetCartBumpCount());
+        }
+    }
+    for (int32 i = 0; i < AllPlayers.Num(); ++i)
+    {
+        AMainPlayerState* MainPS = AllPlayers[i];
+        if (MainPS->GetCartBumpCount() == BestBumpCount)
+        {
+            MainPS->SetTitle(ETitleType::BumpKing);
+            AllPlayers.RemoveAt(i);
+        }
+    }
+
+    // 3) 파괴왕 칭호 부여
+    int32 BestDroppedCount = -1;
+    for (AMainPlayerState* MainPS : AllPlayers)
+    {
+        if (MainPS->GetDroppedItemCount() >= 8)
+        {
+            BestDroppedCount = FMath::Max(BestDroppedCount, MainPS->GetDroppedItemCount());
+        }
+    }
+    for (int32 i = 0; i < AllPlayers.Num(); ++i)
+    {
+        AMainPlayerState* MainPS = AllPlayers[i];
+        if (MainPS->GetDroppedItemCount() == BestDroppedCount)
+        {
+            MainPS->SetTitle(ETitleType::DestroyKing);
+            AllPlayers.RemoveAt(i);
+        }
+    }
+
+    // 4) 영수증 컬렉터 칭호 부여
+    int32 BestCheckoutCount = -1;
+    for (AMainPlayerState* MainPS : AllPlayers)
+    {
+        if (MainPS->GetCheckoutCount() >= 4)
+        {
+            BestCheckoutCount = FMath::Max(BestCheckoutCount, MainPS->GetCheckoutCount());
+        }
+    }
+    for (int32 i = 0; i < AllPlayers.Num(); ++i)
+    {
+        AMainPlayerState* MainPS = AllPlayers[i];
+        if (MainPS->GetCheckoutCount() == BestCheckoutCount)
+        {
+            MainPS->SetTitle(ETitleType::ReceiptCollector);
+            AllPlayers.RemoveAt(i);
         }
     }
 }
 
-float AMainGameMode::GetTitleBonusScore(ETitleType Title) const
-{
-    switch (Title)
-    {
-    case ETitleType::MartKing:
-        return TitleBonus_MartKing;
-    case ETitleType::BumpKing:
-        return TitleBonus_BumpKing;
-    case ETitleType::DestroyKing:
-        return TitleBonus_DestroyKing;
-    case ETitleType::ReceiptCollector:
-        return TitleBonus_ReceiptCollector;
-    case ETitleType::SafeCart:
-        return TitleBonus_SafeCart;
-    case ETitleType::Default:
-    default:
-        return TitleBonus_Default;
-    }
-}
