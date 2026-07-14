@@ -23,5 +23,5 @@ protected:
 private:
     // 충격 강도
     UPROPERTY(EditAnywhere, Category = "Projectile|Glove|Bump")
-    float Impulse;
+    float Strength;
 };

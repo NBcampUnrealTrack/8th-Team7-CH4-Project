@@ -163,4 +163,8 @@ private:
     // 부스터 충돌 당한 사람의 드롭 보정치, 얼마나 더 떨어뜨릴건지
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
     float BoostedTargetDropMultiplier;
+
+    // 글러브 공격에 맞은 사람의 드롭 보정치
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
+    float GloveAttackedDropMultiplier;
 };
