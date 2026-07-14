@@ -308,7 +308,10 @@ void UCartBumpComponent::ApplyKnockback(const FVector& Direction, float Strength
 		return;
 	}
 
-	OwnerCart->LaunchCharacter(KnockbackDirection * Strength, true, false);
+	//수평 넉백 + 세기 비례로 위로 살짝 띄움
+	FVector LaunchVelocity = KnockbackDirection * Strength;
+	LaunchVelocity.Z = FMath::Min(Strength * KnockbackUpRatio, KnockbackUpMax);
+	OwnerCart->LaunchCharacter(LaunchVelocity, true, true);
 
 	//충돌 판정 나는 기믹(거대카트 등)에 밀리면 부스트 끊김
 	OwnerCart->CancelBoost();

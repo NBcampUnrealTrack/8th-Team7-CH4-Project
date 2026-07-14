@@ -131,7 +131,7 @@ void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProd
     }
 
     // 세일 선반 섞기
-    for (int32 i = SaleProductShelfs.Num() - 1; i > 0; --i)
+    for (int32 i = SaleProductShelfs.Num() - 1; i >= 0; --i)
     {
         int32 RandomIndex = FMath::RandRange(0, i);
         if (i != RandomIndex)

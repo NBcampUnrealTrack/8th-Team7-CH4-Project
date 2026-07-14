@@ -92,15 +92,23 @@ protected:
 	//---------- 충돌 넉백 + 리액션(몸통 들썩·기울임) ----------
 	//부스트로 상대 카트를 박았을 때 상대를 밀어내는 세기 (부스트 비비기 방지). LaunchCharacter 속도
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float BoostKnockbackStrength = 1500.f;
+	float BoostKnockbackStrength = 2500.f;
 
-	//일반 충돌(부스트 아님) 시 상대를 밀어내는 세기 = 접근속도 × 이 배율 (살짝만)
+	//일반 충돌(부스트 아님) 시 상대를 밀어내는 세기 = 접근속도 × 이 배율 (박힌 쪽이 확실히 밀리게 — 3주차 피드백 2배 강화)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float NormalKnockbackScale = 0.55f;
+	float NormalKnockbackScale = 1.1f;
 
-	//일반 충돌 넉백 상한 (접근속도가 커도 이 이상은 안 밀림)
+	//일반 충돌 넉백 상한 (접근속도가 커도 이 이상은 안 밀림) — 수직 띄움이 체공으로 수평 거리를 늘려서 상한은 보수적으로
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
-	float NormalKnockbackMax = 700.f;
+	float NormalKnockbackMax = 1000.f;
+
+	//넉백 시 위로 띄우는 비율 (수직속도 = 넉백 세기 × 이 값) — 박힌 쪽이 붕 뜨는 맛
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float KnockbackUpRatio = 0.25f;
+
+	//넉백 수직 속도 상한 (너무 높이 뜨는 것 방지)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float KnockbackUpMax = 450.f;
 
 	//리액션 스프링 강성(높을수록 빨리 제자리로). 감쇠와 함께 '덜컹' 리듬 결정
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "1"))
