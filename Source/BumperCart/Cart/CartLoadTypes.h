@@ -48,4 +48,5 @@ enum class EDropCollisionRole : uint8
     Normal              UMETA(DisplayName = "Normal Collision"),
     BoosterInstigator   UMETA(DisplayName = "Booster Instigator"),
     BoostedTarget       UMETA(DisplayName = "Boosted Target"),
+    GloveAttack         UMETA(DisplayName = "Glove Attacked")
 };
