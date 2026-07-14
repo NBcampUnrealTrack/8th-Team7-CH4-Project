@@ -23,25 +23,51 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
         UE_LOG(LogTemp, Warning, TEXT("플레이어 접속: %s"), *NewPlayer->GetName());
     }
 
-    if (ALobbyGameState* GS = GetGameState<ALobbyGameState>())
+    ALobbyGameState* GS = GetGameState<ALobbyGameState>();
+    if (!GS) return;
+
+    // 로비 입장 순서대로 아직 아무도 선택하지 않은 캐릭터를 자동 배정
+    if (ALobbyPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<ALobbyPlayerState>() : nullptr)
     {
-        // 로비 입장 순서대로 아직 아무도 선택하지 않은 캐릭터를 자동 배정
-        if (ALobbyPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<ALobbyPlayerState>() : nullptr)
+        const int32 CharacterIndex = GS->GetNextAvailableCharacterIndex();
+        if (CharacterIndex != INDEX_NONE)
         {
-            const int32 CharacterIndex = GS->GetNextAvailableCharacterIndex();
-            if (CharacterIndex != INDEX_NONE)
+            PS->SelectCharacter(CharacterIndex);
+            UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 캐릭터 index %d 자동 배정"), *NewPlayer->GetName(), CharacterIndex);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 배정 가능한 캐릭터가 없습니다."), *NewPlayer->GetName());
+        }
+    }
+
+
+
+    // 로비 입장 순서대로 index 부여
+    if (ALobbyPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<ALobbyPlayerState>() : nullptr)
+    {
+        if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+        {
+            // 이미 배정된 적 있는지 확인
+            int32 LobbyIndex = GI->GetPlayerIndex(PS->GetUniqueId());
+
+            // 없으면 새로 배정
+            if (LobbyIndex == INDEX_NONE)
             {
-                PS->SelectCharacter(CharacterIndex);
-                UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 캐릭터 index %d 자동 배정"), *NewPlayer->GetName(), CharacterIndex);
+                LobbyIndex = GI->GetNextLobbyIndex();
+                GI->SetPlayerIndex(PS->GetUniqueId(), LobbyIndex);
+                UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 새로 배정 index = %d"), *NewPlayer->GetName(), LobbyIndex);
             }
             else
             {
-                UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 배정 가능한 캐릭터가 없습니다."), *NewPlayer->GetName());
+                UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 에게 배정된 index = %d"), *NewPlayer->GetName(), LobbyIndex);
             }
-        }
 
-        GS->RefreshPlayerInfos();
+            GI->LogAllPlayerIndices();
+        }
     }
+
+    GS->RefreshPlayerInfos();
 }
 
 void ALobbyGameMode::Logout(AController* Exiting)
@@ -50,6 +76,17 @@ void ALobbyGameMode::Logout(AController* Exiting)
 
     Super::Logout(Exiting);
     UE_LOG(LogTemp, Warning, TEXT("플레이어 퇴장: %s"), *Exiting->GetName());
+
+    // 나간 플레이어의 로비 index 정보를 삭제하고, 뒤 순번들을 당김
+    if (ExitingPS)
+    {
+        if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+        {
+            GI->RemovePlayerIndex(ExitingPS->GetUniqueId());
+
+            GI->LogAllPlayerIndices();
+        }
+    }
 
     if (ALobbyGameState* GS = GetGameState<ALobbyGameState>())
     {

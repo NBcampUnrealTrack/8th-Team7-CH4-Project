@@ -52,7 +52,7 @@ AMainGameMode::AMainGameMode()
     PlayerLoadWaitTimeout = 15.f;
     PlayerLoadWait = 0.f;
 }
-
+/*
 UClass* AMainGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
 {
     if (APlayerState* PS = InController ? InController->PlayerState : nullptr)
@@ -77,7 +77,7 @@ UClass* AMainGameMode::GetDefaultPawnClassForController_Implementation(AControll
 
     return Super::GetDefaultPawnClassForController_Implementation(InController);
 }
-
+*/
 void AMainGameMode::BeginPlay()
 {
     Super::BeginPlay();

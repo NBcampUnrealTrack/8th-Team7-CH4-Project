@@ -22,6 +22,17 @@ void ALobbyGameState::RefreshPlayerInfos(APlayerState* ExcludedPlayerState)
 
     ReplicatedPlayerInfos.Reset();
 
+    UMainGameInstance* GI = GetGameInstance<UMainGameInstance>();
+
+    TArray<APlayerState*> SortedPlayers = PlayerArray;
+    SortedPlayers.Sort([GI](const APlayerState& A, const APlayerState& B)
+    {
+        const int32 IdxA = GI ? GI->GetPlayerIndex(A.GetUniqueId()) : INDEX_NONE;
+        const int32 IdxB = GI ? GI->GetPlayerIndex(B.GetUniqueId()) : INDEX_NONE;
+        return IdxA < IdxB;
+    });
+
+
     for (APlayerState* PS : PlayerArray)
     {
         // 갱신 제외할 플레이어 정보가 있을 경우 패스

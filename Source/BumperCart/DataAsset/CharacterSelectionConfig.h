@@ -15,9 +15,6 @@ struct FCharacterData
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
     FText DisplayName;
 
-    // Pawn 클래스
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
-    TSubclassOf<APawn> PawnClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
     FLinearColor Color;
@@ -36,5 +33,4 @@ public:
     UFUNCTION(BlueprintCallable)
     FLinearColor GetColor(int32 Index) const;
 
-    TSubclassOf<APawn> GetPawnClass(int32 Index) const;
 };

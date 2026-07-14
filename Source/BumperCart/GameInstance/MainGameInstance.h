@@ -31,6 +31,8 @@ public:
     // 플레이 예정 인원 수 조회
     int32 GetExpectedPlayerCount() const;
 
+    // 플레이어 index 배정
+
 #pragma region Character
 public:
     UPROPERTY(EditDefaultsOnly, Category = "Lobby|Character")
@@ -48,5 +50,34 @@ private:
     // 플레이어 아이디 - 선택한 캐릭터
     UPROPERTY()
     TMap<FUniqueNetIdRepl, int32> PlayerCharacterSelections;
+
+#pragma endregion
+
+#pragma region Index
+public:
+    // 로비 접속 순으로 인덱스 배정
+    UFUNCTION(BlueprintCallable, Category = "Lobby|Index")
+    void SetPlayerIndex(const FUniqueNetIdRepl& PlayerId, int32 PlayerIndex);
+
+    // 플레이어 인덱스 조회
+    UFUNCTION(BlueprintCallable, Category = "Lobby|Index")
+    int32 GetPlayerIndex(const FUniqueNetIdRepl& PlayerId) const;
+
+    // 다음 로비 index 번호 발급
+    int32 GetNextLobbyIndex();
+
+    UFUNCTION(BlueprintCallable, Category = "Lobby|Index")
+    void RemovePlayerIndex(const FUniqueNetIdRepl& PlayerId);
+
+    void LogAllPlayerIndices() const;
+
+
+private:
+    // 플레이어 아이디 - 플레이어 인덱스
+    UPROPERTY()
+    TMap<FUniqueNetIdRepl, int32> PlayerIndex;
+
+    int32 NextLobbyIndex = 0;
+
 #pragma endregion
 };
