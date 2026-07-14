@@ -16,6 +16,7 @@ AProductShelf::AProductShelf()
 	PrimaryActorTick.bCanEverTick = false;
 
     ShelfMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShelfMesh"));
+    ShelfMesh->SetMobility(EComponentMobility::Static);
     RootComponent = ShelfMesh;
 
     LaunchPoints = CreateDefaultSubobject<USceneComponent>(TEXT("LaunchPoint"));
@@ -23,7 +24,10 @@ AProductShelf::AProductShelf()
 
     SpawnAreaBox = CreateDefaultSubobject<UBoxComponent>(TEXT("SpawnArea"));
     SpawnAreaBox->SetupAttachment(RootComponent);
-
+    SpawnAreaBox->SetCollisionProfileName(TEXT("NoCollision"));
+    SpawnAreaBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SpawnAreaBox->SetGenerateOverlapEvents(false);
+    SpawnAreaBox->SetMobility(EComponentMobility::Static);
 }
 
 void AProductShelf::BeginPlay()
