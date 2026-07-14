@@ -51,7 +51,7 @@ public:
 private:
     // 게임 시작 전 기본 설정값
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CheckoutManager|Barrier",meta = (AllowPrivateAccess = "true"))
-    bool bUseCheckoutBarrier = true;
+    bool bUseCheckoutBarrier = false;
 
 // ------------------------------------------------------------
 // 계산대 목록 및 세팅

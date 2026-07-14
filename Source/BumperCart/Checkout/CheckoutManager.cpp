@@ -105,7 +105,7 @@ bool ACheckoutManager::InitializeCheckoutZones()
     for (ACheckoutZone* CheckoutZone : CheckoutZones)
     {
         // 델리게이트 연결
-        CheckoutZone->OnCheckoutCompleted.AddUObject(this, &ThisClass::HandleCheckoutCompleted);
+        //CheckoutZone->OnCheckoutCompleted.AddUObject(this, &ThisClass::HandleCheckoutCompleted);
         // 모든 계산대 오픈
         CheckoutZone->SetCheckoutZoneState(ECheckoutZoneState::Open);
         // 차단벽 적용 설정 적용

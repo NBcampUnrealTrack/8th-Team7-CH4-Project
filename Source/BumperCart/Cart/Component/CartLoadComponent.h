@@ -52,6 +52,8 @@ public:
     // 상품 정보 구조체 배열을 채우고, 현재 적재된 상품을 전부 제거함
     bool CheckoutProducts(TArray<FLoadedProductInfo>& OutProducts);
 
+    bool CheckoutSingleProduct(FLoadedProductInfo& OutProduct);
+
     // 더미 메시 연출 갱신하는 함수
     void UpdateLoadVisual();
 

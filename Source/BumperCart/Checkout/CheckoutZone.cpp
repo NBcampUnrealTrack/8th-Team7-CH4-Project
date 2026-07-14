@@ -123,29 +123,29 @@ void ACheckoutZone::OnCheckoutZoneBeginOverlap(UPrimitiveComponent* OverlappedCo
         return;
     }
 
-    if (bUseCheckoutBarrier)
-    {
-        // 이미 정산중인 플레이어가 있으면 후발 플레이어 배출
-        if (IsValid(CurrentCheckoutPlayer) && CurrentCheckoutPlayer != PlayerCharacter)
-        {
-            EjectPlayer(PlayerCharacter);
-            return;
-        }
+    //if (bUseCheckoutBarrier)
+    //{
+    //    // 이미 정산중인 플레이어가 있으면 후발 플레이어 배출
+    //    if (IsValid(CurrentCheckoutPlayer) && CurrentCheckoutPlayer != PlayerCharacter)
+    //    {
+    //        EjectPlayer(PlayerCharacter);
+    //        return;
+    //    }
 
-        // 아이템이 0개일 경우
-        UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
-        if (!IsValid(CartLoadComponent))
-        {
-            return;
-        }
+    //    // 아이템이 0개일 경우
+    //    UCartLoadComponent* CartLoadComponent = PlayerCharacter->FindComponentByClass<UCartLoadComponent>();
+    //    if (!IsValid(CartLoadComponent))
+    //    {
+    //        return;
+    //    }
 
-        //// 아이템 개수가 0개일 경우
-        //// 갇히는 문제 방지
-        //if (CartLoadComponent->GetCurrentLoadedCount() <= 0)
-        //{
-        //    return;
-        //}
-    }
+    //    //// 아이템 개수가 0개일 경우
+    //    //// 갇히는 문제 방지
+    //    //if (CartLoadComponent->GetCurrentLoadedCount() <= 0)
+    //    //{
+    //    //    return;
+    //    //}
+    //}
 
     AddPlayerInZone(PlayerCharacter);
 }
@@ -868,16 +868,16 @@ bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
         return false;
     }
 
-    if (PlayerCharacter->IsCancelCheckoutState())
-    {
-        return false;
-    }
+    //if (PlayerCharacter->IsCancelCheckoutState())
+    //{
+    //    return false;
+    //}
 
-    // 정산 중 충돌로 정산이 취소된 상태인지
-    if (CancelCheckoutPlayers.Contains(PlayerCharacter))
-    {
-        return false;
-    }
+    //// 정산 중 충돌로 정산이 취소된 상태인지
+    //if (CancelCheckoutPlayers.Contains(PlayerCharacter))
+    //{
+    //    return false;
+    //}
 
     const AMainGameState* MainGameState = GetWorld()->GetGameState<AMainGameState>();
     if (!IsValid(MainGameState))
@@ -975,19 +975,19 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
         GrabComponent->SetGrabDisabledByCheckout(true);
     }
 
-    // 벽 충돌 켜질 시
-    if (bUseCheckoutBarrier)
-    {
-        // 정산자는 충돌 무시 처리
-        UpdateCheckoutPlayerBarrierIgnore();
+    //// 벽 충돌 켜질 시
+    //if (bUseCheckoutBarrier)
+    //{
+    //    // 정산자는 충돌 무시 처리
+    //    UpdateCheckoutPlayerBarrierIgnore();
 
-        // 비정산 플레이어 배출
-        EjectNonCheckoutPlayers();
+    //    // 비정산 플레이어 배출
+    //    EjectNonCheckoutPlayers();
 
-        // 충돌 즉시 활성화
-        // 메시는 0.2초에 걸쳐 생성
-        SetCheckoutBarrierEnabled(true);
-    }
+    //    // 충돌 즉시 활성화
+    //    // 메시는 0.2초에 걸쳐 생성
+    //    SetCheckoutBarrierEnabled(true);
+    //}
 
     AMainGameState* MainGameState = GetWorld()->GetGameState<AMainGameState>();
     if (!IsValid(MainGameState))
@@ -1002,10 +1002,25 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
         bIsFinalPhase = true;
     }
 
+    // 기존 일괄 정산 방식
     // 적재된 상품 수에 따라 추가 정산 시간
-    int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
+    //int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
+    //LastLoadedProductCount = ProductCount;
+    //RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount, bIsFinalPhase);
+
+    // 상품 당 정산 방식
+    const int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
     LastLoadedProductCount = ProductCount;
-    RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount, bIsFinalPhase);
+    if (bIsUseSingleCheckout)
+    {
+        RequiredCheckoutTime = FMath::Max(BaseCheckoutTime, 0.5f);
+    }
+    else
+    {
+        // 기존 정산 방식
+        RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount, bIsFinalPhase);
+    }
+
 
     // 클라이언트와 동기화된 정산 시작 시점
     AGameStateBase* GameStateBase = GetWorld()->GetGameState<AGameStateBase>();
@@ -1049,25 +1064,25 @@ void ACheckoutZone::UpdateCheckoutProgress()
         return;
     }
 
-    UE_LOG(
-        LogTemp,
-        Warning,
-        TEXT("[CheckoutTick] Player=%s / CancelState=%d / Progress=%.2f"),
-        *GetNameSafe(CurrentCheckoutPlayer),
-        IsValid(CurrentCheckoutPlayer) ? CurrentCheckoutPlayer->IsCancelCheckoutState() : false,
-        CheckoutProgress
-    );
+    //UE_LOG(
+    //    LogTemp,
+    //    Warning,
+    //    TEXT("[CheckoutTick] Player=%s / CancelState=%d / Progress=%.2f"),
+    //    *GetNameSafe(CurrentCheckoutPlayer),
+    //    IsValid(CurrentCheckoutPlayer) ? CurrentCheckoutPlayer->IsCancelCheckoutState() : false,
+    //    CheckoutProgress
+    //);
 
-    // 충돌 취소 상태일 경우
-    if (CurrentCheckoutPlayer->IsCancelCheckoutState())
-    {
-        // 정산 취소 플레이어 배열에 추가
-        CancelCheckoutPlayers.AddUnique(CurrentCheckoutPlayer);
+    //// 충돌 취소 상태일 경우
+    //if (CurrentCheckoutPlayer->IsCancelCheckoutState())
+    //{
+    //    // 정산 취소 플레이어 배열에 추가
+    //    CancelCheckoutPlayers.AddUnique(CurrentCheckoutPlayer);
 
-        CancelCheckout();
-        TryStartCheckout();
-        return;
-    }
+    //    CancelCheckout();
+    //    TryStartCheckout();
+    //    return;
+    //}
 
     CheckoutProgress = GetCheckoutProgress();
     ElapsedCheckoutTime = CheckoutProgress * RequiredCheckoutTime;
@@ -1134,13 +1149,31 @@ void ACheckoutZone::CompleteCheckout()
         TryStartCheckout();
         return;
     }
+
     // 정산 점수 계산
     TArray<FLoadedProductInfo> CheckoutProducts;
-    if (!CartLoadComponent->CheckoutProducts(CheckoutProducts)) // LoadedProducts 순회하며 정산 데이터 가져옴
+    if (bIsUseSingleCheckout)
     {
-        CancelCheckout();
-        TryStartCheckout();
-        return;
+        FLoadedProductInfo CheckoutProduct;
+
+        if (!CartLoadComponent->CheckoutSingleProduct(CheckoutProduct))
+        {
+            CancelCheckout();
+            TryStartCheckout();
+            return;
+        }
+
+        CheckoutProducts.Add(CheckoutProduct);
+    }
+    else
+    {
+        // 기존 정산 방식
+        if (!CartLoadComponent->CheckoutProducts(CheckoutProducts)) // LoadedProducts 순회하며 정산 데이터 가져옴
+        {
+            CancelCheckout();
+            TryStartCheckout();
+            return;
+        }
     }
 
     // 보너스 점수 적용
@@ -1164,10 +1197,34 @@ void ACheckoutZone::CompleteCheckout()
 
     // 최종 점수 Player State 반영
     MainPlayerState->AddPlayerScore(LastCheckoutScore);
-    MainPlayerState->AddCheckoutCount(1);
 
     MulticastPlayCheckoutCompleteEffect(CompletedPlayer);
     MulticastPlayCheckoutCompleteSound();
+
+    // 단일 상품 정산 true이고, 정산할 품목이 남은 경우
+    if (bIsUseSingleCheckout && CartLoadComponent->GetCurrentLoadedCount() > 0)
+    {
+        CheckoutProgress = 0.0f;
+        ElapsedCheckoutTime = 0.0f;
+        RequiredCheckoutTime = FMath::Max(BaseCheckoutTime, 0.1f);
+
+        AGameStateBase* GameStateBase = GetWorld()->GetGameState<AGameStateBase>();
+
+        if (IsValid(GameStateBase))
+        {
+            CheckoutStartTime = GameStateBase->GetServerWorldTimeSeconds();
+        }
+        else
+        {
+            CheckoutStartTime = GetWorld()->GetTimeSeconds();
+        }
+
+        ForceNetUpdate();
+
+        return;
+    }
+
+    MainPlayerState->AddCheckoutCount(1);
 
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
 
@@ -1181,12 +1238,14 @@ void ACheckoutZone::CompleteCheckout()
     OnCheckoutCompleted.Broadcast(this);
 
     // Manager에서 계산대를 닫지 않은 경우, 다른 플레이어가 바로 정산 시도
-    if (!bUseCheckoutBarrier && CurrentCheckoutZoneState == ECheckoutZoneState::Open)
+    //if (!bUseCheckoutBarrier && CurrentCheckoutZoneState == ECheckoutZoneState::Open)
+    //{
+    //    TryStartCheckout();
+    //}
+    if (CurrentCheckoutZoneState != ECheckoutZoneState::Closed)
     {
         TryStartCheckout();
     }
-
-    //UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Close"));
 }
 
 void ACheckoutZone::CancelCheckout()
