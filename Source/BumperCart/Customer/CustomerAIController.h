@@ -4,7 +4,8 @@
 #include "AIController.h"
 #include "CustomerAIController.generated.h"
 
-class  UBehaviorTree;
+class UBehaviorTree;
+class UBlackboardData;
 
 /**
  * 
@@ -18,8 +19,25 @@ public:
     ACustomerAIController();
 
 protected:
+
+    virtual void BeginPlay() override;
+
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
     virtual void OnPossess(APawn* InPawn) override;
 
-    UPROPERTY(EditAnywhere, Category = "AI | Setup")
-    UBehaviorTree* BehaviorTreeAsset;
+    
+
+private:
+    UPROPERTY(EditDefaultsOnly, Category = "AI | Setting")
+    TObjectPtr<UBehaviorTree> BehaviorTree;
+
+    UPROPERTY(EditDefaultsOnly, Category = "AI | Setting")
+    TObjectPtr<UBlackboardData> BlackboardDataAsset;
+
+    UPROPERTY(EditAnywhere, Category = "AI | Setting")
+    float PatrolRadius = 500.0f;
+
+public:
+    
 };

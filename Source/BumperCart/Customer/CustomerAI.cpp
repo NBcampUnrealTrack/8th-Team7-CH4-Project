@@ -1,5 +1,6 @@
 ﻿#include "Customer/CustomerAI.h"
 
+#include "Customer/CustomerAIController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -9,6 +10,8 @@ ACustomerAI::ACustomerAI()
 
     bReplicates = true;
     SetReplicateMovement(true);
+
+    AIControllerClass = ACustomerAIController::StaticClass();
 
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
