@@ -35,3 +35,20 @@ struct FBCVideoSettings
     bool bVSync = false;
 
 };
+
+USTRUCT(BlueprintType)
+struct FBCAudioSettings
+{
+    GENERATED_BODY()
+
+    // 0.0 무음 ~ 1.0 최대. 배경음/효과음에 함께 곱해지는 전체 음량
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
+    float MasterVolume = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
+    float BGMVolume = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
+    float SFXVolume = 0.5f;
+
+};
