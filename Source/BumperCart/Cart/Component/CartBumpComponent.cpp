@@ -260,25 +260,49 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 		OtherBump->ClientPlayBumpSound();
 	}
 
-	//드롭 역할 + 넉백 세기 (일반=양쪽 다 속도 비례로 살짝, 부스트/필살기=박힌 쪽만 멀리)
-	//필살기는 부스터와 동일한 가해자 취급 + 절대 안 밀리는 완전 면역
-	const bool bIAggressor = OwnerCart->IsBoosting() || OwnerCart->IsUltimateActive();
-	const bool bOtherAggressor = OtherCart && (OtherCart->IsBoosting() || OtherCart->IsUltimateActive());
+	//드롭 역할 + 넉백 세기. 우선순위: 필살기 > 부스터 상쇄 > 부스터 > 일반
+	const bool bIUlt = OwnerCart->IsUltimateActive();
+	const bool bOtherUlt = OtherCart && OtherCart->IsUltimateActive();
+	const bool bIBoost = OwnerCart->IsBoosting();
+	const bool bOtherBoost = OtherCart && OtherCart->IsBoosting();
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 	EDropCollisionRole OtherDropRole = EDropCollisionRole::Normal;
 	const float NormalKnock = FMath::Min(ClosingSpeed * NormalKnockbackScale, NormalKnockbackMax);
 	float OtherKnockStrength = NormalKnock;
 	float MyKnockStrength = OtherCart ? NormalKnock : 0.f; //벽·장애물은 나를 안 밀어냄
-	if (bIAggressor)
+	bool bBoostClash = false; //부스터끼리 상쇄 충돌 (드롭 스킵용)
+	if (bIUlt) //필살기는 상대가 부스터여도 풀 파워 (필살기끼리는 위에서 이미 판정 무시)
 	{
-		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터/필살기로 박음 => 덜 흘림
+		DropRole = EDropCollisionRole::BoosterInstigator;
 		OtherDropRole = EDropCollisionRole::BoostedTarget;
-		OtherKnockStrength = BoostKnockbackStrength; //박힌 쪽은 더 멀리 (비비기 방지)
-		MyKnockStrength = 0.f;                       //본인은 안 밀림
+		OtherKnockStrength = BoostKnockbackStrength;
+		MyKnockStrength = 0.f;
 	}
-	else if (bOtherAggressor)
+	else if (bOtherUlt)
 	{
-		DropRole = EDropCollisionRole::BoostedTarget; //부스터/필살기한테 박힘 => 더 흘림
+		DropRole = EDropCollisionRole::BoostedTarget;
+		OtherDropRole = EDropCollisionRole::BoosterInstigator;
+		OtherKnockStrength = 0.f;
+		MyKnockStrength = BoostKnockbackStrength;
+	}
+	else if (bIBoost && bOtherBoost)
+	{
+		//부스터끼리는 방향 무관 서로 상쇄: 가벼운 고정 넉백으로 대칭 튕김 + 드롭 없음
+		//(레이스로 한쪽만 가해자 되던 비대칭 수정. 부스트는 아래서 양쪽 다 끊김)
+		OtherKnockStrength = BoostClashKnockback;
+		MyKnockStrength = BoostClashKnockback;
+		bBoostClash = true;
+	}
+	else if (bIBoost)
+	{
+		DropRole = EDropCollisionRole::BoosterInstigator; //내가 부스터로 박음 => 덜 흘림
+		OtherDropRole = EDropCollisionRole::BoostedTarget;
+		OtherKnockStrength = BoostKnockbackStrength; //부스터에 박힌 쪽은 더 멀리 (부스트 비비기 방지)
+		MyKnockStrength = 0.f;                       //부스터 본인은 안 밀림
+	}
+	else if (bOtherBoost)
+	{
+		DropRole = EDropCollisionRole::BoostedTarget; //부스터한테 박힘 => 더 흘림
 		OtherDropRole = EDropCollisionRole::BoosterInstigator;
 		OtherKnockStrength = 0.f;
 		MyKnockStrength = BoostKnockbackStrength;
@@ -316,12 +340,12 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 		MulticastPlayBumpReaction(-ToOther, ReactionIntensity); //벽 충돌·부스터 본인(안 밀림)
 	}
 
-	//드롭 — 나 + 상대 (필살기 발동자는 자기 상품 안 흘림)
-	if (!OwnerCart->IsUltimateActive())
+	//드롭 — 나 + 상대 (필살기 발동자는 자기 상품 안 흘림, 부스터 상쇄는 양쪽 다 안 흘림)
+	if (!OwnerCart->IsUltimateActive() && !bBoostClash)
 	{
 		RequestSpill(ClosingSpeed * BumpImpulseScale, DropRole);
 	}
-	if (OtherBump && !(OtherCart && OtherCart->IsUltimateActive()))
+	if (OtherBump && !bBoostClash && !(OtherCart && OtherCart->IsUltimateActive()))
 	{
 		OtherBump->RequestSpill(ClosingSpeed * OtherBump->BumpImpulseScale, OtherDropRole);
 	}

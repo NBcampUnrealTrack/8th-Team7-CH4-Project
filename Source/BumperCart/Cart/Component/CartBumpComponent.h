@@ -112,6 +112,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float NormalKnockbackMax = 1000.f;
 
+	//부스터끼리 충돌(상쇄) 시 양쪽에 주는 고정 넉백 — 일반 충돌 이하로 가볍게, 드롭 없음
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BoostClashKnockback = 600.f;
+
 	//넉백 시 위로 띄우는 비율 (수직속도 = 넉백 세기 × 이 값) — 박힌 쪽이 붕 뜨는 맛
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float KnockbackUpRatio = 0.25f;
