@@ -211,6 +211,45 @@ bool UCartLoadComponent::CheckoutProducts(TArray<FLoadedProductInfo>& OutProduct
     return OutProducts.Num() > 0;
 }
 
+bool UCartLoadComponent::CheckoutSingleProduct(FLoadedProductInfo& OutProduct)
+{
+    OutProduct = FLoadedProductInfo();
+
+    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority())
+    {
+        return false;
+    }
+
+    while (LoadedProducts.IsEmpty())
+    {
+        return false;
+    }
+
+    for (int32 i = LoadedProducts.Num() - 1; i >= 0; --i)
+    {
+        if (!IsValid(LoadedProducts[i]))
+        {
+            continue;
+        }
+
+        OutProduct = LoadedProducts[i]->GetLoadedProductInfo();
+
+        LoadedProducts[i]->SetProductState(EProductState::Paid);
+
+        LoadedProducts[i]->SetLifeSpan(2.f);
+
+        LoadedProducts.RemoveAt(i);
+
+        UpdateLoadInfo();
+
+        return true;
+    }
+
+    UpdateLoadInfo();
+
+    return false;
+}
+
 void UCartLoadComponent::SetLoadDummyBlinkVisible(bool bVisible)
 {
     int32 VisibleCount = GetVisibleDummyCount();
