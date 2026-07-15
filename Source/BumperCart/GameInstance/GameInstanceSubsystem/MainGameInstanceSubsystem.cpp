@@ -764,6 +764,18 @@ FString UMainGameInstanceSubsystem::GetFoundSessionOwnerName(int32 Index) const
     return FoundOwnerName;
 }
 
+int32 UMainGameInstanceSubsystem::GetFoundSessionUserCount(int32 Index) const
+{
+    if (!SearchSettings.IsValid() || !SearchSettings->SearchResults.IsValidIndex(Index)) return 0;
+
+    const FOnlineSession& FoundSession = FilteredResults[Index].Session;
+
+    const int32 MaxPublicConnections  = FoundSession.SessionSettings.NumPublicConnections;
+    const int32 OpenPublicConnections = FoundSession.NumOpenPublicConnections;
+
+    return FMath::Clamp(MaxPublicConnections - OpenPublicConnections, 0, MaxPublicConnections);
+}
+
 // 방에 비밀번호가 존재하다면 비공개 방으로 판단
 bool UMainGameInstanceSubsystem::GetFoundSessionIsPrivate(int32 Index) const
 {
