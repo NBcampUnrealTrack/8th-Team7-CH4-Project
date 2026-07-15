@@ -5,6 +5,7 @@
 #include "ProductShelfManagerConfig.generated.h"
 
 class UNiagaraSystem;
+class USoundBase;
 
 /**
  * 
@@ -30,4 +31,8 @@ public:
     // 스폰시 사용할 이펙트
     UPROPERTY(EditAnywhere, Category = "FX")
     TObjectPtr<UNiagaraSystem> SpawnFX;
+
+    // 스폰 소리
+    UPROPERTY(EditAnywhere, Category = "FX")
+    TObjectPtr<USoundBase> SpawnSound;
 };

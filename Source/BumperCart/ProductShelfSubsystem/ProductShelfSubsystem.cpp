@@ -47,6 +47,7 @@ void UProductShelfSubsystem::InitializeConfig(UProductShelfManagerConfig* InConf
         MaxSpawnLimit = SpawnConfig->MaxSpawnLimit;
         RespawnDelay = SpawnConfig->RespawnDelay;
         SpawnFX = SpawnConfig->SpawnFX;
+        SpawnSound = SpawnConfig->SpawnSound;
 
         FString NetModeStr = (GetWorld() && GetWorld()->GetNetMode() != NM_Client) ? TEXT("서버") : TEXT("클라이언트");
         UE_LOG(LogTemp, Log, TEXT("[%s][선반매니저] 데이터 에셋 적용"), *NetModeStr);
