@@ -9,6 +9,7 @@ class UBoxComponent;
 class UProjectileMovementComponent;
 class UNiagaraComponent;
 class ACartPawn;
+class UNiagaraSystem;
 
 UCLASS()
 class BUMPERCART_API ANPCRushGimmick : public AActor, public IBumpable
@@ -59,8 +60,15 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Sound | Knokback")
     USoundBase* KnockbackSound;
 
+    // 충돌시 사용할 이펙트
+    UPROPERTY(EditAnywhere, Category = "FX")
+    TObjectPtr<UNiagaraSystem> KnockbackFX;
+
     UFUNCTION()
     void OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-    void Knockback(ACartPawn* PlayerCart);
+    void Knockback(ACartPawn* PlayerCart, const FHitResult& SweepResult);
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayerHitEffect(FVector SpawnLocation, FRotator SpawnRotation);
 };
