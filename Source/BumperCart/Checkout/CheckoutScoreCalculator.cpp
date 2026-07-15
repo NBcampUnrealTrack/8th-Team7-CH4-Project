@@ -81,31 +81,38 @@ int32 UCheckoutScoreCalculator::CalculateLastCheckoutBonusScore(int32 BaseScore,
     return LastCheckoutBonusScore;
 }
 
-int32 UCheckoutScoreCalculator::CalculateComboBonusScore(int32 BaseScore, int32 ProductCount, float& ComboMultiplier)
+int32 UCheckoutScoreCalculator::CalculateComboBonusScore(int32 CheckoutCount, int32 ComboBonusScore)
 {
-    ComboMultiplier = 1.0f;
+    //ComboMultiplier = 1.0f;
 
-    if (BaseScore <= 0)
+    //if (BaseScore <= 0)
+    //{
+    //    return 0;
+    //}
+
+
+    //if (ProductCount < 10)
+    //{
+    //    return 0;
+    //}
+
+    //// 10~14 -> 1.5
+    //// 15~19 -> 2.0
+    //// 5개 마다 0.5배 증가
+    //const int32 ComboStep = (ProductCount - 10) / 5;
+
+    //ComboMultiplier = 1.5f + ComboStep * 0.5f;
+
+    //int32 ComboBonusScore = FMath::RoundToInt(BaseScore * (ComboMultiplier - 1.0f));
+
+    //return ComboBonusScore;
+
+    if (CheckoutCount <= 1)
     {
         return 0;
     }
 
-
-    if (ProductCount < 10)
-    {
-        return 0;
-    }
-
-    // 10~14 -> 1.5
-    // 15~19 -> 2.0
-    // 5개 마다 0.5배 증가
-    const int32 ComboStep = (ProductCount - 10) / 5;
-
-    ComboMultiplier = 1.5f + ComboStep * 0.5f;
-
-    int32 ComboBonusScore = FMath::RoundToInt(BaseScore * (ComboMultiplier - 1.0f));
-
-    return ComboBonusScore;
+    return FMath::Max(ComboBonusScore, 0);
 }
 
 int32 UCheckoutScoreCalculator::CalculateTotalScore(int32 BaseScore, int32 SaleBonusScore, int32 LastCheckoutBonusScore, int32 ComboBonusScore)
@@ -115,7 +122,7 @@ int32 UCheckoutScoreCalculator::CalculateTotalScore(int32 BaseScore, int32 SaleB
     return TotalScore;
 }
 
-FCheckoutScoreResult UCheckoutScoreCalculator::CalculateCheckoutScore(const TArray<FLoadedProductInfo>& Products, float SaleBonusMultiplier, bool bIsLastCheckoutBonusApplied, float LastCheckoutBounusMultiplier)
+FCheckoutScoreResult UCheckoutScoreCalculator::CalculateCheckoutScore(const TArray<FLoadedProductInfo>& Products, float SaleBonusMultiplier, bool bIsLastCheckoutBonusApplied, float LastCheckoutBounusMultiplier, int32 CheckoutCount, int32 ComboBonusScore)
 {
     FCheckoutScoreResult Result;
 
@@ -137,17 +144,17 @@ FCheckoutScoreResult UCheckoutScoreCalculator::CalculateCheckoutScore(const TArr
     Result.BaseScore = CalculateBaseScore(Products);
     Result.SaleBonusScore = CalculateSaleBonusScore(Products, SaleBonusMultiplier);
     Result.LastCheckoutBonusScore = CalculateLastCheckoutBonusScore(Result.BaseScore, bIsLastCheckoutBonusApplied, LastCheckoutBounusMultiplier);
-    Result.ComboBonusScore = CalculateComboBonusScore(Result.BaseScore, Result.CheckoutProductCount, Result.ComboMultiplier);
+    Result.ComboBonusScore = CalculateComboBonusScore(CheckoutCount, ComboBonusScore);
     Result.TotalScore = CalculateTotalScore(Result.BaseScore, Result.SaleBonusScore, Result.LastCheckoutBonusScore, Result.ComboBonusScore);
 
-    for (const FLoadedProductInfo& ProductInfo : Products)
-    {
-        // 정산한 상품 수
-        if (ProductInfo.Value > 0)
-        {
-            ++Result.CheckoutProductCount;
-        }
-    }
+    //for (const FLoadedProductInfo& ProductInfo : Products)
+    //{
+    //    // 정산한 상품 수
+    //    if (ProductInfo.Value > 0)
+    //    {
+    //        ++Result.CheckoutProductCount;
+    //    }
+    //}
 
     // 보너스 적용 및 정산 완료 여부
     Result.bIsSaleBonusApplied = Result.SaleBonusScore > 0;

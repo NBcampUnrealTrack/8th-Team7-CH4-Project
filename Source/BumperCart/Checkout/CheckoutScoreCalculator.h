@@ -31,11 +31,16 @@ public:
 
     // 상품 개수에 따른 정산 보너스 점수
     UFUNCTION(BlueprintPure, Category = "Checkout|Score")
-    static int32 CalculateComboBonusScore(int32 BaseScore, int32 ProductCount, float& ComboMultiplier);
+    static int32 CalculateComboBonusScore(int32 CheckoutCount, int32 ComboBonusScore);
 
     // 모든 점수를 합산해 최종 점수 반환
     UFUNCTION(BlueprintPure, Category = "Checkout|Score")
-    static int32 CalculateTotalScore(int32 BaseScore, int32 SaleBonusScore, int32 LastCheckoutBonusScore, int32 ComboBonusScore);
+    static int32 CalculateTotalScore(
+        int32 BaseScore,
+        int32 SaleBonusScore,
+        int32 LastCheckoutBonusScore,
+        int32 ComboBonusScore
+    );
 
     // 전체 계산 결과 구조체 반환
     UFUNCTION(BlueprintPure, Category = "Checkout|Score")
@@ -43,6 +48,8 @@ public:
         const TArray<FLoadedProductInfo>& Products,
         float SaleMultiplier,
         bool bApplyLastCheckoutBonus,
-        float LastCheckoutBonusMultiplier
+        float LastCheckoutBonusMultiplier,
+        int32 CheckoutCount,
+        int32 ComboBonusScore
     );
 };

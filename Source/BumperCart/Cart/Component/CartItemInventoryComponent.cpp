@@ -279,7 +279,7 @@ float UCartItemInventoryComponent::GetItemCooldownPercent() const
         return 0.0f;
     }
 
-    const float CooldownDuration = (0.0f, CurrentItemData->CooldownDuration);
+    const float CooldownDuration = FMath::Max(0.0f, CurrentItemData->CooldownDuration);
 
     if (CooldownDuration <= KINDA_SMALL_NUMBER)
     {

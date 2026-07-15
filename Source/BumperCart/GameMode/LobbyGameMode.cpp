@@ -21,6 +21,21 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
     if (HasAuthority())
     {
         UE_LOG(LogTemp, Warning, TEXT("플레이어 접속: %s"), *NewPlayer->GetName());
+
+        // 온라인 세션에 실제로 등록
+        if (GameSession && NewPlayer && NewPlayer->PlayerState)
+        {
+            const FUniqueNetIdRepl& PlayerUniqueId = NewPlayer->PlayerState->GetUniqueId();
+            if (PlayerUniqueId.IsValid())
+            {
+                GameSession->RegisterPlayer(NewPlayer, PlayerUniqueId, false);
+                UE_LOG(LogTemp, Warning, TEXT("[Lobby] 세션에 플레이어 등록: %s"), *NewPlayer->GetName());
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[Lobby] %s 등록 실패"), *NewPlayer->GetName());
+            }
+        }
     }
 
     ALobbyGameState* GS = GetGameState<ALobbyGameState>();
@@ -73,6 +88,13 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 void ALobbyGameMode::Logout(AController* Exiting)
 {
     APlayerState* ExitingPS = Exiting ? Exiting->PlayerState : nullptr;
+
+    // 온라인 세션에서 플레이어 등록 해제 / PlayerState가 살아있는 Super::Logout 전에 호출해야함
+    if (HasAuthority() && GameSession && Exiting)
+    {
+        GameSession->UnregisterPlayer(Exiting);
+        UE_LOG(LogTemp, Warning, TEXT("[Lobby] 세션에서 플레이어 등록 해제: %s"), *Exiting->GetName());
+    }
 
     Super::Logout(Exiting);
     UE_LOG(LogTemp, Warning, TEXT("플레이어 퇴장: %s"), *Exiting->GetName());

@@ -34,6 +34,16 @@ public:
 	//리액션 스프링 상태 초기화 — 슬립이 몸통 회전을 점유할 때 호출
 	void ResetReaction();
 
+	//---------- 필살기 게이지 ----------
+	//현재 게이지 스택 (UI·발동 판정용)
+	int32 GetUltimateStack() const { return UltimateStack; }
+
+	//게이지 +1 (서버) — 충돌 시 가해자만 호출. 발동 중이면 미획득, 상한 클램프
+	void AddUltimateStack();
+
+	//게이지 소진 (서버) — 발동 시 CartPawn이 호출
+	void ResetUltimateStack();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -102,6 +112,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float NormalKnockbackMax = 1000.f;
 
+	//부스터끼리 충돌(상쇄) 시 양쪽에 주는 고정 넉백 — 일반 충돌 이하로 가볍게, 드롭 없음
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
+	float BoostClashKnockback = 600.f;
+
 	//넉백 시 위로 띄우는 비율 (수직속도 = 넉백 세기 × 이 값) — 박힌 쪽이 붕 뜨는 맛
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))
 	float KnockbackUpRatio = 0.25f;
@@ -163,4 +177,16 @@ private:
 	bool bBumpInvincible = false;
 	float BumpInvincibleTimeRemaining = 0.f; //서버 카운트다운
 	float BumpBlinkAccum = 0.f;              //로컬 깜빡 타이머
+
+	//---------- 필살기 게이지 ----------
+	//충돌마다 가해자에게 +1, 상한 도달 시 발동 가능. 소유 클라 UI용 복제(OwnerOnly)
+	UPROPERTY(ReplicatedUsing = OnRep_UltimateStack)
+	int32 UltimateStack = 0;
+
+	//게이지 상한 = 발동 필요량 (CartPawn.UltimateRequiredStack과 일치시킬 것)
+	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "1"))
+	int32 UltimateMaxStack = 5;
+
+	UFUNCTION()
+	void OnRep_UltimateStack();
 };

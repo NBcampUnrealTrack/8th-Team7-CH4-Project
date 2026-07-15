@@ -95,7 +95,7 @@ bool ALobbyGameState::IsHostPlayerState(const APlayerState* PS) const
     return PC && PC->GetLocalPlayer() != nullptr;
 }
 
-const TArray<FCharacterData>& ALobbyGameState::GetAvailableCharacters() const
+const TArray<FCharacterData> ALobbyGameState::GetAvailableCharacters() const
 {
     const TArray<FCharacterData> Empty;
     if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
@@ -105,7 +105,7 @@ const TArray<FCharacterData>& ALobbyGameState::GetAvailableCharacters() const
             return GI->CharacterSelectionConfig->CharacterDatas;
         }
     }
-    return Empty;
+    return TArray<FCharacterData>();
 }
 
 // 플레이어가 선택한 캐릭터가 이미 다른 플레이어가 선택한 캐릭터인지 확인
