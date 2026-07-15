@@ -141,3 +141,21 @@ int32 ALobbyPlayerState::GetSelectedCharacterIndex() const
 {
     return SelectedCharacterIndex;
 }
+
+
+// 로비 재입장 시 GameInstance에 남아있던 이전 선택 캐릭터를 되살림
+void ALobbyPlayerState::RestoreSelectedCharacterFromGameInstance()
+{
+    if (!HasAuthority()) return;
+    if (SelectedCharacterIndex != INDEX_NONE) return; // 이미 선택되어 있으면 건드리지 않음
+    if (!GetUniqueId().IsValid()) return;
+
+    if (UMainGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UMainGameInstance>() : nullptr)
+    {
+        const int32 SavedIndex = GI->GetPlayerCharacter(GetUniqueId());
+        if (SavedIndex != INDEX_NONE)
+        {
+            SelectedCharacterIndex = SavedIndex;
+        }
+    }
+}

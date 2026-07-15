@@ -27,6 +27,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Lobby|Character")
     int32 GetSelectedCharacterIndex() const;
 
+    void RestoreSelectedCharacterFromGameInstance();
+
 
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -52,6 +54,8 @@ private:
 
     UFUNCTION()
     void OnRep_SelectedCharacter();
+
+    int32 GetSelecctedCharacterIndex() const;
 
     UPROPERTY(ReplicatedUsing = OnRep_SelectedCharacter)
     int32 SelectedCharacterIndex = INDEX_NONE;
