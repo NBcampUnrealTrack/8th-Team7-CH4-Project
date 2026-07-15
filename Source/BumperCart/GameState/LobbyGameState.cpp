@@ -48,8 +48,10 @@ void ALobbyGameState::RefreshPlayerInfos(APlayerState* ExcludedPlayerState)
 
         Info.bIsHost = IsHostPlayerState(PS);
 
-        if (const ALobbyPlayerState* LPS = Cast<ALobbyPlayerState>(PS))
+        if (ALobbyPlayerState* LPS = Cast<ALobbyPlayerState>(PS))
         {
+            LPS->RestoreSelectedCharacterFromGameInstance();
+
             Info.bIsReady = LPS->IsReady();
             Info.SelectedCharacterIndex = LPS->GetSelectedCharacterIndex();
         }
