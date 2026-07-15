@@ -5,6 +5,7 @@
 #include "Cart/CartPawn.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Cart/Component/CartLoadComponent.h"
+#include "NiagaraFunctionLibrary.h"
 
 
 AGloveProjectile::AGloveProjectile()
@@ -28,5 +29,24 @@ void AGloveProjectile::OnHitCart(ACartPawn* HitPlayer)
     if (IsValid(LoadComp))
     {
         LoadComp->DropProducts(Strength, EDropCollisionRole::GloveAttack);
+    }
+
+    Multicast_PlayHitEffect(GetActorLocation());
+}
+
+void AGloveProjectile::Multicast_PlayHitEffect_Implementation(FVector_NetQuantize100 Location)
+{
+    if (GetNetMode() == NM_DedicatedServer) return;
+
+    if (HitEffect)
+    {
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            this,
+            HitEffect,
+            Location,
+            FRotator::ZeroRotator,
+            FVector::OneVector,
+            true
+        );
     }
 }

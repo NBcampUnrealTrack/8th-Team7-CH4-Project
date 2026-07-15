@@ -20,10 +20,11 @@ UCartLoadComponent::UCartLoadComponent()
 
     MaxWeight = 40;
     WeightScaling = 0.5f;
+    TotalValue = 0;
 
     BoosterInstigatorDropMultiplier = 0.f; //부스터 사용 중 충돌 시 드롭 없음 (부스터 아이템화 밸런싱 — 방어 겸용)
     BoostedTargetDropMultiplier = 100.f; // 부스터 피해자는 전부 떨어뜨리게 배율 크게 적용
-    GloveAttackedDropMultiplier = 1.7f;
+    GloveAttackedDropMultiplier = 0.8f;
 
     // 드롭 개수 규칙 지정
     DropCountRules.Add({ 300.f, 0, 1, 0.5f });
@@ -70,6 +71,8 @@ void UCartLoadComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
     DOREPLIFETIME(ThisClass, LoadInfo);
     DOREPLIFETIME(ThisClass, LoadDummyMeshIndices);
+    //DOREPLIFETIME(ThisClass, TotalValue);
+    DOREPLIFETIME_CONDITION(ThisClass, TotalValue, COND_OwnerOnly);
 }
 
 bool UCartLoadComponent::TryAddProduct(AProductBase* Product)
@@ -144,6 +147,19 @@ void UCartLoadComponent::DropProducts(float Impulse, EDropCollisionRole Role)
             }
         }
     }
+    else if (DropCount <= 0 && Role == EDropCollisionRole::BoosterInstigator)
+    {
+        // 부스터를 사용해서 낙하 개수만 없다면
+        APawn* OwnerPawn = Cast<APawn>(GetOwner());
+        if (IsValid(OwnerPawn))
+        {
+            AMainPlayerState* PS = OwnerPawn->GetPlayerState<AMainPlayerState>();
+            if (IsValid(PS))
+            {
+                PS->AddCartBumpCount(1);
+            }
+        }
+    }
 
     if (ActualDropCount <= 0) return;
 
@@ -166,17 +182,17 @@ void UCartLoadComponent::DropProducts(float Impulse, EDropCollisionRole Role)
 
 int32 UCartLoadComponent::GetTotalValue() const
 {
-    int32 TotalValue = 0;
+    int32 SumValue = 0;
 
     for (const AProductBase* Product : LoadedProducts)
     {
         if (IsValid(Product))
         {
-            TotalValue += Product->GetFinalValue();
+            SumValue += Product->GetFinalValue();
         }
     }
 
-    return TotalValue;
+    return SumValue;
 }
 
 int32 UCartLoadComponent::GetCurrentLoadedCount() const
@@ -344,6 +360,7 @@ void UCartLoadComponent::UpdateLoadInfo()
 
     LoadInfo.CurrentLoadedCount = Count;
     LoadInfo.CurrentWeight = TotalWeight;
+    TotalValue = GetTotalValue();
 
     int32 CurrentCount = GetVisibleDummyCount();
 
@@ -353,6 +370,7 @@ void UCartLoadComponent::UpdateLoadInfo()
     if (GetNetMode() != NM_DedicatedServer)
     {
         OnRep_LoadInfo();
+        OnRep_TotalValue();
     }
 }
 
@@ -569,5 +587,9 @@ void UCartLoadComponent::OnRep_LoadInfo()
     UpdateLoadVisual();
 
     OnLoadInfoChanged.Broadcast(GetOwner(), LoadInfo);
-    OnTotalValueChanged.Broadcast(GetTotalValue());
+}
+
+void UCartLoadComponent::OnRep_TotalValue()
+{
+    OnTotalValueChanged.Broadcast(TotalValue);
 }

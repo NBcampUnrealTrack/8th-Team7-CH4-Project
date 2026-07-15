@@ -21,7 +21,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     const FLoadInfo&, LoadInfo
 );
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTotalValueChanged, int32, TotalValue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTotalValueChanged, int32, NewTotalValue);
 
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -73,6 +73,9 @@ protected:
 
     UFUNCTION()
     void OnRep_LoadInfo();
+
+    UFUNCTION()
+    void OnRep_TotalValue();
 
 private:
     // 충격량에 따라 몇개를 떨어뜨릴지 계산하는 함수
@@ -148,6 +151,9 @@ private:
     // 현재 무게, 적재 개수를 구조체로 관리
     UPROPERTY(ReplicatedUsing = OnRep_LoadInfo, VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
     FLoadInfo LoadInfo;
+
+    UPROPERTY(ReplicatedUsing = OnRep_TotalValue, VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Load", meta = (AllowPrivateAccess = "true"))
+    int32 TotalValue;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cart|Drop", meta = (AllowPrivateAccess = "true"))
     TArray<FDropCountRule> DropCountRules;

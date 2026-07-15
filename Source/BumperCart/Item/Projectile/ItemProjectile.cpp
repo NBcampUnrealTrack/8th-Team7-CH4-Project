@@ -167,7 +167,9 @@ void AItemProjectile::HandleHitCart(ACartPawn* HitPlayer)
         return;
     }
 
+#if !UE_BUILD_SHIPPING
     UE_LOG(LogTemp, Warning, TEXT("투사체 플레이어 타격"));
+#endif
 
     // 주변 플레이어 사운드 재생
     MulticastPlayHitProjectileSound(GetActorLocation());
@@ -185,7 +187,9 @@ void AItemProjectile::HandleHitOtherActor(AActor* HitActor)
         return;
     }
 
+#if !UE_BUILD_SHIPPING
     UE_LOG(LogTemp, Warning, TEXT("다른 액터와 충돌"));
+#endif
 
     MulticastPlayHitProjectileSound(GetActorLocation());
 
