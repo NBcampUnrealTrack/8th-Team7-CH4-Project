@@ -3,6 +3,7 @@
 
 #include "GameMode/LobbyGameMode.h"
 
+#include "GameFramework/GameSession.h"
 #include "GameInstance/MainGameInstance.h"
 #include "GameState/LobbyGameState.h"
 #include "PlayerState/LobbyPlayerState.h"
@@ -92,8 +93,11 @@ void ALobbyGameMode::Logout(AController* Exiting)
     // 온라인 세션에서 플레이어 등록 해제 / PlayerState가 살아있는 Super::Logout 전에 호출해야함
     if (HasAuthority() && GameSession && Exiting)
     {
-        GameSession->UnregisterPlayer(Exiting);
-        UE_LOG(LogTemp, Warning, TEXT("[Lobby] 세션에서 플레이어 등록 해제: %s"), *Exiting->GetName());
+        if (APlayerController* ExitingPC = Cast<APlayerController>(Exiting))
+        {
+            GameSession->UnregisterPlayer(ExitingPC);
+            UE_LOG(LogTemp, Warning, TEXT("[Lobby] 세션에서 플레이어 등록 해제: %s"), *Exiting->GetName());
+        }
     }
 
     Super::Logout(Exiting);

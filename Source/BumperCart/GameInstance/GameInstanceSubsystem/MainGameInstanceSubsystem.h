@@ -210,4 +210,24 @@ private:
 
 
 #pragma endregion
+
+#pragma region Steam Login
+public:
+    void StartAutoLoginRetry(float IntervalSeconds);
+
+    void StopAutoLoginRetry();
+
+    virtual void Deinitialize() override;
+
+private:
+    UFUNCTION()
+    void HandleAutoLoginResult(bool bWasSuccessful, const FString& ErrorMessage);
+
+    void AutoLoginTick();
+
+    FTimerHandle LoginRetryTimerHandle;
+    bool bAutoLoginRetryActive = false;
+    bool bSteamLaunchURLSent = false;
+    bool bIsLoginRequestPending = false;
+#pragma endregion
 };

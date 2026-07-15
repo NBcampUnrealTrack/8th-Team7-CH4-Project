@@ -48,12 +48,24 @@ void UMainGameInstanceSubsystem::Login(const FString& CredentialName)
     //패키지 실행인데 Steam을 못 잡은 경우(클라 미실행/미로그인) — 에디터(PIE)의 Null 폴백은 로컬 LAN 테스트용이라 통과
     if (IsUsingNullFallback() && IsRunningGame())
     {
+        IOnlineSubsystem* Before = Online::GetSubsystem(GetWorld());
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] Reload 시도 전 서브시스템: %s"), Before ? *Before->GetSubsystemName().ToString() : TEXT("None"));
+
+
         //그 사이 Steam 클라이언트에 로그인했을 수 있으니 서브시스템 재생성 후 재판정 (타이틀 시점이라 안전)
         FModuleManager::GetModuleChecked<FOnlineSubsystemModule>("OnlineSubsystem").ReloadDefaultSubsystem();
+
+        IOnlineSubsystem* After = Online::GetSubsystem(GetWorld());
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] Reload 시도 후 서브시스템: %s"), After ? *After->GetSubsystemName().ToString() : TEXT("None"));
+
         if (IsUsingNullFallback())
         {
+            if (!bSteamLaunchURLSent)
+            {
+                FPlatformProcess::LaunchURL(TEXT("steam://open/main"), nullptr, nullptr);
+                bSteamLaunchURLSent = true;
+            }
             //여전히 실패 => Steam 클라이언트 실행을 띄워주고 안내. 로그인 후 Login 버튼 재시도 가능
-            FPlatformProcess::LaunchURL(TEXT("steam://open/main"), nullptr, nullptr);
             OnLoginResult.Broadcast(false, TEXT("Steam 로그인이 필요합니다. Steam 로그인 후 다시 시도해주세요."));
             return;
         }
@@ -75,14 +87,75 @@ void UMainGameInstanceSubsystem::Login(const FString& CredentialName)
         return;
     }
 
+    // 이미 비동기 로그인 요청이 진행 중이면 중복 호출 방지
+    if (bIsLoginRequestPending) return;
+
+    bIsLoginRequestPending = true;
     //미로그인 상태 => 자동 로그인 시도 (자격증명은 Steam 클라이언트가 처리)
     Identity->ClearOnLoginCompleteDelegates(0, this);
     Identity->OnLoginCompleteDelegates[0].AddUObject(this, &UMainGameInstanceSubsystem::OnLoginComplete);
     Identity->Login(0, FOnlineAccountCredentials());
 }
 
+void UMainGameInstanceSubsystem::StartAutoLoginRetry(float IntervalSeconds)
+{
+    if (bAutoLoginRetryActive) return;
+
+    bAutoLoginRetryActive = true;
+    bSteamLaunchURLSent = false;
+
+    OnLoginResult.AddDynamic(this, &UMainGameInstanceSubsystem::HandleAutoLoginResult);
+
+    // 최초 1회 로그인 시도
+    Login(TEXT(""));
+
+    if (bAutoLoginRetryActive)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(LoginRetryTimerHandle, this, &UMainGameInstanceSubsystem::AutoLoginTick, IntervalSeconds, true);
+        }
+    }
+}
+
+void UMainGameInstanceSubsystem::AutoLoginTick()
+{
+    Login(TEXT(""));
+}
+
+void UMainGameInstanceSubsystem::StopAutoLoginRetry()
+{
+    if (!bAutoLoginRetryActive) return;
+    bAutoLoginRetryActive = false;
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(LoginRetryTimerHandle);
+    }
+
+    OnLoginResult.RemoveDynamic(this, &UMainGameInstanceSubsystem::HandleAutoLoginResult);
+}
+
+void UMainGameInstanceSubsystem::HandleAutoLoginResult(bool bWasSuccessful, const FString& ErrorMessage)
+{
+    if (!bAutoLoginRetryActive) return;
+
+    if (bWasSuccessful)
+    {
+        StopAutoLoginRetry();
+    }
+}
+
+void UMainGameInstanceSubsystem::Deinitialize()
+{
+    StopAutoLoginRetry();
+    Super::Deinitialize();
+}
+
 void UMainGameInstanceSubsystem::OnLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error)
 {
+    bIsLoginRequestPending = false;
+
     IOnlineIdentityPtr Identity = GetIdentityInterface();
     if (Identity.IsValid())
     {
