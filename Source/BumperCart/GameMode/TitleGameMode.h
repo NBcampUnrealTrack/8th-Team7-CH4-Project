@@ -7,11 +7,13 @@
 #include "TitleGameMode.generated.h"
 
 /**
- * 
+ *
  */
 UCLASS()
 class BUMPERCART_API ATitleGameMode : public AGameMode
 {
 	GENERATED_BODY()
-	
+
+protected:
+    virtual void BeginPlay();
 };
