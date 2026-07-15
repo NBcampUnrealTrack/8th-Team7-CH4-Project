@@ -1010,6 +1010,7 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
     //RequiredCheckoutTime = CalculateCheckoutDuration(ProductCount, bIsFinalPhase);
 
     // 상품 당 정산 방식
+    CurrentCheckoutCount = 0;
     const int32 ProductCount = CartLoadComponent->GetCurrentLoadedCount();
     LastLoadedProductCount = ProductCount;
     if (bIsUseSingleCheckout)
@@ -1180,12 +1181,17 @@ void ACheckoutZone::CompleteCheckout()
         }
     }
 
+    // 현재 연속 정산 횟수
+    const int32 CheckoutCount = CurrentCheckoutCount + 1;
+
     // 보너스 점수 적용
     const FCheckoutScoreResult ScoreResult = UCheckoutScoreCalculator::CalculateCheckoutScore(
             CheckoutProducts,
             SaleBonusMultiplier,
             bIsLastCheckoutBonusApplied,
-            LastCheckoutBonusMultiplier
+            LastCheckoutBonusMultiplier,
+            CheckoutCount,
+            ComboBonusPerCheckout
         );
 
     // 정산 실패 시
@@ -1199,8 +1205,12 @@ void ACheckoutZone::CompleteCheckout()
     // 최종 점수 계산
     LastCheckoutScore = ScoreResult.TotalScore;
 
-    // 최종 점수 Player State 반영
+    // 최종 점수, 정산 횟수 Player State 반영
     MainPlayerState->AddPlayerScore(LastCheckoutScore);
+    MainPlayerState->AddCheckoutCount(1);
+
+    // 연속 정산 횟수 업데이트
+    CurrentCheckoutCount = CheckoutCount;
 
     MulticastPlayCheckoutCompleteEffect(CompletedPlayer);
     MulticastPlayCheckoutCompleteSound();
@@ -1229,8 +1239,6 @@ void ACheckoutZone::CompleteCheckout()
 
         return;
     }
-
-    MainPlayerState->AddCheckoutCount(1);
 
     UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
 
@@ -1291,6 +1299,8 @@ void ACheckoutZone::ResetCheckout()
     ElapsedCheckoutTime = 0.0f;
     RequiredCheckoutTime = 0.0f;
     CheckoutProgress = 0.0f;
+
+    CurrentCheckoutCount = 0;
 
     // 정산 초기화 시 호출
     OnRep_CheckoutSession();
