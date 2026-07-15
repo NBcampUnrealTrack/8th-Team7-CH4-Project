@@ -90,6 +90,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Online|Session")
     FString GetFoundSessionOwnerName(int32 Index) const;
 
+    // 검색 결과 인덱스에 해당하는 방 인원 조회
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
+    int32 GetFoundSessionUserCount(int32 Index) const;
+
     // 비공개 방인지 아닌지 조회
     UFUNCTION(BlueprintCallable, Category = "Online|Session")
     bool GetFoundSessionIsPrivate(int32 Index) const;
