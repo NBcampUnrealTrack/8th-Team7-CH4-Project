@@ -28,7 +28,7 @@ protected:
 
     // 쇼핑 행동 확인
     UPROPERTY(EditAnywhere, Category = "Blackboard")
-    FBlackboardKeySelector IsTargetPointKey;
+    FBlackboardKeySelector IsShoppingKey;
 
 
 };

@@ -19,25 +19,10 @@ public:
     ACustomerAIController();
 
 protected:
-
-    virtual void BeginPlay() override;
-
-    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
     virtual void OnPossess(APawn* InPawn) override;
 
-    
-
-private:
+protected:
     UPROPERTY(EditDefaultsOnly, Category = "AI | Setting")
-    TObjectPtr<UBehaviorTree> BehaviorTree;
+    TObjectPtr<UBehaviorTree> CustomerBehaviorTree;
 
-    UPROPERTY(EditDefaultsOnly, Category = "AI | Setting")
-    TObjectPtr<UBlackboardData> BlackboardDataAsset;
-
-    UPROPERTY(EditAnywhere, Category = "AI | Setting")
-    float PatrolRadius = 500.0f;
-
-public:
-    
 };

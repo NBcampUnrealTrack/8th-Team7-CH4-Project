@@ -9,26 +9,17 @@
 
 ACustomerAIController::ACustomerAIController()
 {
-    BehaviorTree = nullptr;
-    BlackboardDataAsset = nullptr;
-}
-
-void ACustomerAIController::BeginPlay()
-{
-    Super::BeginPlay();
-}
-
-void ACustomerAIController::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-    Super::EndPlay(EndPlayReason);
+    bReplicates = true;
 }
 
 void ACustomerAIController::OnPossess(APawn* InPawn)
 {
     Super::OnPossess(InPawn);
 
-    if (BehaviorTree)
+    if (!HasAuthority()) return;
+
+    if (CustomerBehaviorTree)
     {
-        RunBehaviorTree(BehaviorTree);
+        RunBehaviorTree(CustomerBehaviorTree);
     }
 }

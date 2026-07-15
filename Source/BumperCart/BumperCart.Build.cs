@@ -25,6 +25,7 @@ public class BumperCart : ModuleRules
             "SlateCore",
             "Niagara",
             "NavigationSystem",
+            "GameplayTasks",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
