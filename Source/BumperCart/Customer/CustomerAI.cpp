@@ -3,6 +3,8 @@
 #include "Customer/CustomerAIController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/TargetPoint.h"
 
 ACustomerAI::ACustomerAI()
 {
@@ -22,83 +24,32 @@ ACustomerAI::ACustomerAI()
         MoveComp->MaxWalkSpeed = 300.0f;
         MoveComp->bOrientRotationToMovement = true;
     }
-
-    CurrentState = ECustomerState::Patrolling;
-    MinShoppingTime = 5.0f;
-    MaxShoppingTime = 15.0f;
 }
 
 void ACustomerAI::BeginPlay()
 {
-	Super::BeginPlay();
-	
+    Super::BeginPlay();
+
+    if (!HasAuthority()) return;
+
+    TArray<AActor*> FoundActors;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATargetPoint::StaticClass(), FoundActors);
+
+    for (AActor* Actor : FoundActors)
+    {
+        if (Actor && Actor->ActorHasTag(FName("ShoppingPoint")))
+        {
+            if (ATargetPoint* TargetPoint = Cast<ATargetPoint>(Actor))
+            {
+                CachedTargetPoints.Add(TargetPoint);
+            }
+        }
+    }
 }
 
 void ACustomerAI::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(ThisClass, CurrentState);
-}
-
-void ACustomerAI::OnRep_CustomerState()
-{
-    switch (CurrentState)
-    {
-    case ECustomerState::Patrolling:
-        break;
-
-    case ECustomerState::Shopping:
-        if (GetCharacterMovement())
-        {
-            GetCharacterMovement()->StopMovementImmediately();
-        }
-        break;
-
-    case ECustomerState::KnockedOut:
-        break;
-    }
-}
-
-void ACustomerAI::StartShoppingAtShelf()
-{
-    if (!HasAuthority()) return;
-
-    if (CurrentState == ECustomerState::Patrolling)
-    {
-        CurrentState = ECustomerState::Shopping;
-        OnRep_CustomerState();
-    }
-}
-
-void ACustomerAI::ResumePatrol()
-{
-    if (!HasAuthority()) return;
-
-    if (CurrentState == ECustomerState::Shopping)
-    {
-        CurrentState = ECustomerState::Patrolling;
-
-        if (GetCharacterMovement())
-        {
-            GetCharacterMovement()->MaxWalkSpeed = 300.0f;
-        }
-
-        OnRep_CustomerState();
-    }
-}
-
-void ACustomerAI::SetKnockedOut()
-{
-    if (!HasAuthority()) return;
-
-    CurrentState = ECustomerState::KnockedOut;
-
-    if (GetCharacterMovement())
-    {
-        GetCharacterMovement()->StopMovementImmediately();
-        GetCharacterMovement()->DisableMovement();
-    }
-
-    OnRep_CustomerState();
+    DOREPLIFETIME(ThisClass, bIsShoppingState);
 }

@@ -5,12 +5,15 @@
 #include "Cart/Bumpable.h"
 #include "CustomerAI.generated.h"
 
+class ATargetPoint;
+
 UENUM(BlueprintType)
 enum class ECustomerState : uint8
 {
+    Idle,
     Patrolling,
+    MovingToTarget,
     Shopping,
-    KnockedOut
 };
 
 UCLASS()
@@ -21,45 +24,37 @@ class BUMPERCART_API ACustomerAI : public ACharacter, public IBumpable
 public:
 	ACustomerAI();
 
-#pragma region Override
-protected:
     virtual void BeginPlay() override;
 
-public:
-    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-#pragma endregion
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const;
 
-#pragma region State
+#pragma region Setting
 protected:
-    // 현재 이동, 쇼핑, 충돌
-    UPROPERTY(ReplicatedUsing = OnRep_CustomerState, BlueprintReadOnly, Category = "Customer | State")
-    ECustomerState CurrentState;
+    UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "AI")
+    bool bIsShoppingState;
 
     // 최소 쇼핑 시간
     UPROPERTY(EditAnywhere, Category = "Customer | Setup")
-    float MinShoppingTime;
+    float MinShoppingTime = 3.0f;
 
     // 최대 쇼핑 시간
     UPROPERTY(EditAnywhere, Category = "Customer | Setup")
-    float MaxShoppingTime;
-
-    UFUNCTION()
-    void OnRep_CustomerState();
+    float MaxShoppingTime = 7.0f;
 
 public:
-    UFUNCTION(BlueprintCallable, Category = "Customer | AI")
-    void StartShoppingAtShelf();
-
-    UFUNCTION(BlueprintCallable, Category = "Customer | AI")
-    void ResumePatrol();
-
-    UFUNCTION(BlueprintCallable, Category = "Customer | AI")
-    void SetKnockedOut();
-
-    FORCEINLINE ECustomerState GetCurrentState() const { return CurrentState; }
-
     FORCEINLINE float GetRandomShoppingTime() const { return FMath::FRandRange(MinShoppingTime, MaxShoppingTime); }
+
+    FORCEINLINE bool SetIsShoppingState(bool IsShopping) { return bIsShoppingState = IsShopping; }
 #pragma endregion
 
+#pragma region WayPoint
+private:
+    UPROPERTY()
+    TArray<TWeakObjectPtr<ATargetPoint>> CachedTargetPoints;
+
+public:
+    const TArray<TWeakObjectPtr<ATargetPoint>>& GetCachedTargetPoints() const { return CachedTargetPoints; }
+
+#pragma endregion
 
 };
