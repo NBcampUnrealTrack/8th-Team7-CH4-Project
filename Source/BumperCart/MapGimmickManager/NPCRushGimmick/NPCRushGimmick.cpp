@@ -73,6 +73,8 @@ void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor*
         UE_LOG(LogTemp, Log, TEXT("[맵 기믹 매니저] 거대 카트가 마트 벽에 부딪혀 박살났습니다!"));
 
         Destroy();
+
+        return;
     }
 
     if (ACartPawn* HitPlayer = Cast<ACartPawn>(OtherActor))
@@ -85,11 +87,11 @@ void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 
         LastHitTime = CurrentTime;
 
-        Knockback(HitPlayer);
+        Knockback(HitPlayer, SweepResult);
     }
 }
 
-void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
+void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart, const FHitResult& SweepResult)
 {
     if (!HasAuthority()) return;
 
@@ -119,6 +121,13 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
         FinalKnockbackDir = (CartForward - CartRight).GetSafeNormal2D();
     }
 
+    FVector SpawnLocation = PlayerCart->GetActorLocation();
+    SpawnLocation.Z += 60.0f;
+
+    FRotator SpawnRotation = FinalKnockbackDir.Rotation();
+
+    Multicast_PlayerHitEffect(SpawnLocation, SpawnRotation);
+
     EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 
     UCartLoadComponent* CartLoadComp = PlayerCart->FindComponentByClass<UCartLoadComponent>();
@@ -135,5 +144,25 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart)
     }
 
     PlayerCart->ClientPlayCameraShake(nullptr, 1.0f);
+}
+
+void ANPCRushGimmick::Multicast_PlayerHitEffect_Implementation(FVector SpawnLocation, FRotator SpawnRotation)
+{
+    UE_LOG(LogTemp, Warning, TEXT("[이펙트 디버그] 멀티캐스트 호출됨! 위치: %s"), *SpawnLocation.ToString());
+
+    if (KnockbackFX)
+    {
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            GetWorld(),
+            KnockbackFX,
+            SpawnLocation,
+            SpawnRotation,
+            FVector(1.0f),
+            true,
+            true,
+            ENCPoolMethod::None,
+            true
+        );
+    }
 }
 
