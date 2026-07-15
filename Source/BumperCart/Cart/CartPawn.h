@@ -96,7 +96,7 @@ public:
     UStaticMeshComponent* GetBodyMesh() { EnsureBodyMeshResolved(); return SlipSpinMesh; }
     FRotator GetBodyMeshBaseRelRot() const { return SlipSpinMeshBaseRelRot; }
     //거대화 중엔 오프셋도 배율 — 커진 캡슐 바닥에 바퀴가 붙도록 (슬립·리액션 복귀 위치도 동일 기준)
-    FVector GetBodyMeshBaseRelLoc() const { return SlipSpinMeshBaseRelLoc * (bUltimateActive ? UltimateScale : 1.f); }
+    FVector GetBodyMeshBaseRelLoc() const { return SlipSpinMeshBaseRelLoc * CurrentUltimateScale; }
 
     //부스트 강제 종료 (서버) — 충돌·기믹 넉백 시 호출. 소유 클라에도 전파
     void CancelBoost();
@@ -240,6 +240,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "1"))
 	float UltimateSpeedMultiplier = 1.15f;
 
+	//[오버슈트 방식] 커질 때 스프링 진동수 (클수록 빨리 커짐). 게임플레이 상태는 즉시, 시각·판정 크기만 트윈
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "0.1"))
+	float UltimateGrowSpeed = 9.f;
+
+	//[오버슈트 방식] 작아질 때 스프링 진동수 — 복귀는 커질 때보다 빠르게
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "0.1"))
+	float UltimateShrinkSpeed = 13.f;
+
+	//[오버슈트 방식] 감쇠비 (<1이면 목표를 넘어 부풀었다 복귀 = 출렁이는 팝, 낮을수록 더 출렁). 1이면 오버슈트 없음
+	UPROPERTY(EditAnywhere, Category = "Cart|Ultimate", meta = (ClampMin = "0.1", ClampMax = "1"))
+	float UltimateOvershootRatio = 0.35f;
+
     //---------- 카메라 연출 컴포넌트 ----------
     //속도 줌/FOV·카메라 충돌 전담 (튜닝 프로퍼티는 컴포넌트로 이동)
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Camera")
@@ -339,6 +351,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
 	USoundBase* SlipSound;
 
+	//필살기 발동 시 효과음 (거대화 시작) — 내 카트 2D / 상대 3D
+	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
+	USoundBase* UltimateStartSound;
+
+	//필살기 종료 시 효과음 (원래 크기로 복귀) — 내 카트 2D / 상대 3D
+	UPROPERTY(EditAnywhere, Category = "Cart|SFX")
+	USoundBase* UltimateEndSound;
+
 protected:
 	//---------- 입력 핸들러 ----------
 	void OnThrottle(const FInputActionValue& Value);
@@ -371,8 +391,14 @@ protected:
 	UFUNCTION()
 	void OnRep_UltimateActive();
 
-	//몸통 메시 + 캡슐 반경을 배율만큼 조정 (bOn=false면 원본 복귀)
-	void ApplyUltimateScale(bool bOn);
+	//발동/종료 시 목표 크기 지정 + 사운드 (서버 로컬 + OnRep 공용). 실제 크기 변화는 Tick의 보간이 담당
+	void SetUltimateVisual(bool bOn);
+
+	//몸통 메시 + 캡슐(판정)을 지정 배율 S로 세팅. Tick이 매 프레임 보간된 S로 호출 => 커지고/작아지는 연출
+	void ApplyUltimateScale(float S);
+
+	//거대화/복귀 크기 트윈 구동 (Tick) — 감쇠 스프링 오버슈트 팝
+	void DriveUltimateScale(float DeltaTime);
 
 	//미끄럼 시작/종료 (로컬 적용) — MulticastApplySlip에서 호출
 	void StartSlip(float Duration, float SpinAngleDeg);
@@ -410,6 +436,13 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_UltimateActive)
 	bool bUltimateActive = false;
 	FTimerHandle UltimateTimerHandle;
+
+	//현재 적용된 크기 배율(1=원본). Tick이 UltimateTargetScale로 보간하며 ApplyUltimateScale 호출
+	float CurrentUltimateScale = 1.f;
+	//목표 크기 배율 — 발동 시 UltimateScale, 종료 시 1
+	float UltimateTargetScale = 1.f;
+	//오버슈트 스프링 속도
+	float UltimateScaleVel = 0.f;
 
 	//크기 원복용 원본 캐시 (BeginPlay)
 	float DefaultCapsuleRadius = 0.f;
