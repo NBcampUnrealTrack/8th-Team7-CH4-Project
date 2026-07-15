@@ -110,6 +110,9 @@ public:
 
     void ClearCancelCheckoutState();
 
+    UFUNCTION(BlueprintPure, Category = "Cart")
+    FLinearColor GetColor() const { return CartColor; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override; //서버: 로비 선택 색을 카트에 적용
