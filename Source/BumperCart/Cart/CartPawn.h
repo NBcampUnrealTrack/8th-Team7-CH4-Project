@@ -35,6 +35,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsBoosting() const { return bIsBoosting; }
 
+	//부스터 사용 가능 여부 (쿨다운 끝 + 미발동) — UI 아이콘 활성 표시용
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	bool IsBoostReady() const { return !bIsBoosting && !bBoostOnCooldown; }
+
+	//부스터 남은 쿨다운(초) — 사용 가능하면 0. 소유 클라 기준 (HUD는 소유 클라에서만 표시)
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	float GetBoostCooldownRemaining() const;
+
+	//부스터 쿨다운 진행률 0(방금 사용)=>1(사용 가능) — 차오르는 게이지 바에 바로 바인딩
+	UFUNCTION(BlueprintCallable, Category = "Cart")
+	float GetBoostCooldownProgress() const;
+
 	//필살기(돌진 모드) 발동 중인지 — 무적·거대화·부스터급 충격. 충돌 판정·연출에서 조회
 	UFUNCTION(BlueprintCallable, Category = "Cart")
 	bool IsUltimateActive() const { return bUltimateActive; }

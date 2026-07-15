@@ -29,7 +29,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
-#include "Engine/World.h"   
+#include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
 #include "DrawDebugHelpers.h" //임시 디버그 - 필살기 게이지 출력 제거 시 함께 삭제
 
@@ -508,6 +508,31 @@ void ACartPawn::EndBoost()
 void ACartPawn::ResetBoostCooldown()
 {
 	bBoostOnCooldown = false;
+}
+
+//부스터 남은 쿨다운(초) — 소유 클라 타이머 기준
+float ACartPawn::GetBoostCooldownRemaining() const
+{
+	if (!bBoostOnCooldown)
+	{
+		return 0.f;
+	}
+	//GetTimerRemaining은 무효 핸들에 -1 => 0 클램프
+	return FMath::Max(GetWorldTimerManager().GetTimerRemaining(BoostCooldownTimerHandle), 0.f);
+}
+
+//쿨다운 진행률 0(방금 사용)=>1(사용 가능). 부스트 지속 중엔 0 (끝나야 쿨다운 시작)
+float ACartPawn::GetBoostCooldownProgress() const
+{
+	if (bIsBoosting)
+	{
+		return 0.f;
+	}
+	if (!bBoostOnCooldown)
+	{
+		return 1.f;
+	}
+	return 1.f - FMath::Clamp(GetBoostCooldownRemaining() / FMath::Max(BoostCooldown, KINDA_SMALL_NUMBER), 0.f, 1.f);
 }
 
 //부스트 강제 종료 (서버) — 충돌·기믹 넉백 시 호출. 부스트 중이 아니면 무동작
