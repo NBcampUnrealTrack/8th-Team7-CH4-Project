@@ -772,8 +772,8 @@ int32 UMainGameInstanceSubsystem::GetFoundSessionUserCount(int32 Index) const
 
     const int32 MaxPublicConnections  = FoundSession.SessionSettings.NumPublicConnections;
     const int32 OpenPublicConnections = FoundSession.NumOpenPublicConnections;
-
-    return FMath::Clamp(OpenPublicConnections, 0, MaxPublicConnections);
+    UE_LOG(LogTemp, Warning, TEXT("최대 방 인원수: %d / 빈 자리: %d / 접속 인원: %d"), MaxPublicConnections,  OpenPublicConnections, FMath::Clamp(MaxPublicConnections-OpenPublicConnections, 0, MaxPublicConnections))
+    return FMath::Clamp(MaxPublicConnections-OpenPublicConnections, 0, MaxPublicConnections);
 }
 
 // 방에 비밀번호가 존재하다면 비공개 방으로 판단
