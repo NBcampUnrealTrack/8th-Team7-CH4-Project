@@ -64,6 +64,8 @@ void AMapGimmickManager::StartGimmickSpawning()
 {
     if (!HasAuthority()) return;
 
+    SpawnCustomerAI();
+
     GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AMapGimmickManager::RespawnObstacles, ObstacleRespawnInterval, true);
 }
 
@@ -310,7 +312,7 @@ void AMapGimmickManager::SpawnCustomerAI()
     float SearchRadius = 5000.0f;
     FNavLocation RandomNavLocation;
 
-    for (int32 i = 0; i < SpawnCustomerAICount; i++)
+    for (int32 i = 0; i < SpawnCustomerAICount;)
     {
         int32 RandomIndex = FMath::RandRange(0, CustomerAIList.Num() - 1);
         TSubclassOf<ACustomerAI> CustomerAI = CustomerAIList[RandomIndex];
@@ -323,9 +325,14 @@ void AMapGimmickManager::SpawnCustomerAI()
             FRotator SpawnRotation = FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f);
 
             FActorSpawnParameters SpawnParams;
-            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
 
             ACustomerAI* SpawnedCustomer = GetWorld()->SpawnActor<ACustomerAI>(CustomerAI, SpawnLocation, SpawnRotation, SpawnParams);
+
+            if (SpawnedCustomer)
+            {
+                i++;
+            }
         }
     }
     
