@@ -33,6 +33,7 @@ AItemProjectile::AItemProjectile()
     CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
     CollisionComponent->SetCollisionResponseToChannel(BCCollisionChannel::Cart, ECR_Overlap);
     CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Overlap);
+    CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 
     ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
     ProjectileMesh->SetupAttachment(CollisionComponent);
