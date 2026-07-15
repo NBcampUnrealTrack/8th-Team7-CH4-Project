@@ -483,6 +483,14 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
     int32 LastCheckoutScore = 0;
 
+    // 현재 연속 정산 횟수
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Checkout|Score")
+    int32 CurrentCheckoutCount = 0;
+
+    // 두 번째 정산부터 지급하는 고정 콤보 점수
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkout|Score")
+    int32 ComboBonusPerCheckout = 10;
+
 // ------------------------------------------------------------
 // RepNotify
 // ------------------------------------------------------------
