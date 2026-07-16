@@ -80,7 +80,10 @@ void AProductBase::Destroyed()
     {
         if (UProductShelfSubsystem* ShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
         {
-            ShelfSubsystem->OnProductDestroyed();
+            if (bOnSale == false)
+            {
+                ShelfSubsystem->OnProductDestroyed();
+            }
         }
     }
 
