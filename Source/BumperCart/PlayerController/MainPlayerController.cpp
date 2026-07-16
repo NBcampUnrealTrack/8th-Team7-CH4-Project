@@ -19,6 +19,8 @@ void AMainPlayerController::OnRep_PlayerState()
 
 void AMainPlayerController::BeginPlay()
 {
+    Super::BeginPlay();
+
     if (!IsLocalController()) return;
 
     if (IsValid(UIWidgetClass))
