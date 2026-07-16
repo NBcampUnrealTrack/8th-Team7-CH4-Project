@@ -22,7 +22,7 @@ void AMainPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (!IsLocalController() || GetNetMode() == NM_DedicatedServer) return;
+    if (!IsLocalController()) return;
 
     if (UGameInstance* GameInstance = GetGameInstance())
     {
