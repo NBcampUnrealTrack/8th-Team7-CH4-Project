@@ -1243,7 +1243,7 @@ void ACheckoutZone::CompleteCheckout()
     MainPlayerState->AddCheckoutCount(1);
 
     // 정산 점수 팝업 표시
-    //CompletedPlayer->ClientShowCheckoutScore(ScoreResult);
+    CompletedPlayer->ClientShowCheckoutScore(ScoreResult);
 
     // 연속 정산 횟수 업데이트
     CurrentCheckoutCount = CheckoutCount;
