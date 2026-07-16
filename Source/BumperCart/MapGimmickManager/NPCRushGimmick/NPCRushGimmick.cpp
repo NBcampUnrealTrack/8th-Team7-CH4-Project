@@ -13,7 +13,7 @@
 
 ANPCRushGimmick::ANPCRushGimmick()
 {
- 	PrimaryActorTick.bCanEverTick = false;
+ 	PrimaryActorTick.bCanEverTick = true;
 
     bReplicates = true;
 
@@ -22,7 +22,18 @@ ANPCRushGimmick::ANPCRushGimmick()
 
     CartMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CartMesh"));
     CartMesh->SetupAttachment(RootComponent);
-    //CartMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    FrontLeftWheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FrontLeftWheel"));
+    FrontLeftWheel->SetupAttachment(CartMesh);
+
+    FrontRightWheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FrontRightWheel"));
+    FrontRightWheel->SetupAttachment(CartMesh);
+
+    BackLeftWheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BackLeftWheel"));
+    BackLeftWheel->SetupAttachment(CartMesh);
+
+    BackRightWheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BackRightWheel"));
+    BackRightWheel->SetupAttachment(CartMesh);
 
     NPCRushFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
     NPCRushFX->SetupAttachment(CartMesh);
@@ -40,11 +51,19 @@ ANPCRushGimmick::ANPCRushGimmick()
     }
 
     NPCRushAudioComponent->bAutoActivate = true;
+
+    CurrentWheelRotationPitch = 0.0f;
+    WheelRotationSpeed = -300.0f;
 }
 
 void ANPCRushGimmick::BeginPlay()
 {
 	Super::BeginPlay();
+
+    FrontLeftInitRot = FrontLeftWheel->GetRelativeRotation();
+    FrontRightInitRot = FrontRightWheel->GetRelativeRotation();
+    BackLeftInitRot = BackLeftWheel->GetRelativeRotation();
+    BackRightInitRot = BackRightWheel->GetRelativeRotation();
 
     if (SpawnSound)
     {
@@ -60,6 +79,22 @@ void ANPCRushGimmick::BeginPlay()
     {
         BoxCollision->OnComponentBeginOverlap.AddDynamic(this, &ANPCRushGimmick::OnCartOverlap);
     }
+}
+
+void ANPCRushGimmick::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    CurrentWheelRotationPitch += WheelRotationSpeed * DeltaTime;
+
+    CurrentWheelRotationPitch = FMath::Fmod(CurrentWheelRotationPitch, 360.0f);
+
+    FRotator NewWheelRotation = FRotator(CurrentWheelRotationPitch, 0.0f, 0.0f);
+
+    FrontLeftWheel->SetRelativeRotation(FRotator(CurrentWheelRotationPitch, FrontLeftInitRot.Yaw, FrontLeftInitRot.Roll));
+    FrontRightWheel->SetRelativeRotation(FRotator(CurrentWheelRotationPitch, FrontRightInitRot.Yaw, FrontRightInitRot.Roll));
+    BackLeftWheel->SetRelativeRotation(FRotator(CurrentWheelRotationPitch, BackLeftInitRot.Yaw, BackLeftInitRot.Roll));
+    BackRightWheel->SetRelativeRotation(FRotator(CurrentWheelRotationPitch, BackRightInitRot.Yaw, BackRightInitRot.Roll));
 }
 
 void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
