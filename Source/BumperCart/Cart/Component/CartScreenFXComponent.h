@@ -18,7 +18,7 @@ class UUserWidget;
 
 //카트의 시각 연출을 전담하는 컴포넌트.
 //화면: 부스트 중 가장자리 스피드라인(PostProcess MID, 내 화면만)
-//월드: 뒷바퀴 소켓에 부착한 바닥 리본(속도감)·브레이크 스파크 (모든 클라 표시)
+//월드: 뒷바퀴 소켓에 부착한 바닥 리본(속도감)·브레이크 스파크·부스트 트레일/먼지 (모든 클라 표시)
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BUMPERCART_API UCartScreenFXComponent : public UActorComponent
 {
@@ -76,6 +76,15 @@ protected:
 	//브레이크를 이 시간(초) 유지하면 히트 최대 — Niagara User.BrakeHeat(0~1)로 전달되어 스파크 색이 주황->하양으로 달아오름
 	UPROPERTY(EditAnywhere, Category = "Cart|WheelFX", meta = (ClampMin = "0.1"))
 	float BrakeHeatRampTime = 1.5f;
+
+	//---------- 부스트 전용 FX (뒷바퀴 소켓 부착, 부스트 중에만 활성) ----------
+	//부스트 중엔 일반 리본을 끄고 이 불꽃 트레일로 교체 (BP에서 지정. 비어있으면 리본만 꺼짐)
+	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
+	TObjectPtr<UNiagaraSystem> BoostTrailSystem;
+
+	//부스트 중 뒷바퀴에서 일어나는 먼지 (BP에서 지정. 비어있으면 무동작)
+	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
+	TObjectPtr<UNiagaraSystem> BoostDustSystem;
 
 	//---------- 브레이크 스키드 마크 (바닥 데칼) ----------
 	//타이어 자국 데칼 머티리얼 (Material Domain = Deferred Decal). 비어있으면 무동작
@@ -147,9 +156,20 @@ private:
 	TObjectPtr<UNiagaraComponent> SparkFXLeft;
 	UPROPERTY(Transient)
 	TObjectPtr<UNiagaraComponent> SparkFXRight;
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> BoostTrailFXLeft;
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> BoostTrailFXRight;
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> BoostDustFXLeft;
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> BoostDustFXRight;
 
 	//스파크 현재 활성 상태 (상태 바뀔 때만 Activate/Deactivate)
 	bool bSparksActive = false;
+
+	//부스트 FX(트레일·먼지) 현재 활성 상태
+	bool bBoostFXActive = false;
 
 	//브레이크 히트 누적(0~1). 밟는 동안 차오르고, 떼면 2배 속도로 식음
 	float BrakeHeat = 0.f;

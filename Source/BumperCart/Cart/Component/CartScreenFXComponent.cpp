@@ -135,11 +135,15 @@ void UCartScreenFXComponent::SetupWheelFX()
 		FallbackRight = FVector(-10.f, 20.f, -88.f);
 	}
 
-	//바닥 리본: 항상 재생(파라미터로 강도 제어) / 스파크: 브레이크 때만 Activate
+	//바닥 리본: 항상 재생(파라미터로 강도 제어) / 스파크·부스트 트레일·먼지: 해당 상태일 때만 Activate
 	RibbonFXLeft = SpawnWheelFX(GroundRibbonSystem, AttachTarget, LeftSocket, FallbackLeft, true);
 	RibbonFXRight = SpawnWheelFX(GroundRibbonSystem, AttachTarget, RightSocket, FallbackRight, true);
 	SparkFXLeft = SpawnWheelFX(BrakeSparkSystem, AttachTarget, LeftSocket, FallbackLeft, false);
 	SparkFXRight = SpawnWheelFX(BrakeSparkSystem, AttachTarget, RightSocket, FallbackRight, false);
+	BoostTrailFXLeft = SpawnWheelFX(BoostTrailSystem, AttachTarget, LeftSocket, FallbackLeft, false);
+	BoostTrailFXRight = SpawnWheelFX(BoostTrailSystem, AttachTarget, RightSocket, FallbackRight, false);
+	BoostDustFXLeft = SpawnWheelFX(BoostDustSystem, AttachTarget, LeftSocket, FallbackLeft, false);
+	BoostDustFXRight = SpawnWheelFX(BoostDustSystem, AttachTarget, RightSocket, FallbackRight, false);
 
 	//스키드 데칼용 뒷바퀴 위치 조회 정보 캐시 (소켓 or 폴백 오프셋)
 	WheelAttach = AttachTarget;
@@ -171,22 +175,37 @@ void UCartScreenFXComponent::DriveWheelFX(float ForwardSpeed, float DeltaTime)
 {
 	//--- 바닥 리본 ---
 	//계단식 게이트(짧은 10 램프): MinSpeed 넘으면 꽉 참, 미만이면 0. 후진(음수)도 0
-	//무거우면 최고속도가 MinSpeed 아래라 자동 OFF, 부스트 땐 빨라져서 ON
-	const float SpeedLineAlpha = FMath::GetMappedRangeValueClamped(
+	//무거우면 최고속도가 MinSpeed 아래라 자동 OFF. 부스트 중엔 리본을 끄고 전용 트레일로 교체
+	const bool bBoosting = OwnerCart->IsBoosting();
+	const float SpeedLineAlpha = bBoosting ? 0.f : FMath::GetMappedRangeValueClamped(
 		FVector2D(SpeedLineMinSpeed, SpeedLineMinSpeed + 10.f), FVector2D(0.f, 1.f), ForwardSpeed);
 	//적재무게 => Niagara에서 굵기/길이 커브에 사용 (가벼움 0 ~ 무거움 1)
 	const float SpeedLineLoad = FMath::Clamp(OwnerCart->GetLoadRatio(), 0.f, 1.f);
-	const float BoostValue = OwnerCart->IsBoosting() ? 1.f : 0.f;
 
 	auto DriveRibbon = [&](UNiagaraComponent* Fx)
 	{
 		if (!Fx) { return; }
 		Fx->SetVariableFloat(FName("SpeedAlpha"), SpeedLineAlpha);
 		Fx->SetVariableFloat(FName("LoadRatio"), SpeedLineLoad);
-		Fx->SetVariableFloat(FName("Boost"), BoostValue);
 	};
 	DriveRibbon(RibbonFXLeft);
 	DriveRibbon(RibbonFXRight);
+
+	//--- 부스트 전용 FX (불꽃 트레일 + 먼지): 부스트 상태 전환 시에만 토글 ---
+	if (bBoosting != bBoostFXActive)
+	{
+		bBoostFXActive = bBoosting;
+		auto ToggleBoostFX = [&](UNiagaraComponent* Fx)
+		{
+			if (!Fx) { return; }
+			if (bBoosting) { Fx->Activate(true); }
+			else { Fx->Deactivate(); } //Deactivate => 새 파티클만 중단, 남은 먼지·트레일은 수명대로 자연 소멸
+		};
+		ToggleBoostFX(BoostTrailFXLeft);
+		ToggleBoostFX(BoostTrailFXRight);
+		ToggleBoostFX(BoostDustFXLeft);
+		ToggleBoostFX(BoostDustFXRight);
+	}
 
 	//--- 브레이크 스파크: 브레이크 중 + 충분히 빠를 때만. 상태가 바뀔 때만 토글 ---
 	const bool bWantSparks = OwnerCart->IsBraking() && ForwardSpeed > BrakeSparkMinSpeed;
