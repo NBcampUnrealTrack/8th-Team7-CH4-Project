@@ -91,13 +91,21 @@ protected:
 
 
 // ------------------------------------------------------------
-// 궤적 이펙트
+// 이펙트
 // ------------------------------------------------------------
+private:
+    // 모든 클라이언트에서 충돌 이펙트 재생
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastPlayHitProjectileEffect(const FVector& EffectLocation);
+
 protected:
     // 투사체 궤적 Niagara
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile|Effect")
     TObjectPtr<UNiagaraSystem> TrailNiagaraSystem;
 
+    // 투사체 충돌 Niagara
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile|Effect")
+    TObjectPtr<UNiagaraSystem> HitNiagaraSystem;
 
 // ------------------------------------------------------------
 // 사운드

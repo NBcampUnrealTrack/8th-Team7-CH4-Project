@@ -9,6 +9,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "Sound/SoundBase.h"
@@ -27,13 +28,9 @@ AItemProjectile::AItemProjectile()
 
     // 충돌 설정
     CollisionComponent->InitSphereRadius(25.0f);
-    CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    CollisionComponent->SetGenerateOverlapEvents(true);
-
-    CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-    CollisionComponent->SetCollisionResponseToChannel(BCCollisionChannel::Cart, ECR_Overlap);
-    CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Overlap);
-    CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+    CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    CollisionComponent->SetGenerateOverlapEvents(false);
+    CollisionComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
 
     ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
     ProjectileMesh->SetupAttachment(CollisionComponent);
@@ -149,6 +146,11 @@ void AItemProjectile::FireInDirection(const FVector& Direction)
     }
 
     ProjectileMovement->Velocity = FireDirection * ProjectileSpeed;
+
+    // SpawnActor가 완료된 후 충돌 활성화
+    CollisionComponent->SetGenerateOverlapEvents(true);
+    CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    CollisionComponent->UpdateOverlaps();
 }
 
 void AItemProjectile::OnHitCart(ACartPawn* HitPlayer)
@@ -172,6 +174,9 @@ void AItemProjectile::HandleHitCart(ACartPawn* HitPlayer)
     UE_LOG(LogTemp, Warning, TEXT("투사체 플레이어 타격"));
 #endif
 
+    // 주변 플레이어 충돌 이펙트 재생
+    MulticastPlayHitProjectileEffect(GetActorLocation());
+
     // 주변 플레이어 사운드 재생
     MulticastPlayHitProjectileSound(GetActorLocation());
 
@@ -192,9 +197,33 @@ void AItemProjectile::HandleHitOtherActor(AActor* HitActor)
     UE_LOG(LogTemp, Warning, TEXT("다른 액터와 충돌"));
 #endif
 
+    MulticastPlayHitProjectileEffect(GetActorLocation());
+
     MulticastPlayHitProjectileSound(GetActorLocation());
 
     Destroy();
+}
+
+// ------------------------------------------------------------
+// 이펙트
+// ------------------------------------------------------------
+
+void AItemProjectile::MulticastPlayHitProjectileEffect_Implementation(const FVector& EffectLocation)
+{
+    if (!IsValid(HitNiagaraSystem))
+    {
+        return;
+    }
+
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        this,
+        HitNiagaraSystem,
+        EffectLocation,
+        FRotator::ZeroRotator,
+        FVector::OneVector,
+        true,
+        true
+    );
 }
 
 // ------------------------------------------------------------
