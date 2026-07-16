@@ -98,40 +98,8 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
         // 제품 베이스의 StartSpawn()으로 날아가는 느낌 표현
         SpawnedProduct->StartSpawn(SpawnStartLocation, SpawnEndLocation, this);
 
-        // 나이아가라
-        if (UWorld* World = GetWorld())
-        {
-            if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
-            {
-                UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
-
-                if (IsValid(SpawnFX))
-                {
-                    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-                        World,
-                        SpawnFX,
-                        SpawnStartLocation,
-                        SpawnStartRotation,
-                        FVector(1.0f),
-                        true,
-                        true
-                    );
-                }
-
-                USoundBase* SpawnSound = ProductShelfSubsystem->GetSpawnSound();
-
-                if (IsValid(SpawnSound))
-                {
-                    UGameplayStatics::PlaySoundAtLocation(
-                        World,
-                        SpawnSound,
-                        SpawnStartLocation,                
-                        FRotator::ZeroRotator
-                    );
-                }
-
-            }
-        }
+        // 이펙트, 사운드
+        Multicast_ProductSpawnEffect(SpawnStartLocation, SpawnStartRotation);
 
         //UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());
 
@@ -164,5 +132,42 @@ FVector AProductShelf::GetRandomPointInVolume() const
 
     // TransformPosition이 이 로컬 좌표를 선반이 회전한 각도만큼 돌림.
     return ShelfTransform.TransformPosition(ShelfLocalLocation);
+}
+
+void AProductShelf::Multicast_ProductSpawnEffect_Implementation(FVector SpawnLocation, FRotator SpawnRotation)
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
+        {
+            UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
+
+            if (IsValid(SpawnFX))
+            {
+                UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+                    World,
+                    SpawnFX,
+                    SpawnLocation,
+                    SpawnRotation,
+                    FVector(1.0f),
+                    true,
+                    true
+                );
+            }
+
+            USoundBase* SpawnSound = ProductShelfSubsystem->GetSpawnSound();
+
+            if (IsValid(SpawnSound))
+            {
+                UGameplayStatics::PlaySoundAtLocation(
+                    World,
+                    SpawnSound,
+                    SpawnLocation,
+                    FRotator::ZeroRotator
+                );
+            }
+
+        }
+    }
 }
 

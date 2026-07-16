@@ -73,6 +73,9 @@ public:
 
     FVector GetRandomPointInVolume() const;
 
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_ProductSpawnEffect(FVector SpawnLocation, FRotator SpawnRotation);
+
 #pragma endregion
 
 };
