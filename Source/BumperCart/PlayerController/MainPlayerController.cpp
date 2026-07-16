@@ -4,6 +4,7 @@
 #include "PlayerController/MainPlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "PlayerState/MainPlayerState.h"
+#include "Audio/BGMSubsystem.h"
 
 void AMainPlayerController::InitPlayerState()
 {
@@ -19,7 +20,17 @@ void AMainPlayerController::OnRep_PlayerState()
 
 void AMainPlayerController::BeginPlay()
 {
+    Super::BeginPlay();
+
     if (!IsLocalController()) return;
+
+    if (UGameInstance* GameInstance = GetGameInstance())
+    {
+        if (UBGMSubsystem* BGMSubsystem = GameInstance->GetSubsystem<UBGMSubsystem>())
+        {
+            BGMSubsystem->PlayBGM(EBGMScene::InGame);
+        }
+    }
 
     if (IsValid(UIWidgetClass))
     {

@@ -16,6 +16,7 @@
 #include "GameInstance/MainGameInstance.h"
 #include "PlayerController/LobbyPlayerController.h"
 #include "HAL/PlatformProcess.h"
+#include "Kismet/GameplayStatics.h"
 #include "Misc/CoreMisc.h"
 
 
@@ -194,6 +195,7 @@ void UMainGameInstanceSubsystem::HostListenServer(const FString& InRoomName, con
     //같은 이름의 세션 존재 시 해당 세션 우선 제거 후 진행
     if (Sessions->GetNamedSession(NAME_GameSession))
     {
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 기존 GameSession이 남아있어 먼저 파괴합니다."));
         Sessions->OnDestroySessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnDestroySessionComplete);
         Sessions->DestroySession(NAME_GameSession);
         return;
@@ -201,6 +203,7 @@ void UMainGameInstanceSubsystem::HostListenServer(const FString& InRoomName, con
 
     CreateSessionInternal();
 }
+
 
 //Steam을 못 잡아 Null로 폴백된 상태인지 (에디터 PIE 등) => LAN 모드로 로컬 멀티 테스트 가능하게
 bool UMainGameInstanceSubsystem::IsUsingNullFallback() const
@@ -278,6 +281,7 @@ void UMainGameInstanceSubsystem::OnDestroySessionComplete(FName SessionName, boo
     if (bWasSuccessful)
     {
         // 기존 세션 정리가 끝났으니 다시 호스팅 시도
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] 기존 세션 파괴 성공 → 재생성 진행"));
         CreateSessionInternal();
     }
     else
@@ -755,7 +759,10 @@ void UMainGameInstanceSubsystem::ReturnToTitle()
     if (CurrentNetMode == NM_ListenServer )
     {
         UE_LOG(LogTemp, Log, TEXT("[Steam] 호스트: 타이틀 이동 "));
-        World->ServerTravel(LevelPath, true);
+
+        GEngine->ShutdownWorldNetDriver(World);
+
+        UGameplayStatics::OpenLevel(this, FName(*LevelPath), true);
     }
     else if (CurrentNetMode == NM_Client)
     {

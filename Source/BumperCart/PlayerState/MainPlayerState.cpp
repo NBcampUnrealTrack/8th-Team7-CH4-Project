@@ -32,19 +32,27 @@ void AMainPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME(AMainPlayerState, Title);
 }
 
+void AMainPlayerState::OnRep_PlayerName()
+{
+    Super::OnRep_PlayerName();
+
+    OnPlayerDisplayInfoChanged.Broadcast();
+}
+
 // 점수 관련
-void AMainPlayerState::AddPlayerScore(float AddScore)
+void AMainPlayerState::AddPlayerScore(int32 AddScore)
 {
     if (!HasAuthority()) return;
 
 #if !UE_BUILD_DEBUG
-    UE_LOG(LogTemp, Warning, TEXT("[MainPlayerState] AddPlayerScore (서버) - 대상 플레이어: %s, 기존 점수: %f, 추가될 점수: %f"),
+    UE_LOG(LogTemp, Warning, TEXT("[MainPlayerState] AddPlayerScore (서버) - 대상 플레이어: %s, 기존 점수: %d, 추가될 점수: %d"),
         *GetPlayerName(), PlayerScore, AddScore);
 #endif
 
     PlayerScore += AddScore;
 
     OnPlayerStatsChanged.Broadcast();
+    OnPlayerScoreChanged.Broadcast();
     ForceNetUpdate();
 
     //등수 계산
@@ -54,7 +62,7 @@ void AMainPlayerState::AddPlayerScore(float AddScore)
     }
 }
 
-float AMainPlayerState::GetPlayerScore() const
+int32 AMainPlayerState::GetPlayerScore() const
 {
     return PlayerScore;
 }
@@ -62,6 +70,7 @@ float AMainPlayerState::GetPlayerScore() const
 void AMainPlayerState::OnRep_PlayerScore()
 {
     OnPlayerStatsChanged.Broadcast();
+    OnPlayerScoreChanged.Broadcast();
 }
 
 // 순위 관련
@@ -185,4 +194,6 @@ void AMainPlayerState::ResetStats()
     Title = ETitleType::Default;
 
     OnPlayerStatsChanged.Broadcast();
+    OnPlayerScoreChanged.Broadcast();
+    ForceNetUpdate();
 }

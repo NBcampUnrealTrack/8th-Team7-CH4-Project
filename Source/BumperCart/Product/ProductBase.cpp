@@ -23,7 +23,7 @@ AProductBase::AProductBase()
 
     bReplicates = true;
     SetReplicateMovement(false);
-    SetNetUpdateFrequency(1.f);
+    SetNetUpdateFrequency(10.f);
 
     // 컴포넌트 설정
     ProductCollision = CreateDefaultSubobject<USphereComponent>(TEXT("Root"));
@@ -173,6 +173,7 @@ void AProductBase::ApplyProductState()
     {
     case EProductState::Display:
         SetActorHiddenInGame(false);
+        SetNetUpdateFrequency(10.f);
 
         ProductCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
@@ -183,6 +184,7 @@ void AProductBase::ApplyProductState()
     case EProductState::Spawning:   // Fall Through
     case EProductState::Falling:
         SetActorHiddenInGame(false);
+        SetNetUpdateFrequency(20.f);
 
         ProductCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
@@ -195,6 +197,7 @@ void AProductBase::ApplyProductState()
     case EProductState::None: 
     default:
         SetActorHiddenInGame(true);
+        SetNetUpdateFrequency(1.f);
 
         ProductCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
