@@ -109,7 +109,7 @@ public:
 #pragma region SaleProduct Spawn
 public:
     // 세일 제품 스폰
-    void SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct);
+    void SaleProductSpawn();
 
 #pragma endregion
 

@@ -49,7 +49,7 @@ void AProductShelf::BeginPlay()
     }
 }
 
-AProductBase* AProductShelf::SpawnRandomProduct()
+AProductBase* AProductShelf::SpawnRandomProduct(bool bOnSale)
 {
     if (!HasAuthority())  return nullptr;
 
@@ -63,7 +63,7 @@ AProductBase* AProductShelf::SpawnRandomProduct()
     int32 RandomIndex = FMath::RandRange(0, ProductList.Num() - 1);
     TSubclassOf<AProductBase> RandomProduct = ProductList[RandomIndex];
 
-    return SpawnSpecificItem(RandomProduct);
+    return SpawnSpecificItem(RandomProduct, bOnSale);
 }
 
 AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass, bool bOnSale)
@@ -123,7 +123,7 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
                 if (IsValid(SpawnSound))
                 {
                     UGameplayStatics::PlaySoundAtLocation(
-                        GetWorld(),
+                        World,
                         SpawnSound,
                         SpawnStartLocation,                
                         FRotator::ZeroRotator
@@ -133,7 +133,7 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
             }
         }
 
-        UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());
+        //UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());
 
         return SpawnedProduct;
     }

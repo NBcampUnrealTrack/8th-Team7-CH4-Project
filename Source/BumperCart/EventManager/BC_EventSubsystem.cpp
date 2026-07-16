@@ -22,16 +22,10 @@ void UBC_EventSubsystem::InitializeSaleEventConfig(USaleEventConfig* InSaleEnvan
         SaleEventConfig = InSaleEnvantConfig;
         UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] GameMode에서 세일 이벤트 데이터 에셋 로드완료"));
 
-        SaleProductList = SaleEventConfig->SaleProductList;
+        //SaleProductList = SaleEventConfig->SaleProductList;
         SaleEventTime = SaleEventConfig->SaleEventTime;
         SaleProductSpawnInterval = SaleEventConfig->SaleProductSpawnInterval;
 
-        // 서버
-        //if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
-        //{
-        //    // 게임 모드에서 호출시 삭제 예정 - 테스트용
-        //    GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &UBC_EventSubsystem::StartSaleEvent, SaleProductSpawnInterval, false);
-        //}
     }
 }
 
@@ -39,19 +33,19 @@ TSubclassOf<AProductBase> UBC_EventSubsystem::SaleProductSelection()
 {
     if (GetWorld() && GetWorld()->GetNetMode() == NM_Client) return nullptr;
 
-    if (SaleProductList.Num() == 0)
-    {
-        UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 제품선반매니저에 등록된 제품 목록이 비어있습니다."));
-        return nullptr;
-    }
+    //if (SaleProductList.Num() == 0)
+    //{
+    //    UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 제품선반매니저에 등록된 제품 목록이 비어있습니다."));
+    //    return nullptr;
+    //}
 
-    // 세일 제품 랜덤 선택
-    int32 RandomIndex = FMath::RandRange(0, SaleProductList.Num() - 1);
-    TSubclassOf<AProductBase> SaleProduct = SaleProductList[RandomIndex];
+    //// 세일 제품 랜덤 선택
+    //int32 RandomIndex = FMath::RandRange(0, SaleProductList.Num() - 1);
+    //TSubclassOf<AProductBase> SaleProduct = SaleProductList[RandomIndex];
 
-    UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 세일 제품 : %s"), *SaleProduct->GetName());
+    //UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 세일 제품 : %s"), *SaleProduct->GetName());
 
-    return SaleProduct;
+    return nullptr;
 }
 
 void UBC_EventSubsystem::StartSaleEvent()
@@ -62,18 +56,20 @@ void UBC_EventSubsystem::StartSaleEvent()
     GetWorld()->GetTimerManager().ClearTimer(SaleProductSpawnTimerHandle);
 
     // 세일 제품 저장
-    CurrentSaleProduct = SaleProductSelection();
+    //CurrentSaleProduct = SaleProductSelection();
 
-    if (IsValid(CurrentSaleProduct))
+    UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 세일 이벤트 시작"));
+    GetWorld()->GetTimerManager().SetTimer(SaleProductSpawnTimerHandle, this, &UBC_EventSubsystem::ExecuteRepeatSpawn, SaleProductSpawnInterval, true, 0.0f);
+    GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &UBC_EventSubsystem::StopSaleEvent, SaleEventTime, false);
+
+    /*if (IsValid(CurrentSaleProduct))
     {
-        UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 세일 이벤트 시작"));
-        GetWorld()->GetTimerManager().SetTimer(SaleProductSpawnTimerHandle, this, &UBC_EventSubsystem::ExecuteRepeatSpawn, SaleProductSpawnInterval, true, 0.0f);
-        GetWorld()->GetTimerManager().SetTimer(SaleEventTimerHandle, this, &UBC_EventSubsystem::StopSaleEvent, SaleEventTime, false);
+        
     }
     else
     {
         UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 세일 제품이 선택되지 않았습니다."));
-    }
+    }*/
 }
 
 void UBC_EventSubsystem::StopSaleEvent()
@@ -83,7 +79,7 @@ void UBC_EventSubsystem::StopSaleEvent()
     GetWorld()->GetTimerManager().ClearTimer(SaleEventTimerHandle);
     GetWorld()->GetTimerManager().ClearTimer(SaleProductSpawnTimerHandle);
 
-    CurrentSaleProduct = nullptr;
+    //CurrentSaleProduct = nullptr;
 
     UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 세일 이벤트 종료, "));
 }
@@ -91,16 +87,16 @@ void UBC_EventSubsystem::StopSaleEvent()
 void UBC_EventSubsystem::ExecuteRepeatSpawn()
 {
     if (GetWorld() && GetWorld()->GetNetMode() == NM_Client) return;
-
-    if (!IsValid(CurrentSaleProduct)) return;
+    
+    //if (!IsValid(CurrentSaleProduct)) return;
 
     if (UWorld* World = GetWorld())
     {
         if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
         {
-            ProductShelfSubsystem->SaleProductSpawn(CurrentSaleProduct);
+            ProductShelfSubsystem->SaleProductSpawn();
 
-            UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 선반 서브시스템 -> 세일제품 스폰 반복 호출"));
+            //UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 선반 서브시스템 -> 세일제품 스폰 반복 호출"));
         }
         else
         {

@@ -119,11 +119,11 @@ void UProductShelfSubsystem::StartProductSpawning()
     GetWorld()->GetTimerManager().SetTimer(RespawnTimerHandle, this, &UProductShelfSubsystem::ProductSpawnCall, RespawnDelay, true, 0.0f);
 }
 
-void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProduct)
+void UProductShelfSubsystem::SaleProductSpawn()
 {
     if (GetWorld() && GetWorld()->GetNetMode() == NM_Client) return;
 
-    if(!IsValid(SaleProduct)) return;
+    //if(!IsValid(SaleProduct)) return;
 
     if (SaleProductShelfs.Num() == 0)
     {
@@ -145,16 +145,17 @@ void UProductShelfSubsystem::SaleProductSpawn(TSubclassOf<AProductBase> SaleProd
     {
         if (IsValid(SaleShelf))
         {
-            AProductBase* SpawnedProduct = SaleShelf->SpawnSpecificItem(SaleProduct, true);
+            //AProductBase* SpawnedProduct = SaleShelf->SpawnSpecificItem(SaleProduct, true);
+            AProductBase* SpawnedProduct = SaleShelf->SpawnRandomProduct(true);
 
             if (IsValid(SpawnedProduct))
             {
-                CurrentProductCount++;
+                //CurrentProductCount++;
                 //UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 세일 제품 스폰 및 체크 완료."));
             }
             else
             {
-                UE_LOG(LogTemp, Warning, TEXT("[제품선반 서브시스템] 세일 제품 스폰 실패."));
+                //UE_LOG(LogTemp, Warning, TEXT("[제품선반 서브시스템] 세일 제품 스폰 실패."));
             }
         }
     }
@@ -178,7 +179,7 @@ void UProductShelfSubsystem::LimitedProductSpawn(TSubclassOf<AProductBase> Limit
 
     if (IsValid(SpawnedProduct))
     {
-        CurrentProductCount++;
+        //CurrentProductCount++;
 
         //UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 한정 제품 스폰 및 체크 완료."));
     }
