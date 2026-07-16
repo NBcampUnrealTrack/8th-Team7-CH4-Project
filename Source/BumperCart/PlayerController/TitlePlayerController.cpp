@@ -1,8 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "PlayerController/TitlePlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "Audio/BGMSubsystem.h"
 
 void ATitlePlayerController::BeginPlay()
 {
@@ -11,6 +12,14 @@ void ATitlePlayerController::BeginPlay()
     if (IsLocalController() == false)
     {
         return;
+    }
+
+    if (UGameInstance* GameInstance = GetGameInstance())
+    {
+        if (UBGMSubsystem* BGMSubsystem = GameInstance->GetSubsystem<UBGMSubsystem>())
+        {
+            BGMSubsystem->PlayBGM(EBGMScene::Title);
+        }
     }
 
     if (IsValid(UIWidgetClass) == true)
