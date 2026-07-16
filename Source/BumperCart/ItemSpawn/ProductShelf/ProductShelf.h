@@ -66,7 +66,7 @@ protected:
 
 public:
     // 제품 목록중 랜덤 선택후 스폰 호출, 제품 반환
-    AProductBase* SpawnRandomProduct();
+    AProductBase* SpawnRandomProduct(bool bOnSale = false);
 
     // 제품 스폰
     AProductBase* SpawnSpecificItem(TSubclassOf<AProductBase> ItemClass, bool bOnSale = false);

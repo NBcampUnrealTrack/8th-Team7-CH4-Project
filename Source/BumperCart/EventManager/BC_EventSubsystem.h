@@ -33,8 +33,8 @@ private:
 
     // USaleEventConfig에 정보가 들어있고 설정 확인용
     // 세일 제품 목록
-    UPROPERTY(VisibleAnywhere, Category = "Sale Event | Product List")
-    TArray<TSubclassOf<AProductBase>> SaleProductList;
+    //UPROPERTY(VisibleAnywhere, Category = "Sale Event | Product List")
+    //TArray<TSubclassOf<AProductBase>> SaleProductList;
 
     // 세일 이벤트 제한시간
     UPROPERTY(VisibleAnywhere, Category = "Sale Event | Info")

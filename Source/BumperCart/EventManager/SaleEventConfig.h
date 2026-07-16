@@ -15,8 +15,8 @@ class BUMPERCART_API USaleEventConfig : public UDataAsset
 
 public:
     // 세일 제품 목록
-    UPROPERTY(EditAnywhere, Category = "Sale Event | Product List")
-    TArray<TSubclassOf<AProductBase>> SaleProductList;
+    //UPROPERTY(EditAnywhere, Category = "Sale Event | Product List")
+    //TArray<TSubclassOf<AProductBase>> SaleProductList;
 
     // 세일 이벤트 지속시간
     UPROPERTY(EditAnywhere, Category = "Sale Event | Info")
