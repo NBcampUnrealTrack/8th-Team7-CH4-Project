@@ -112,7 +112,9 @@ int32 UCheckoutScoreCalculator::CalculateComboBonusScore(int32 CheckoutCount, in
         return 0;
     }
 
-    return FMath::Max(ComboBonusScore, 0);
+    const int32 SafeComboScore = FMath::Max(ComboBonusScore, 0);
+
+    return (CheckoutCount - 1) * SafeComboScore;
 }
 
 int32 UCheckoutScoreCalculator::CalculateTotalScore(int32 BaseScore, int32 SaleBonusScore, int32 LastCheckoutBonusScore, int32 ComboBonusScore)
