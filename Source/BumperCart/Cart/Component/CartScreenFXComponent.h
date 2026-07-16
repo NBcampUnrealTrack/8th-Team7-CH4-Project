@@ -86,6 +86,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
 	TObjectPtr<UNiagaraSystem> BoostDustSystem;
 
+	//부스트 중 카트 중앙(루트)에 1개만 부착하는 연출 — 잔상처럼 바퀴 좌우 복제가 아닌 카트 단위 FX (BP에서 지정. 비어있으면 무동작)
+	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
+	TObjectPtr<UNiagaraSystem> BoostCenterSystem;
+
 	//---------- 브레이크 스키드 마크 (바닥 데칼) ----------
 	//타이어 자국 데칼 머티리얼 (Material Domain = Deferred Decal). 비어있으면 무동작
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal")
@@ -164,6 +168,8 @@ private:
 	TObjectPtr<UNiagaraComponent> BoostDustFXLeft;
 	UPROPERTY(Transient)
 	TObjectPtr<UNiagaraComponent> BoostDustFXRight;
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> BoostCenterFX;
 
 	//스파크 현재 활성 상태 (상태 바뀔 때만 Activate/Deactivate)
 	bool bSparksActive = false;
