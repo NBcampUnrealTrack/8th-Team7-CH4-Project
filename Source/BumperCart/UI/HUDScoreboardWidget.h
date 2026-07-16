@@ -64,6 +64,12 @@ private:
     UFUNCTION()
     void HandlePlayerStateRemoved(AMainPlayerState* PlayerState);
 
+    UFUNCTION()
+    void HandlePlayerDisplayInfoChanged();
+
+    UFUNCTION()
+    void HandlePlayerPawnSet(APlayerState* PlayerState, APawn* NewPawn, APawn* OldPawn);
+
     /* GameStae, PlayerState 관련 */
 
     void TryCacheGameState();

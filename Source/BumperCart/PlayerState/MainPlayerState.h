@@ -8,6 +8,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerStatsChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerScoreChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerDisplayInfoChanged);
 
 UENUM(BlueprintType)
 enum class ETitleType : uint8
@@ -34,6 +35,10 @@ public:
     // 플레이어 점수가 변할 시 호출됨
     UPROPERTY(BlueprintAssignable, Category = "PlayerStats")
     FOnPlayerScoreChanged OnPlayerScoreChanged;
+
+    // 플레이어 표시 정보 변할 시 호출됨
+    UPROPERTY(BlueprintAssignable, Category = "PlayerStats")
+    FOnPlayerDisplayInfoChanged OnPlayerDisplayInfoChanged;
 
     //점수 추가
     void AddPlayerScore(int32 AddScore);
@@ -71,6 +76,8 @@ public:
 
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+    virtual void OnRep_PlayerName() override;
 
 private:
     UFUNCTION()

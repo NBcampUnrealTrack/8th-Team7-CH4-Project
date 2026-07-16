@@ -32,6 +32,13 @@ void AMainPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME(AMainPlayerState, Title);
 }
 
+void AMainPlayerState::OnRep_PlayerName()
+{
+    Super::OnRep_PlayerName();
+
+    OnPlayerDisplayInfoChanged.Broadcast();
+}
+
 // 점수 관련
 void AMainPlayerState::AddPlayerScore(int32 AddScore)
 {

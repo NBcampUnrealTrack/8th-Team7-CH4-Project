@@ -46,6 +46,8 @@ void UHUDScoreboardWidget::NativeDestruct()
         if (AMainPlayerState* PS = Pair.Key.Get())
         {
             PS->OnPlayerScoreChanged.RemoveDynamic(this, &ThisClass::HandlePlayerScoreChanged);
+            PS->OnPlayerDisplayInfoChanged.RemoveDynamic(this, &ThisClass::HandlePlayerDisplayInfoChanged);
+            PS->OnPawnSet.RemoveDynamic(this, &ThisClass::HandlePlayerPawnSet);
         }
     }
 
@@ -88,6 +90,16 @@ void UHUDScoreboardWidget::HandlePlayerStateAdded(AMainPlayerState* PlayerState)
 void UHUDScoreboardWidget::HandlePlayerStateRemoved(AMainPlayerState* PlayerState)
 {
     RemovePlayerRow(PlayerState);
+}
+
+void UHUDScoreboardWidget::HandlePlayerDisplayInfoChanged()
+{
+    QueueRefresh();
+}
+
+void UHUDScoreboardWidget::HandlePlayerPawnSet(APlayerState* PlayerState, APawn* NewPawn, APawn* OldPawn)
+{
+    QueueRefresh();
 }
 
 void UHUDScoreboardWidget::TryCacheGameState()
@@ -170,6 +182,9 @@ void UHUDScoreboardWidget::AddPlayerRow(AMainPlayerState* PlayerState)
     if (!IsValid(Row)) return;
 
     PlayerState->OnPlayerScoreChanged.AddUniqueDynamic(this, &ThisClass::HandlePlayerScoreChanged);
+    PlayerState->OnPlayerDisplayInfoChanged.AddUniqueDynamic(this, &ThisClass::HandlePlayerDisplayInfoChanged);
+    PlayerState->OnPawnSet.AddUniqueDynamic(this, &ThisClass::HandlePlayerPawnSet);
+
 
     PlayerRows.Add(PlayerState, Row);
     Row->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -183,6 +198,8 @@ void UHUDScoreboardWidget::RemovePlayerRow(AMainPlayerState* PlayerState)
     if (!IsValid(PlayerState)) return;
 
     PlayerState->OnPlayerScoreChanged.RemoveDynamic(this, &ThisClass::HandlePlayerScoreChanged);
+    PlayerState->OnPlayerDisplayInfoChanged.RemoveDynamic(this, &ThisClass::HandlePlayerDisplayInfoChanged);
+    PlayerState->OnPawnSet.RemoveDynamic(this, &ThisClass::HandlePlayerPawnSet);
 
     UHUDScoreboardRowWidget* Row = PlayerRows.FindRef(PlayerState);
     PlayerRows.Remove(PlayerState);
