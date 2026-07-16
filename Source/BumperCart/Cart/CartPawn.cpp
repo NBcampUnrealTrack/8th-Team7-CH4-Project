@@ -912,6 +912,22 @@ void ACartPawn::ClientApplyTomatoScreenBlock_Implementation(float Duration)
 	ScreenFXComponent->ApplyTomatoScreenBlock(Duration);
 }
 
+//정산 완료 시 서버가 소유 클라에 호출 => 점수 팝업 UI 표시. 로컬·계산완료만
+void ACartPawn::ClientShowCheckoutScore_Implementation(const FCheckoutScoreResult& ScoreResult)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (!ScoreResult.bIsCalculationCompleted)
+	{
+		return;
+	}
+
+	BP_ShowCheckoutScore(ScoreResult);
+}
+
 //외부에서 카트를 강제로 밀어내기 (거대카트·체크아웃존 등 공용 진입점) — 컴포넌트에 위임
 void ACartPawn::ApplyExternalKnockback(const FVector& Direction, float Strength)
 {

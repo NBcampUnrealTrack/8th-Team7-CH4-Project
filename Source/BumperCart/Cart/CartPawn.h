@@ -5,6 +5,7 @@
 #include "Cart/Component/CartLoadComponent.h"
 #include "Cart/SlideAffectable.h"
 #include "Cart/Bumpable.h"
+#include "Checkout/CheckoutTypes.h"
 #include "CartPawn.generated.h"
 
 class USpringArmComponent;
@@ -89,6 +90,14 @@ public:
     //범프 충돌 외에도 거대 카트 충돌·아이템 드롭 등 다른 시스템이 공용으로 호출. ShakeClass가 비면 카트 기본(BumpCameraShakeClass) 사용
     UFUNCTION(Client, Reliable, BlueprintCallable, Category = "Cart|Camera")
     void ClientPlayCameraShake(TSubclassOf<UCameraShakeBase> ShakeClass, float Scale);
+
+    //정산 완료 시 정산 점수를 소유 클라에 전달 (서버 => 소유 클라)
+    UFUNCTION(Client, Reliable)
+    void ClientShowCheckoutScore(const FCheckoutScoreResult& ScoreResult);
+
+    //정산 점수 팝업 UI 생성 (BP에서 구현)
+    UFUNCTION(BlueprintImplementableEvent, Category = "Checkout|UI")
+    void BP_ShowCheckoutScore(const FCheckoutScoreResult& ScoreResult);
 
     //카메라 연출 컴포넌트(CartCameraComponent)용 접근자
     USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
