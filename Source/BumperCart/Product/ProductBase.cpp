@@ -23,7 +23,7 @@ AProductBase::AProductBase()
 
     bReplicates = true;
     SetReplicateMovement(false);
-    SetNetUpdateFrequency(1.f);
+    SetNetUpdateFrequency(10.f);
 
     // 컴포넌트 설정
     ProductCollision = CreateDefaultSubobject<USphereComponent>(TEXT("Root"));

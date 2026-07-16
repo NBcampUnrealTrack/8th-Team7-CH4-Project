@@ -1,4 +1,4 @@
-// MainPlayerState.h
+﻿// MainPlayerState.h
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "MainPlayerState.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerStatsChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerScoreChanged);
 
 UENUM(BlueprintType)
 enum class ETitleType : uint8
@@ -30,10 +31,14 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "PlayerStats")
     FOnPlayerStatsChanged OnPlayerStatsChanged;
 
+    // 플레이어 점수가 변할 시 호출됨
+    UPROPERTY(BlueprintAssignable, Category = "PlayerStats")
+    FOnPlayerScoreChanged OnPlayerScoreChanged;
+
     //점수 추가
-    void AddPlayerScore(float AddScore);
+    void AddPlayerScore(int32 AddScore);
     UFUNCTION(BlueprintPure, Category = "PlayerStats")
-    float GetPlayerScore() const;
+    int32 GetPlayerScore() const;
 
     //플레이어 순위
     void SetRank(int32 NewRank);
@@ -87,7 +92,7 @@ private:
     void OnRep_Title();
 
     UPROPERTY(ReplicatedUsing = OnRep_PlayerScore, VisibleAnywhere,  Category = "PlayerStats")
-    float PlayerScore;
+    int32 PlayerScore;
 
     UPROPERTY(ReplicatedUsing = OnRep_Rank, VisibleAnywhere,  Category = "PlayerStats")
     int32 Rank;
