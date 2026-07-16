@@ -144,6 +144,8 @@ void UCartScreenFXComponent::SetupWheelFX()
 	BoostTrailFXRight = SpawnWheelFX(BoostTrailSystem, AttachTarget, RightSocket, FallbackRight, false);
 	BoostDustFXLeft = SpawnWheelFX(BoostDustSystem, AttachTarget, LeftSocket, FallbackLeft, false);
 	BoostDustFXRight = SpawnWheelFX(BoostDustSystem, AttachTarget, RightSocket, FallbackRight, false);
+	//중앙 부스트 FX: 바퀴 좌우가 아니라 루트(캡슐 중앙)에 1개만 — 잔상 등 카트 단위 연출용
+	BoostCenterFX = SpawnWheelFX(BoostCenterSystem, GetOwner()->GetRootComponent(), NAME_None, FVector::ZeroVector, false);
 
 	//스키드 데칼용 뒷바퀴 위치 조회 정보 캐시 (소켓 or 폴백 오프셋)
 	WheelAttach = AttachTarget;
@@ -205,6 +207,7 @@ void UCartScreenFXComponent::DriveWheelFX(float ForwardSpeed, float DeltaTime)
 		ToggleBoostFX(BoostTrailFXRight);
 		ToggleBoostFX(BoostDustFXLeft);
 		ToggleBoostFX(BoostDustFXRight);
+		ToggleBoostFX(BoostCenterFX);
 	}
 
 	//--- 브레이크 스파크: 브레이크 중 + 충분히 빠를 때만. 상태가 바뀔 때만 토글 ---
