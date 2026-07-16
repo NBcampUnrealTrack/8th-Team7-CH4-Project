@@ -1,4 +1,4 @@
-// MainGameState.h
+﻿// MainGameState.h
 
 #pragma once
 
@@ -18,7 +18,10 @@ enum class ERoundPhase : uint8
     RoundEnd              UMETA(DisplayName = "3:00 - 라운드 종료")
 };
 
+class AMainPlayerState;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRoundPhaseChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMainPlayerStateChanged, AMainPlayerState*, PlayerState);
 
 UCLASS()
 class BUMPERCART_API AMainGameState : public AGameState
@@ -29,6 +32,14 @@ public:
     // Phase가 바뀔 때마다 호출
     UPROPERTY(BlueprintAssignable, Category = "Round")
     FOnRoundPhaseChanged OnRoundPhaseChanged;
+
+    // 플레이어가 추가될 때마다 호출
+    UPROPERTY(BlueprintAssignable, Category = "Player")
+    FOnMainPlayerStateChanged OnMainPlayerStateAdded;
+
+    // 플레이어가 제거될 때마다 호출
+    UPROPERTY(BlueprintAssignable, Category = "Player")
+    FOnMainPlayerStateChanged OnMainPlayerStateRemoved;
 
     // 라운드 시간(3분)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Round")
@@ -57,6 +68,12 @@ public:
     // 라운드 시작 전인지 확인
     UFUNCTION()
     bool bCanPlayerMove() const;
+
+    // 플레이어 추가하는 함수
+    virtual void AddPlayerState(APlayerState* PlayerState) override;
+
+    // 플레이어 제거하는 함수
+    virtual void RemovePlayerState(APlayerState* PlayerState) override;
 
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

@@ -1,9 +1,10 @@
-// MainGameState.cpp
+﻿// MainGameState.cpp
 
 
 #include "GameState/MainGameState.h"
 
 #include "Net/UnrealNetwork.h"
+#include "PlayerState/MainPlayerState.h"
 
 void AMainGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -11,7 +12,7 @@ void AMainGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
     DOREPLIFETIME(AMainGameState, CurrentPhase);
     DOREPLIFETIME(AMainGameState, RoundStartServerTime);
-    DOREPLIFETIME(AMainGameState, FinalWinnerNames)
+    DOREPLIFETIME(AMainGameState, FinalWinnerNames);
 }
 
 void AMainGameState::SetRoundPhase(ERoundPhase NewPhase)
@@ -83,5 +84,25 @@ bool AMainGameState::bCanPlayerMove() const
     else
     {
         return true;
+    }
+}
+
+void AMainGameState::AddPlayerState(APlayerState* PlayerState)
+{
+    Super::AddPlayerState(PlayerState);
+
+    if (AMainPlayerState* PS = Cast<AMainPlayerState>(PlayerState))
+    {
+        OnMainPlayerStateAdded.Broadcast(PS);
+    }
+}
+
+void AMainGameState::RemovePlayerState(APlayerState* PlayerState)
+{
+    Super::RemovePlayerState(PlayerState);
+
+    if (AMainPlayerState* PS = Cast<AMainPlayerState>(PlayerState))
+    {
+        OnMainPlayerStateRemoved.Broadcast(PS);
     }
 }
