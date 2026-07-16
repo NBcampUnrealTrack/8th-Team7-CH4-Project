@@ -183,8 +183,6 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart, const FHitResult& SweepRe
 
 void ANPCRushGimmick::Multicast_PlayerHitEffect_Implementation(FVector SpawnLocation, FRotator SpawnRotation)
 {
-    UE_LOG(LogTemp, Warning, TEXT("[이펙트 디버그] 멀티캐스트 호출됨! 위치: %s"), *SpawnLocation.ToString());
-
     if (KnockbackFX)
     {
         UNiagaraFunctionLibrary::SpawnSystemAtLocation(
