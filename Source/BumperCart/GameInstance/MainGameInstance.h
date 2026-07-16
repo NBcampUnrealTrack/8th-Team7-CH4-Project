@@ -8,6 +8,7 @@
 
 
 class UCharacterSelectionConfig;
+class UBGMConfig;
 
 UCLASS()
 class BUMPERCART_API UMainGameInstance : public UGameInstance
@@ -79,5 +80,11 @@ private:
 
     int32 NextLobbyIndex = 0;
 
+#pragma endregion
+
+#pragma region Sound
+public:
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BGM")
+    TObjectPtr<UBGMConfig> BGMConfig;
 #pragma endregion
 };
