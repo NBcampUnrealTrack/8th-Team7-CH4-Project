@@ -117,6 +117,19 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
                         true
                     );
                 }
+
+                USoundBase* SpawnSound = ProductShelfSubsystem->GetSpawnSound();
+
+                if (IsValid(SpawnSound))
+                {
+                    UGameplayStatics::PlaySoundAtLocation(
+                        GetWorld(),
+                        SpawnSound,
+                        SpawnStartLocation,                
+                        FRotator::ZeroRotator
+                    );
+                }
+
             }
         }
 

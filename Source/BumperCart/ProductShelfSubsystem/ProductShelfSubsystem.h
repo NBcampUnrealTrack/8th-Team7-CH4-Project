@@ -9,6 +9,7 @@
 class AProductShelf;
 class UProductShelfManagerConfig;
 class UNiagaraSystem;
+class USoundBase;
 
 /**
  * 
@@ -76,8 +77,11 @@ private:
     float RespawnDelay = 20.0f;
 
     // 스폰시 사용할 이펙트
-    UPROPERTY(EditAnywhere, Category = "FX")
+    UPROPERTY(EditAnywhere, Category = "Manager | FX")
     TObjectPtr<UNiagaraSystem> SpawnFX;
+
+    UPROPERTY(EditAnywhere, Category = "Manager | Spawn Sound")
+    TObjectPtr<USoundBase> SpawnSound;
 
 public:
     // 제품 스폰 호출
@@ -98,6 +102,7 @@ public:
     FORCEINLINE int32 GetCurrentProductCount() const { return CurrentProductCount; }
     FORCEINLINE void SetMaxSpawnCount(int32 SpawnCount) { MaxSpawnCount = SpawnCount; }
     FORCEINLINE UNiagaraSystem* GetSpawnFX() const { return SpawnFX; }
+    FORCEINLINE USoundBase* GetSpawnSound() const { return SpawnSound; }
 
 #pragma endregion
 
