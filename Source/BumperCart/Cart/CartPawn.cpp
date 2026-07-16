@@ -29,6 +29,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Engine/World.h"
+#include "Engine/LocalPlayer.h"
 #include "DrawDebugHelpers.h" //임시 디버그 - 필살기 게이지 출력 제거 시 함께 삭제
 
 ACartPawn::ACartPawn()
@@ -241,6 +243,9 @@ void ACartPawn::Tick(float DeltaSeconds)
 			SlipSpinMesh->SetRelativeRotation(SlipSpinMeshBaseRelRot + FRotator(0.f, SpinYaw, 0.f));
 		}
 	}
+
+	//필살기 거대화/복귀 크기 트윈 — 게임플레이 상태는 즉시, 시각·판정 크기만 (오버슈트/단계 선택은 CVar)
+	DriveUltimateScale(DeltaSeconds);
 
 	//(충돌 리액션 스프링·무적 깜빡 => CartBumpComponent로 분리)
 
@@ -505,6 +510,31 @@ void ACartPawn::ResetBoostCooldown()
 	bBoostOnCooldown = false;
 }
 
+//부스터 남은 쿨다운(초) — 소유 클라 타이머 기준
+float ACartPawn::GetBoostCooldownRemaining() const
+{
+	if (!bBoostOnCooldown)
+	{
+		return 0.f;
+	}
+	//GetTimerRemaining은 무효 핸들에 -1 => 0 클램프
+	return FMath::Max(GetWorldTimerManager().GetTimerRemaining(BoostCooldownTimerHandle), 0.f);
+}
+
+//쿨다운 진행률 0(방금 사용)=>1(사용 가능). 부스트 지속 중엔 0 (끝나야 쿨다운 시작)
+float ACartPawn::GetBoostCooldownProgress() const
+{
+	if (bIsBoosting)
+	{
+		return 0.f;
+	}
+	if (!bBoostOnCooldown)
+	{
+		return 1.f;
+	}
+	return 1.f - FMath::Clamp(GetBoostCooldownRemaining() / FMath::Max(BoostCooldown, KINDA_SMALL_NUMBER), 0.f, 1.f);
+}
+
 //부스트 강제 종료 (서버) — 충돌·기믹 넉백 시 호출. 부스트 중이 아니면 무동작
 void ACartPawn::CancelBoost()
 {
@@ -556,7 +586,7 @@ void ACartPawn::ServerStartUltimate_Implementation()
 
 	bUltimateActive = true;
 	BumpComponent->ResetUltimateStack(); //발동하면 게이지 소진
-	ApplyUltimateScale(true);            //서버 로컬 (타 클라는 OnRep)
+	SetUltimateVisual(true);             //목표 크기·사운드 (서버 로컬, 타 클라는 OnRep). 크기 트윈은 Tick
 
 	GetWorldTimerManager().SetTimer(UltimateTimerHandle, this, &ACartPawn::EndUltimate, UltimateDuration, false);
 }
@@ -577,19 +607,40 @@ bool ACartPawn::IsUltimateReady() const
 void ACartPawn::EndUltimate()
 {
 	bUltimateActive = false;
-	ApplyUltimateScale(false); //서버 로컬 (타 클라는 OnRep)
+	SetUltimateVisual(false); //목표 크기·사운드 (서버 로컬, 타 클라는 OnRep). 크기 트윈은 Tick
 }
 
-//필살기 상태 복제 => 각 클라가 크기 적용/원복
+//필살기 상태 복제 => 각 클라가 목표 크기·사운드 세팅 (실제 크기 변화는 Tick 보간)
 void ACartPawn::OnRep_UltimateActive()
 {
-	ApplyUltimateScale(bUltimateActive);
+	SetUltimateVisual(bUltimateActive);
 }
 
-//몸통 메시 + 캡슐(판정 범위) 배율 조정. 캡슐 높이 변화만큼 발 위치를 유지하도록 액터 Z 보정 => 부양/파묻힘 방지
-void ACartPawn::ApplyUltimateScale(bool bOn)
+//발동/종료 시 목표 크기 지정 + 사운드. 실제 크기 변화는 Tick의 보간이 담당 (서버 로컬 + OnRep 공용 경로)
+void ACartPawn::SetUltimateVisual(bool bOn)
 {
-	const float S = bOn ? UltimateScale : 1.f;
+	UltimateTargetScale = bOn ? UltimateScale : 1.f;
+
+	//발동/종료음 — 내 카트는 2D(귀에 크게), 상대 카트는 위치 기반 3D
+	USoundBase* Sfx = bOn ? UltimateStartSound : UltimateEndSound;
+	if (Sfx)
+	{
+		if (IsLocallyControlled())
+		{
+			UGameplayStatics::PlaySound2D(this, Sfx);
+		}
+		else
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, Sfx, GetActorLocation());
+		}
+	}
+}
+
+//몸통 메시 + 캡슐(판정)을 지정 배율 S로 세팅. 캡슐 높이 변화만큼 발 위치를 유지하도록 액터 Z 보정 => 부양/파묻힘 방지
+//Tick이 매 프레임 보간된 S로 호출 => 커지고/작아지는 연출. DeltaHalf가 현재 높이 기준이라 트윈에도 누적이 맞물림
+void ACartPawn::ApplyUltimateScale(float S)
+{
+	CurrentUltimateScale = S; //GetBodyMeshBaseRelLoc이 이 값을 써서 오프셋도 같은 배율 (바퀴 부양 방지)
 
 	//시각 — 몸통 메시 (전 클라). 오프셋도 배율 => 바퀴가 새 캡슐 바닥에 붙음 (부양 방지)
 	if (UStaticMeshComponent* Body = GetBodyMesh())
@@ -613,6 +664,33 @@ void ACartPawn::ApplyUltimateScale(bool bOn)
 	{
 		AddActorWorldOffset(FVector(0.f, 0.f, DeltaHalf), false, nullptr, ETeleportType::TeleportPhysics);
 	}
+}
+
+//거대화/복귀 크기 트윈 구동 (Tick, 전 클라) — 감쇠 스프링, 목표를 살짝 넘었다 되돌아오는 오버슈트 팝
+void ACartPawn::DriveUltimateScale(float DeltaTime)
+{
+	//크기+속도 모두 잦아들면 정확히 스냅 후 정지 (오버슈트가 목표를 지나는 순간 조기 종료 방지 위해 속도도 확인)
+	if (FMath::IsNearlyEqual(CurrentUltimateScale, UltimateTargetScale, 0.002f) && FMath::Abs(UltimateScaleVel) < 0.01f)
+	{
+		if (!FMath::IsNearlyEqual(CurrentUltimateScale, UltimateTargetScale, KINDA_SMALL_NUMBER))
+		{
+			UltimateScaleVel = 0.f;
+			ApplyUltimateScale(UltimateTargetScale); //잔여 오차 스냅
+		}
+		return;
+	}
+
+	//감쇠 스프링 1스텝: a = -k(x-target) - c·v. 감쇠비<1이면 목표를 넘어 오버슈트
+	//커질 때/작아질 때 진동수를 다르게 — 성장은 천천히 보이고, 복귀는 빠르게
+	const float Freq = (UltimateTargetScale > 1.f) ? UltimateGrowSpeed : UltimateShrinkSpeed;
+	const float K = Freq * Freq;                              //강성
+	const float C = 2.f * UltimateOvershootRatio * Freq;      //감쇠 (ratio<1 => 오버슈트)
+	const float Accel = -K * (CurrentUltimateScale - UltimateTargetScale) - C * UltimateScaleVel;
+	UltimateScaleVel += Accel * DeltaTime;
+
+	//프레임 히치 시 스프링 발산 방지 — 원본~오버슈트 여유 범위로 클램프
+	const float NextScale = FMath::Clamp(CurrentUltimateScale + UltimateScaleVel * DeltaTime, 1.f, UltimateScale * 1.4f);
+	ApplyUltimateScale(NextScale);
 }
 
 bool ACartPawn::IsCancelCheckoutState() const
@@ -832,6 +910,22 @@ void ACartPawn::ClientApplyTomatoScreenBlock_Implementation(float Duration)
 	}
 
 	ScreenFXComponent->ApplyTomatoScreenBlock(Duration);
+}
+
+//정산 완료 시 서버가 소유 클라에 호출 => 점수 팝업 UI 표시. 로컬·계산완료만
+void ACartPawn::ClientShowCheckoutScore_Implementation(const FCheckoutScoreResult& ScoreResult)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (!ScoreResult.bIsCalculationCompleted)
+	{
+		return;
+	}
+
+	BP_ShowCheckoutScore(ScoreResult);
 }
 
 //외부에서 카트를 강제로 밀어내기 (거대카트·체크아웃존 등 공용 진입점) — 컴포넌트에 위임

@@ -234,6 +234,16 @@ private:
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Checkout|Effect", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UNiagaraSystem> CheckoutCompleteEffect;
 
+    // 정산 중 이펙트
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkout|Effect", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UNiagaraComponent> CheckoutProcessingEffect;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Effect|Processing")
+    FLinearColor OpenWaveColor = FLinearColor(0.15f, 1.0f, 0.3f, 1.0f);
+
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Effect|Processing")
+    FLinearColor ClosingSoonWaveColor = FLinearColor(0.15f, 1.0f, 0.3f, 1.0f);
+
 // ------------------------------------------------------------
 // 차단벽
 // ------------------------------------------------------------

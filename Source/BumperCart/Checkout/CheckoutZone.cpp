@@ -68,6 +68,11 @@ ACheckoutZone::ACheckoutZone()
     OpenStateEffect->SetupAttachment(CheckoutZoneVisual);
     OpenStateEffect->SetAutoActivate(false);
     OpenStateEffect->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
+
+    CheckoutProcessingEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("CheckoutProcessingEffect"));
+    CheckoutProcessingEffect->SetupAttachment(CheckoutZoneVisual);
+    CheckoutProcessingEffect->SetAutoActivate(false);
+    CheckoutProcessingEffect->SetRelativeLocation(FVector(0.0f, 0.0f, 1.0f));
 }
 
 void ACheckoutZone::BeginPlay()
@@ -280,27 +285,55 @@ void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
 
 void ACheckoutZone::UpdateCheckoutEffect()
 {
-    if (!IsValid(OpenStateEffect))
+    //if (!IsValid(OpenStateEffect))
+    //{
+    //    return;
+    //}
+
+    //// 오픈 상태만 작용
+    //const bool bShouldPlayOpenNiagara = CurrentCheckoutZoneState == ECheckoutZoneState::Open;
+
+    //if (bShouldPlayOpenNiagara)
+    //{
+    //    if (!OpenStateEffect->IsActive())
+    //    {
+    //        OpenStateEffect->Activate(true);
+    //    }
+
+    //    return;
+    //}
+
+    //if (OpenStateEffect->IsActive())
+    //{
+    //    OpenStateEffect->DeactivateImmediate();
+    //}
+
+    if (!IsValid(CheckoutProcessingEffect))
     {
         return;
     }
 
-    // 오픈 상태만 작용
-    const bool bShouldPlayOpenNiagara = CurrentCheckoutZoneState == ECheckoutZoneState::Open;
+    const bool bIsOpen = CurrentCheckoutZoneState == ECheckoutZoneState::Open;
+    const bool bIsClosingSoon = CurrentCheckoutZoneState == ECheckoutZoneState::ClosingSoon;
 
-    if (bShouldPlayOpenNiagara)
+    const bool bShouldPlay = bIsCheckoutInProgress && (bIsOpen || bIsClosingSoon);
+
+    if (!bShouldPlay)
     {
-        if (!OpenStateEffect->IsActive())
-        {
-            OpenStateEffect->Activate(true);
-        }
-
+        CheckoutProcessingEffect->Deactivate();
         return;
     }
 
-    if (OpenStateEffect->IsActive())
+    const FLinearColor WaveColor =
+        bIsClosingSoon
+        ? ClosingSoonWaveColor
+        : OpenWaveColor;
+
+    CheckoutProcessingEffect->SetVariableLinearColor(TEXT("User.WaveColor"),  WaveColor);
+
+    if (!CheckoutProcessingEffect->IsActive())
     {
-        OpenStateEffect->DeactivateImmediate();
+        CheckoutProcessingEffect->Activate(true);
     }
 }
 
@@ -1209,6 +1242,9 @@ void ACheckoutZone::CompleteCheckout()
     MainPlayerState->AddPlayerScore(LastCheckoutScore);
     MainPlayerState->AddCheckoutCount(1);
 
+    // 정산 점수 팝업 표시
+    CompletedPlayer->ClientShowCheckoutScore(ScoreResult);
+
     // 연속 정산 횟수 업데이트
     CurrentCheckoutCount = CheckoutCount;
 
@@ -1498,6 +1534,8 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
 
 void ACheckoutZone::OnRep_CheckoutSession()
 {
+    UpdateCheckoutEffect();
+
     UpdateCheckoutPlayerBarrierIgnore();
 
     OnCheckoutSessionChanged.Broadcast(CheckoutZoneID, CurrentCheckoutPlayer, bIsCheckoutInProgress);

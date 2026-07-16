@@ -1,4 +1,4 @@
-// MainGameInstance.h
+﻿// MainGameInstance.h
 
 #pragma once
 
@@ -35,7 +35,7 @@ public:
 
 #pragma region Character
 public:
-    UPROPERTY(EditDefaultsOnly, Category = "Lobby|Character")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby|Character")
     TObjectPtr<UCharacterSelectionConfig> CharacterSelectionConfig;
 
     // 플레이어가 로비에서 준비 완료 시 확정한 캐릭터를 저장
