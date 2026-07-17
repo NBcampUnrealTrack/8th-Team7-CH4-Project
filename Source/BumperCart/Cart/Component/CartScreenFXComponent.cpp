@@ -28,6 +28,21 @@ UCartScreenFXComponent::UCartScreenFXComponent()
 	{
 		SkidDecalMaterial = SkidDecalFinder.Object;
 	}
+
+	//카트 색(DA_CharacterSelectionConfig)별 잔상 색 기본값 — 민트는 확정 시안 그대로, 나머지는 각 색의 파스텔 틴트에 ×0.8~×1.7 밝기 랜덤
+	auto AddGhostColor = [this](const FLinearColor& Cart, const FLinearColor& Min, const FLinearColor& Max)
+	{
+		FBoostGhostColorEntry& Entry = GhostColorByCart.AddDefaulted_GetRef();
+		Entry.CartColor = Cart;
+		Entry.GhostColorMin = Min;
+		Entry.GhostColorMax = Max;
+	};
+	AddGhostColor(FLinearColor(0.232708f, 1.f, 0.932103f), FLinearColor(0.45f, 0.85f, 0.8f, 0.55f), FLinearColor(0.45f, 0.85f, 1.7f, 1.3f));   //Mint
+	AddGhostColor(FLinearColor(1.f, 0.f, 0.f),             FLinearColor(0.8f, 0.36f, 0.36f, 0.55f), FLinearColor(1.7f, 0.765f, 0.765f, 1.3f)); //Red
+	AddGhostColor(FLinearColor(0.f, 0.f, 1.f),             FLinearColor(0.36f, 0.36f, 0.8f, 0.55f), FLinearColor(0.765f, 0.765f, 1.7f, 1.3f)); //Blue
+	AddGhostColor(FLinearColor(0.f, 1.f, 0.f),             FLinearColor(0.36f, 0.8f, 0.36f, 0.55f), FLinearColor(0.765f, 1.7f, 0.765f, 1.3f)); //Green
+	AddGhostColor(FLinearColor(1.f, 1.f, 0.f),             FLinearColor(0.8f, 0.8f, 0.36f, 0.55f),  FLinearColor(1.7f, 1.7f, 0.765f, 1.3f));   //Basic(노랑)
+	AddGhostColor(FLinearColor(0.443393f, 0.f, 0.494792f), FLinearColor(0.752f, 0.36f, 0.8f, 0.55f), FLinearColor(1.598f, 0.765f, 1.7f, 1.3f)); //Purple
 }
 
 void UCartScreenFXComponent::BeginPlay()
@@ -172,6 +187,32 @@ UNiagaraComponent* UCartScreenFXComponent::SpawnWheelFX(UNiagaraSystem* System, 
 	return Fx;
 }
 
+//카트 색과 가장 가까운 매핑 항목의 잔상 색을 BoostCenterFX(NS_BoostGhost)의 User.GhostColorMin/Max로 전달
+void UCartScreenFXComponent::ApplyBoostGhostColor()
+{
+	if (!BoostCenterFX || !OwnerCart || GhostColorByCart.Num() == 0)
+	{
+		return;
+	}
+
+	const FLinearColor CartColor = OwnerCart->GetColor();
+	const FBoostGhostColorEntry* Best = &GhostColorByCart[0];
+	float BestDist = TNumericLimits<float>::Max();
+	for (const FBoostGhostColorEntry& Entry : GhostColorByCart)
+	{
+		const FLinearColor Diff = Entry.CartColor - CartColor;
+		const float Dist = Diff.R * Diff.R + Diff.G * Diff.G + Diff.B * Diff.B;
+		if (Dist < BestDist)
+		{
+			BestDist = Dist;
+			Best = &Entry;
+		}
+	}
+
+	BoostCenterFX->SetVariableLinearColor(FName("GhostColorMin"), Best->GhostColorMin);
+	BoostCenterFX->SetVariableLinearColor(FName("GhostColorMax"), Best->GhostColorMax);
+}
+
 //리본 파라미터 갱신 + 브레이크 스파크 on/off·히트 누적
 void UCartScreenFXComponent::DriveWheelFX(float ForwardSpeed, float DeltaTime)
 {
@@ -197,6 +238,10 @@ void UCartScreenFXComponent::DriveWheelFX(float ForwardSpeed, float DeltaTime)
 	if (bBoosting != bBoostFXActive)
 	{
 		bBoostFXActive = bBoosting;
+		if (bBoosting)
+		{
+			ApplyBoostGhostColor(); //잔상 색을 카트 색에 맞춰 갱신 (활성화 전에 세팅)
+		}
 		auto ToggleBoostFX = [&](UNiagaraComponent* Fx)
 		{
 			if (!Fx) { return; }

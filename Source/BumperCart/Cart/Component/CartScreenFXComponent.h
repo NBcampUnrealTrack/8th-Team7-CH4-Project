@@ -16,6 +16,25 @@ class UNiagaraSystem;
 class UStaticMeshComponent;
 class UUserWidget;
 
+//카트 색(DA_CharacterSelectionConfig) => 부스트 잔상 색 랜덤 범위 매핑 항목
+USTRUCT()
+struct FBoostGhostColorEntry
+{
+	GENERATED_BODY()
+
+	//매칭 기준 카트 색 (가장 가까운 항목이 선택됨)
+	UPROPERTY(EditAnywhere)
+	FLinearColor CartColor = FLinearColor::White;
+
+	//잔상 색 랜덤 하한 (RGB=틴트, A=오파시티 소스)
+	UPROPERTY(EditAnywhere)
+	FLinearColor GhostColorMin = FLinearColor(0.45f, 0.85f, 0.8f, 0.55f);
+
+	//잔상 색 랜덤 상한 (HDR 허용)
+	UPROPERTY(EditAnywhere)
+	FLinearColor GhostColorMax = FLinearColor(0.45f, 0.85f, 1.7f, 1.3f);
+};
+
 //카트의 시각 연출을 전담하는 컴포넌트.
 //화면: 부스트 중 가장자리 스피드라인(PostProcess MID, 내 화면만)
 //월드: 뒷바퀴 소켓에 부착한 바닥 리본(속도감)·브레이크 스파크·부스트 트레일/먼지 (모든 클라 표시)
@@ -90,6 +109,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
 	TObjectPtr<UNiagaraSystem> BoostCenterSystem;
 
+	//카트 색별 잔상 색 매핑 (생성자에서 DA_CharacterSelectionConfig 색 기준으로 채움. 비어있으면 시스템 기본값 사용)
+	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
+	TArray<FBoostGhostColorEntry> GhostColorByCart;
+
 	//---------- 브레이크 스키드 마크 (바닥 데칼) ----------
 	//타이어 자국 데칼 머티리얼 (Material Domain = Deferred Decal). 비어있으면 무동작
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal")
@@ -124,6 +147,9 @@ private:
 
 	//나이아가라 컴포넌트 하나를 생성해 부착. 소켓이 없을 땐 FallbackOffset 위치로
 	UNiagaraComponent* SpawnWheelFX(UNiagaraSystem* System, USceneComponent* AttachTo, FName Socket, const FVector& FallbackOffset, bool bStartActive);
+
+	//카트 색과 가장 가까운 매핑 항목의 잔상 색을 BoostCenterFX User 파라미터로 전달 (부스트 시작 시)
+	void ApplyBoostGhostColor();
 
 	//리본 파라미터 갱신 + 브레이크 스파크 on/off·히트 누적 (매 프레임)
 	void DriveWheelFX(float ForwardSpeed, float DeltaTime);
