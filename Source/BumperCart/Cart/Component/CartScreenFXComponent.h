@@ -9,6 +9,7 @@
 
 class ACartPawn;
 class UCameraComponent;
+class UDecalComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UNiagaraComponent;
@@ -113,6 +114,31 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
 	TArray<FBoostGhostColorEntry> GhostColorByCart;
 
+	//---------- 무게 속박 연출 (적재 절반부터, 바퀴 뒤 바닥 웨이브 자국) ----------
+	//바닥 웨이브 자국 데칼 머티리얼 (M_HeavyDragMark 자동 로드. 비어있으면 무동작)
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX")
+	TObjectPtr<UMaterialInterface> HeavyMarkMaterial;
+
+	//이 적재율부터 속박 연출 표시
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0", ClampMax = "1"))
+	float HeavyDragMinLoad = 0.5f;
+
+	//자국은 이 전진 속도(cm/s) 이상일 때만 (정지 중엔 링 데칼만)
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0"))
+	float HeavyDragMinSpeed = 150.f;
+
+	//뒷바퀴가 이 거리(cm) 이동할 때마다 자국 하나
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "1"))
+	float HeavyMarkSpacing = 60.f;
+
+	//자국 수명(초) — 절반 지난 뒤부터 페이드아웃
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0.1"))
+	float HeavyMarkLifetime = 0.8f;
+
+	//자국 데칼 크기 (X=투영 깊이, Y=폭 절반, Z=진행 방향 길이 절반)
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX")
+	FVector HeavyMarkSize = FVector(24.f, 12.f, 40.f);
+
 	//---------- 브레이크 스키드 마크 (바닥 데칼) ----------
 	//타이어 자국 데칼 머티리얼 (Material Domain = Deferred Decal). 비어있으면 무동작
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal")
@@ -150,6 +176,15 @@ private:
 
 	//카트 색과 가장 가까운 매핑 항목의 잔상 색을 BoostCenterFX User 파라미터로 전달 (부스트 시작 시)
 	void ApplyBoostGhostColor();
+
+	//무게 속박 연출 구동 — 링 데칼 크기/강도 + 바닥 자국 스탬프 (매 프레임)
+	void DriveHeavyDrag(float ForwardSpeed);
+
+	//한쪽 뒷바퀴: 마지막 자국에서 HeavyMarkSpacing 이상 벌어지면 자국 스탬프
+	void TrySpawnHeavyMark(const FVector& WheelPos, FVector& LastPos, bool& bHasLast, float HeavyAlpha);
+
+	//지정 위치 바닥에 속박 자국 데칼 하나 (웨이브 위상 랜덤, 수명 후 페이드)
+	void SpawnHeavyMarkAt(const FVector& WorldPos, float HeavyAlpha);
 
 	//리본 파라미터 갱신 + 브레이크 스파크 on/off·히트 누적 (매 프레임)
 	void DriveWheelFX(float ForwardSpeed, float DeltaTime);
@@ -199,6 +234,12 @@ private:
 
 	//스파크 현재 활성 상태 (상태 바뀔 때만 Activate/Deactivate)
 	bool bSparksActive = false;
+
+	//마지막 속박 자국 위치 (거리 기반 스탬프)
+	FVector LastHeavyMarkPosLeft = FVector::ZeroVector;
+	FVector LastHeavyMarkPosRight = FVector::ZeroVector;
+	bool bHasLastHeavyMarkLeft = false;
+	bool bHasLastHeavyMarkRight = false;
 
 	//부스트 FX(트레일·먼지) 현재 활성 상태
 	bool bBoostFXActive = false;
