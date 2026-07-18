@@ -56,7 +56,6 @@ void AItemSpawnManager::StartSpawning()
 
     if (!RandomItemBoxClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("RandomItemBoxClass가 지정되지 않음"));
         return;
     }
 
@@ -162,7 +161,6 @@ void AItemSpawnManager::SpawnRandomItemBoxAtSlot(FRandomItemBoxSpawnSlot& SpawnS
 
     if (!IsValid(SpawnSlot.SpawnPoint))
     {
-        UE_LOG(LogTemp, Warning, TEXT("SapwnPoint 스폰하세요"));
         return;
     }
 
@@ -187,13 +185,10 @@ void AItemSpawnManager::SpawnRandomItemBoxAtSlot(FRandomItemBoxSpawnSlot& SpawnS
 
     if (!IsValid(SpawnedItemBox))
     {
-        UE_LOG(LogTemp, Warning, TEXT("%s: 아이템 박스 스폰 실패"), *GetNameSafe(SpawnSlot.SpawnPoint));
         return;
     }
 
     SpawnSlot.SpawnedItemBox = SpawnedItemBox;
-
-    UE_LOG(LogTemp, Warning, TEXT("%s: 아이템 박스 스폰 성공"), *GetNameSafe(SpawnSlot.SpawnPoint));
 }
 
 
@@ -214,7 +209,5 @@ void AItemSpawnManager::ClearSpawnedRandomItemBoxes()
 
         SpawnSlot.SpawnedItemBox = nullptr;
     }
-
-    UE_LOG(LogTemp, Warning, TEXT("모든 아이템 박스 제거"));
 }
 

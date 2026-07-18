@@ -37,13 +37,6 @@ void ACheckoutManager::BeginPlay()
     {
         return;
     }
-
-    UE_LOG(LogTemp, Warning, TEXT("계산대 수: %d"), CheckoutZones.Num());
-
-    for (ACheckoutZone* CheckoutZone : CheckoutZones)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("계산대 ID: %d"), CheckoutZone->GetCheckoutZoneID());
-    }
 }
 
 // ------------------------------------------------------------

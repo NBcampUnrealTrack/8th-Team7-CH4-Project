@@ -87,7 +87,5 @@ bool UProjectileItemAction::Execute(ACartPawn* PlayerCharacter)
 
     ItemProjectile->FireInDirection(FireDirection);
 
-    UE_LOG(LogTemp, Warning, TEXT("%s: %s 아이템 사용"), *GetNameSafe(PlayerCharacter), *ProjectileClass->GetName());
-
     return true;
 }

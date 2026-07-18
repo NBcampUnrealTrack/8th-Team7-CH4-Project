@@ -80,20 +80,20 @@ void ARandomItemBox::OnPickupTriggerBeginOverlap(UPrimitiveComponent* Overlapped
     UCartItemInventoryComponent* ItemInventory = PlayerCharacter->FindComponentByClass<UCartItemInventoryComponent>();
     if (!IsValid(ItemInventory))
     {
+#if !UE_BUILD_SHIPPING
         UE_LOG(LogTemp, Warning, TEXT("%s: 인벤토리 없음"), *GetNameSafe(PlayerCharacter));
+#endif
         return;
     }
 
     UItemDataAsset* SelectedItem = SelectRandomItem();
     if (!IsValid(SelectedItem))
     {
-        UE_LOG(LogTemp, Warning, TEXT("랜덤 선택된 아이템 없음"));
         return;
     }
 
     if (ItemInventory->AcquireItem(SelectedItem))
     {
-        UE_LOG(LogTemp, Warning, TEXT("%s: %s 아이템 획득"), *GetNameSafe(PlayerCharacter), *GetNameSafe(SelectedItem));
         Destroy();
     }
 }
