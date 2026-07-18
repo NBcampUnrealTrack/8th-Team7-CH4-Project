@@ -288,8 +288,8 @@ protected:
 
     //---------- 그랩 컴포넌트 ----------
     // 생성자에서 생성하고, SetupPlayerInputComponent에서 IMC 바인딩
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Grab")
-    UCartGrabComponent* GrabComponent;
+    /*UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Cart|Grab")
+    UCartGrabComponent* GrabComponent;*/
 
     //---------- 아이템 인벤토리 컴포넌트 ----------
     // 생성자에서 생성, SetupPlayerInputComponent에서 아이템 사용 입력(Shift) 바인딩

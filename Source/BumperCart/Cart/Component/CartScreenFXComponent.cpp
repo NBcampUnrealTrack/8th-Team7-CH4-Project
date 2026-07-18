@@ -1,4 +1,4 @@
-// BumperCart - B(카트/플레이어 조작) 파트
+﻿// BumperCart - B(카트/플레이어 조작) 파트
 // 카트 연출(FX) 컴포넌트 — 화면 가장자리 스피드라인(PP, 로컬 전용) + 바퀴 월드 FX(바닥 리본·브레이크 스파크)
 
 #include "CartScreenFXComponent.h"
@@ -23,14 +23,14 @@ UCartScreenFXComponent::UCartScreenFXComponent()
 
 	//대부분 에셋(PP 머티리얼·나이아가라)은 BP_CartPawn의 이 컴포넌트에서 지정. 비어있으면 해당 연출만 무동작
 	//스키드 데칼 머티리얼만 C++에서 자동 로드 — BP 오버라이드는 main 병합 시 날아가기 쉬워 코드에 고정
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SkidDecalFinder(TEXT("/Game/Developers/dbals/FX/M_SkidDecal.M_SkidDecal"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SkidDecalFinder(TEXT("/Game/BumperCart/Cart/VFX/M_SkidDecal.M_SkidDecal"));
 	if (SkidDecalFinder.Succeeded())
 	{
 		SkidDecalMaterial = SkidDecalFinder.Object;
 	}
 
 	//무게 속박 연출도 코드 고정 (BP 오버라이드 병합 유실 방지)
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> HeavyMarkFinder(TEXT("/Game/Developers/dbals/FX/M_HeavyDragMark.M_HeavyDragMark"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> HeavyMarkFinder(TEXT("/Game/BumperCart/Cart/VFX/M_HeavyDragMark.M_HeavyDragMark"));
 	if (HeavyMarkFinder.Succeeded())
 	{
 		HeavyMarkMaterial = HeavyMarkFinder.Object;
@@ -171,7 +171,7 @@ void UCartScreenFXComponent::SetupWheelFX()
 	//속박 자국 머티리얼: 에디터 기동 후 만들어진 에셋은 CDO 로드가 놓침 => 런타임 보강 로드
 	if (!HeavyMarkMaterial)
 	{
-		HeavyMarkMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Developers/dbals/FX/M_HeavyDragMark.M_HeavyDragMark"));
+		HeavyMarkMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/BumperCart/Cart/VFX/M_HeavyDragMark.M_HeavyDragMark"));
 	}
 
 	//스키드 데칼용 뒷바퀴 위치 조회 정보 캐시 (소켓 or 폴백 오프셋)

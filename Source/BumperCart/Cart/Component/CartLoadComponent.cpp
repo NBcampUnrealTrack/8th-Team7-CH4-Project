@@ -47,7 +47,7 @@ UCartLoadComponent::UCartLoadComponent()
     LoadedProducts.Reset();
 
     static ConstructorHelpers::FObjectFinder<USoundBase> LoadSoundFinder(
-        TEXT("/Game/Developers/dongh/Audio/MoneyPickupSound.MoneyPickupSound")
+        TEXT("/Game/BumperCart/Audio/SFX/Product/SFX_MoneyPickupSound.SFX_MoneyPickupSound")
     );
     if (LoadSoundFinder.Succeeded())
     {
