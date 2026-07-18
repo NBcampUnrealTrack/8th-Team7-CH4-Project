@@ -82,10 +82,10 @@ ACartPawn::ACartPawn()
 	LoadComponent = CreateDefaultSubobject<UCartLoadComponent>(TEXT("CartLoadComponent"));
 
     //임시 효과음 기본값 (정식 사운드 작업 때 교체. 충돌음은 CartBumpComponent)
-    static ConstructorHelpers::FObjectFinder<USoundBase> BoostSoundFinder(TEXT("/Game/Developers/dbals/Audio/Boost2.Boost2"));
+    static ConstructorHelpers::FObjectFinder<USoundBase> BoostSoundFinder(TEXT("/Game/BumperCart/Audio/SFX/Cart/SFX_Boost.SFX_Boost"));
     if (BoostSoundFinder.Succeeded()) { BoostSound = BoostSoundFinder.Object; }
 
-    static ConstructorHelpers::FObjectFinder<USoundBase> BrakeSoundFinder(TEXT("/Game/Developers/dbals/Audio/Brake.Brake"));
+    static ConstructorHelpers::FObjectFinder<USoundBase> BrakeSoundFinder(TEXT("/Game/BumperCart/Audio/SFX/Cart/SFX_Brake.SFX_Brake"));
     if (BrakeSoundFinder.Succeeded()) { BrakeSound = BrakeSoundFinder.Object; }
 
     // 그랩 컴포넌트 부착, SetupPlayerInputComponent에서 바인딩

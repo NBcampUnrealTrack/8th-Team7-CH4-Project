@@ -1,4 +1,4 @@
-// BumperCart - B(카트/플레이어 조작) 파트
+﻿// BumperCart - B(카트/플레이어 조작) 파트
 
 #include "CartBumpComponent.h"
 #include "Cart/CartPawn.h"
@@ -18,7 +18,7 @@ UCartBumpComponent::UCartBumpComponent()
 	SetIsReplicatedByDefault(true); //무적 상태 복제 + RPC용
 
 	//임시 효과음 기본값 (정식 사운드 작업 때 교체)
-	static ConstructorHelpers::FObjectFinder<USoundBase> BumpSoundFinder(TEXT("/Game/Developers/dbals/Audio/Bump.Bump"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> BumpSoundFinder(TEXT("/Game/BumperCart/Audio/SFX/Cart/SFX_Bump.SFX_Bump"));
 	if (BumpSoundFinder.Succeeded()) { BumpSound = BumpSoundFinder.Object; }
 }
 
