@@ -14,7 +14,7 @@ ATransitionScreenActor::ATransitionScreenActor()
 void ATransitionScreenActor::BeginPlay()
 {
     Super::BeginPlay();
-        
+
     if (LoadingWidgetClass && GEngine && GEngine->GameViewport)
     {
         LoadingWidget = CreateWidget<UUserWidget>(GetWorld(), LoadingWidgetClass);
@@ -24,4 +24,4 @@ void ATransitionScreenActor::BeginPlay()
         }
     }
 }
-}
+
