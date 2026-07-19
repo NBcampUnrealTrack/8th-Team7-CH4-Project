@@ -1,4 +1,4 @@
-//BumperCart - B(카트/플레이어 조작) 파트
+﻿//BumperCart - B(카트/플레이어 조작) 파트
 
 #include "Lobby/LobbyCartDisplay.h"
 #include "Components/StaticMeshComponent.h"
@@ -20,14 +20,14 @@ ALobbyCartDisplay::ALobbyCartDisplay()
 	CartMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	//기본 메시 = 카트 본체 (레벨 인스턴스에서 교체 가능)
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeshFinder(TEXT("/Game/Developers/dongh/Cart/Mesh/SM_Shopping_Cart.SM_Shopping_Cart"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeshFinder(TEXT("/Game/BumperCart/Cart/Mesh/SM_Shopping_Cart.SM_Shopping_Cart"));
 	if (MeshFinder.Succeeded())
 	{
 		CartMesh->SetStaticMesh(MeshFinder.Object);
 	}
 
 	//인게임 카트(BP_CartPawn)와 같은 머티리얼로 통일 — 메시 기본 머티리얼엔 CartColor 파라미터가 없음
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MaterialFinder(TEXT("/Game/Developers/dongh/Cart/Materials/MI_Shopping_Cart_Custom.MI_Shopping_Cart_Custom"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MaterialFinder(TEXT("/Game/BumperCart/Cart/Materials/MI_Shopping_Cart_Custom.MI_Shopping_Cart_Custom"));
 	if (MeshFinder.Succeeded() && MaterialFinder.Succeeded())
 	{
 		for (int32 i = 0; i < CartMesh->GetNumMaterials(); ++i)

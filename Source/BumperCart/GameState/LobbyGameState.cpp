@@ -20,6 +20,12 @@ void ALobbyGameState::RefreshPlayerInfos(APlayerState* ExcludedPlayerState)
 {
     if (!HasAuthority()) return;
 
+    UWorld* World = GetWorld();
+    if (!World || World->bIsTearingDown)
+    {
+        return;
+    }
+
     ReplicatedPlayerInfos.Reset();
 
     UMainGameInstance* GI = GetGameInstance<UMainGameInstance>();
@@ -81,6 +87,12 @@ bool ALobbyGameState::bIsAllPlayersReady() const
 // 플레이어의 정보가 바뀔 시 호출
 void ALobbyGameState::OnRep_PlayerInfos()
 {
+    UWorld* World = GetWorld();
+    if (!World || World->bIsTearingDown)
+    {
+        return;
+    }
+
     OnLobbyPlayersChanged.Broadcast();
 }
 

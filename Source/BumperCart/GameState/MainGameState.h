@@ -19,9 +19,12 @@ enum class ERoundPhase : uint8
 };
 
 class AMainPlayerState;
+class UUserWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRoundPhaseChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMainPlayerStateChanged, AMainPlayerState*, PlayerState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWaitingForPlayersChanged, bool, bIsWaiting);
+
 
 UCLASS()
 class BUMPERCART_API AMainGameState : public AGameState
@@ -91,4 +94,22 @@ private:
     UPROPERTY(Replicated)
     TArray<FString> FinalWinnerNames;
 
+
+#pragma region PlayerLoadingWait
+public:
+    UPROPERTY(BlueprintAssignable, Category = "Loading")
+    FOnWaitingForPlayersChanged OnWaitingForPlayersChanged;
+
+    void SetWaitingForPlayers(bool bInWaiting);
+
+    UFUNCTION(BlueprintPure, Category = "Loading")
+    bool IsWaitingForPlayers() const { return bWaitingForPlayers; }
+
+private:
+    UPROPERTY(ReplicatedUsing = OnRep_bWaitingForPlayers)
+    bool bWaitingForPlayers = true;
+
+    UFUNCTION()
+    void OnRep_bWaitingForPlayers();
+#pragma endregion
 };

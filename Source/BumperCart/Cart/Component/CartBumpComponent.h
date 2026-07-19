@@ -81,7 +81,7 @@ protected:
 
 	//무적 중 몸통 깜빡임 간격(초)
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0.01"))
-	float BumpBlinkInterval = 0.08f;
+	float BumpBlinkInterval = 0.16f;
 
 	//한 번 쏟은 뒤 다음 드롭까지 최소 간격(초) — 모든 스필(충돌·부스터오용) 공통
 	UPROPERTY(EditAnywhere, Category = "Cart|Bump", meta = (ClampMin = "0"))

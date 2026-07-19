@@ -9,12 +9,32 @@
 
 class ACartPawn;
 class UCameraComponent;
+class UDecalComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UNiagaraComponent;
 class UNiagaraSystem;
 class UStaticMeshComponent;
 class UUserWidget;
+
+//카트 색(DA_CharacterSelectionConfig) => 부스트 잔상 색 랜덤 범위 매핑 항목
+USTRUCT()
+struct FBoostGhostColorEntry
+{
+	GENERATED_BODY()
+
+	//매칭 기준 카트 색 (가장 가까운 항목이 선택됨)
+	UPROPERTY(EditAnywhere)
+	FLinearColor CartColor = FLinearColor::White;
+
+	//잔상 색 랜덤 하한 (RGB=틴트, A=오파시티 소스)
+	UPROPERTY(EditAnywhere)
+	FLinearColor GhostColorMin = FLinearColor(0.45f, 0.85f, 0.8f, 0.55f);
+
+	//잔상 색 랜덤 상한 (HDR 허용)
+	UPROPERTY(EditAnywhere)
+	FLinearColor GhostColorMax = FLinearColor(0.45f, 0.85f, 1.7f, 1.3f);
+};
 
 //카트의 시각 연출을 전담하는 컴포넌트.
 //화면: 부스트 중 가장자리 스피드라인(PostProcess MID, 내 화면만)
@@ -86,6 +106,39 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
 	TObjectPtr<UNiagaraSystem> BoostDustSystem;
 
+	//부스트 중 카트 중앙(루트)에 1개만 부착하는 연출 — 잔상처럼 바퀴 좌우 복제가 아닌 카트 단위 FX (BP에서 지정. 비어있으면 무동작)
+	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
+	TObjectPtr<UNiagaraSystem> BoostCenterSystem;
+
+	//카트 색별 잔상 색 매핑 (생성자에서 DA_CharacterSelectionConfig 색 기준으로 채움. 비어있으면 시스템 기본값 사용)
+	UPROPERTY(EditAnywhere, Category = "Cart|BoostFX")
+	TArray<FBoostGhostColorEntry> GhostColorByCart;
+
+	//---------- 무게 속박 연출 (적재 절반부터, 바퀴 뒤 바닥 웨이브 자국) ----------
+	//바닥 웨이브 자국 데칼 머티리얼 (M_HeavyDragMark 자동 로드. 비어있으면 무동작)
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX")
+	TObjectPtr<UMaterialInterface> HeavyMarkMaterial;
+
+	//이 적재율부터 속박 연출 표시
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0", ClampMax = "1"))
+	float HeavyDragMinLoad = 0.5f;
+
+	//자국은 이 전진 속도(cm/s) 이상일 때만 (정지 중엔 링 데칼만)
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0"))
+	float HeavyDragMinSpeed = 150.f;
+
+	//뒷바퀴가 이 거리(cm) 이동할 때마다 자국 하나
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "1"))
+	float HeavyMarkSpacing = 60.f;
+
+	//자국 수명(초) — 절반 지난 뒤부터 페이드아웃
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0.1"))
+	float HeavyMarkLifetime = 0.8f;
+
+	//자국 데칼 크기 (X=투영 깊이, Y=폭 절반, Z=진행 방향 길이 절반)
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX")
+	FVector HeavyMarkSize = FVector(24.f, 12.f, 40.f);
+
 	//---------- 브레이크 스키드 마크 (바닥 데칼) ----------
 	//타이어 자국 데칼 머티리얼 (Material Domain = Deferred Decal). 비어있으면 무동작
 	UPROPERTY(EditAnywhere, Category = "Cart|SkidDecal")
@@ -120,6 +173,18 @@ private:
 
 	//나이아가라 컴포넌트 하나를 생성해 부착. 소켓이 없을 땐 FallbackOffset 위치로
 	UNiagaraComponent* SpawnWheelFX(UNiagaraSystem* System, USceneComponent* AttachTo, FName Socket, const FVector& FallbackOffset, bool bStartActive);
+
+	//카트 색과 가장 가까운 매핑 항목의 잔상 색을 BoostCenterFX User 파라미터로 전달 (부스트 시작 시)
+	void ApplyBoostGhostColor();
+
+	//무게 속박 연출 구동 — 링 데칼 크기/강도 + 바닥 자국 스탬프 (매 프레임)
+	void DriveHeavyDrag(float ForwardSpeed);
+
+	//한쪽 뒷바퀴: 마지막 자국에서 HeavyMarkSpacing 이상 벌어지면 자국 스탬프
+	void TrySpawnHeavyMark(const FVector& WheelPos, FVector& LastPos, bool& bHasLast, float HeavyAlpha);
+
+	//지정 위치 바닥에 속박 자국 데칼 하나 (웨이브 위상 랜덤, 수명 후 페이드)
+	void SpawnHeavyMarkAt(const FVector& WorldPos, float HeavyAlpha);
 
 	//리본 파라미터 갱신 + 브레이크 스파크 on/off·히트 누적 (매 프레임)
 	void DriveWheelFX(float ForwardSpeed, float DeltaTime);
@@ -164,9 +229,17 @@ private:
 	TObjectPtr<UNiagaraComponent> BoostDustFXLeft;
 	UPROPERTY(Transient)
 	TObjectPtr<UNiagaraComponent> BoostDustFXRight;
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> BoostCenterFX;
 
 	//스파크 현재 활성 상태 (상태 바뀔 때만 Activate/Deactivate)
 	bool bSparksActive = false;
+
+	//마지막 속박 자국 위치 (거리 기반 스탬프)
+	FVector LastHeavyMarkPosLeft = FVector::ZeroVector;
+	FVector LastHeavyMarkPosRight = FVector::ZeroVector;
+	bool bHasLastHeavyMarkLeft = false;
+	bool bHasLastHeavyMarkRight = false;
 
 	//부스트 FX(트레일·먼지) 현재 활성 상태
 	bool bBoostFXActive = false;
