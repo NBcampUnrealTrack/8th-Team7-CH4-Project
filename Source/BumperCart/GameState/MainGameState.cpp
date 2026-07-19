@@ -3,6 +3,7 @@
 
 #include "GameState/MainGameState.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Net/UnrealNetwork.h"
 #include "PlayerState/MainPlayerState.h"
 
@@ -13,6 +14,7 @@ void AMainGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
     DOREPLIFETIME(AMainGameState, CurrentPhase);
     DOREPLIFETIME(AMainGameState, RoundStartServerTime);
     DOREPLIFETIME(AMainGameState, FinalWinnerNames);
+    DOREPLIFETIME(AMainGameState, bWaitingForPlayers);
 }
 
 void AMainGameState::SetRoundPhase(ERoundPhase NewPhase)
@@ -106,3 +108,21 @@ void AMainGameState::RemovePlayerState(APlayerState* PlayerState)
         OnMainPlayerStateRemoved.Broadcast(PS);
     }
 }
+
+void AMainGameState::SetWaitingForPlayers(bool bInWaiting)
+{
+    if (!HasAuthority()) return;
+
+    if (bWaitingForPlayers == bInWaiting) return;
+
+    bWaitingForPlayers = bInWaiting;
+
+    OnRep_bWaitingForPlayers();
+}
+
+void AMainGameState::OnRep_bWaitingForPlayers()
+{
+    OnWaitingForPlayersChanged.Broadcast(bWaitingForPlayers);
+}
+
+
