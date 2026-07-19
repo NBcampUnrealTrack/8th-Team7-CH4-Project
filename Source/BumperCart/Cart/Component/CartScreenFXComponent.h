@@ -127,17 +127,21 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0"))
 	float HeavyDragMinSpeed = 150.f;
 
-	//뒷바퀴가 이 거리(cm) 이동할 때마다 자국 하나
+	//뒷바퀴가 이 거리(cm) 이동할 때마다 자국 하나 (자국 길이보다 좁게 => 앞 자국 꼬리가 다음 자국에 겹침)
 	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "1"))
-	float HeavyMarkSpacing = 60.f;
+	float HeavyMarkSpacing = 40.f;
+
+	//자국을 바퀴 위치에서 이만큼(cm) 뒤로 물려서 찍음 (바퀴 밑이 아니라 바퀴 뒤에 보이도록)
+	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0"))
+	float HeavyMarkBackOffset = 15.f;
 
 	//자국 수명(초) — 절반 지난 뒤부터 페이드아웃
 	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX", meta = (ClampMin = "0.1"))
-	float HeavyMarkLifetime = 0.8f;
+	float HeavyMarkLifetime = 1.0f;
 
-	//자국 데칼 크기 (X=투영 깊이, Y=폭 절반, Z=진행 방향 길이 절반)
+	//자국 데칼 크기 (X=투영 깊이, Y=폭 절반, Z=진행 방향 길이 절반) — 팔 흔들림 여유 폭 포함
 	UPROPERTY(EditAnywhere, Category = "Cart|HeavyFX")
-	FVector HeavyMarkSize = FVector(24.f, 12.f, 40.f);
+	FVector HeavyMarkSize = FVector(24.f, 30.f, 50.f);
 
 	//---------- 브레이크 스키드 마크 (바닥 데칼) ----------
 	//타이어 자국 데칼 머티리얼 (Material Domain = Deferred Decal). 비어있으면 무동작
@@ -183,7 +187,7 @@ private:
 	//한쪽 뒷바퀴: 마지막 자국에서 HeavyMarkSpacing 이상 벌어지면 자국 스탬프
 	void TrySpawnHeavyMark(const FVector& WheelPos, FVector& LastPos, bool& bHasLast, float HeavyAlpha);
 
-	//지정 위치 바닥에 속박 자국 데칼 하나 (웨이브 위상 랜덤, 수명 후 페이드)
+	//지정 위치 바닥에 속박 자국 데칼 하나 (/ \ 쉐브론 모양, 위상 랜덤, 수명 후 페이드)
 	void SpawnHeavyMarkAt(const FVector& WorldPos, float HeavyAlpha);
 
 	//리본 파라미터 갱신 + 브레이크 스파크 on/off·히트 누적 (매 프레임)
