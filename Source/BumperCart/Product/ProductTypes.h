@@ -77,6 +77,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FLinearColor OverlayColor = FLinearColor::White;
 
+    // 오라 강도
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float AuraStrength = 0.f;
+
     // 가치
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 Value = 0;

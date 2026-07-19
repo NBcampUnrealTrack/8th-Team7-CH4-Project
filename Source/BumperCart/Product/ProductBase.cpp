@@ -653,10 +653,13 @@ void AProductBase::ApplyValueAura()
 
     AuraComponent->SetAsset(AuraSystem);
 
-    FLinearColor Color = GetValueOverlayColor();
-    Color.A = 0.08f;
+    const FProductValueGradeRule* Rule = FindValueGradeRule();
+    FLinearColor Color = Rule ? Rule->OverlayColor : ValueGradeConfig->DefaultColor;
+    Color.A = 1.f;
+    float Strength = Rule ? Rule->AuraStrength : 0.f;
 
     AuraComponent->SetVariableLinearColor(TEXT("User.AuraColor"), Color);
+    AuraComponent->SetVariableFloat(TEXT("User.AuraStrength"), Strength);
 
     RefreshAuraActive();
 }
