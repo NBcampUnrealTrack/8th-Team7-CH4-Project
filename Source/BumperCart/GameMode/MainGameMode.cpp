@@ -148,6 +148,15 @@ void AMainGameMode::CheckAllPlayersLoaded()
         }
     }
 
+#if WITH_EDITOR
+    // 로딩 지연 테스트
+    if (bIsAllLoaded && PlayerLoadWait < 5.0f)
+    {
+        bIsAllLoaded = false;
+        UE_LOG(LogMainGameMode, Warning, TEXT("[테스트] 강제 로딩 지연 중... (%.2f초/5초)"), PlayerLoadWait);
+    }
+#endif
+
    bool bTimedOut = false;
    if(PlayerLoadWait >= PlayerLoadWaitTimeout)
    {
@@ -169,6 +178,8 @@ void AMainGameMode::CheckAllPlayersLoaded()
             UE_LOG(LogMainGameMode, Warning,
                 TEXT("[플레이어 접속 체크] 모든 플레이어(%d명) 접속 완료"), GS->PlayerArray.Num());
         }
+
+        GS->SetWaitingForPlayers(false);
 
         // 시작 연출 대기 이후 실제 라운드 시작
         OnGameStartEvent.Broadcast();

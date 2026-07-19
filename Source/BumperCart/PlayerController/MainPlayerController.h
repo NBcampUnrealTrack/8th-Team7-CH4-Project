@@ -37,4 +37,22 @@ private:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Controller|Main", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UUserWidget> UIWidgetInstance;
+
+#pragma region PlayerLoadingWait
+private:
+    // 플레이어 접속 대기 중 띄울 위젯
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Controller|Main|Loading", meta = (AllowPrivateAccess = "true"))
+    TSubclassOf<UUserWidget> WaitingWidgetClass;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Controller|Main|Loading", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UUserWidget> WaitingWidgetInstance;
+
+    UFUNCTION()
+    void HandleWaitingForPlayersChanged(bool bIsWaiting);
+
+    // BeginPlay 시점에 GameState가 아직 준비 안 됐을 경우 재시도용
+    void TryBindWaitingDelegate();
+
+    FTimerHandle Timer_BindWaitingDelegate;
+#pragma endregion
 };
