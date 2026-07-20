@@ -264,7 +264,17 @@ void ACheckoutZone::MulticastPlayCheckoutCompleteSound_Implementation()
         return;
     }
 
-    UGameplayStatics::PlaySoundAtLocation(this, CheckoutCompleteSound, GetActorLocation());
+    //UGameplayStatics::PlaySoundAtLocation(this, CheckoutCompleteSound, GetActorLocation());
+    UGameplayStatics::PlaySoundAtLocation(
+        this,
+        CheckoutCompleteSound,
+        GetActorLocation(),
+        GetActorRotation(),
+        1.0f,                              // Volume
+        1.0f,                              // Pitch
+        0.0f,                              // Start Time
+        CheckoutCompleteAttenuation         // 거리 감쇠
+    );
 }
 
 void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
