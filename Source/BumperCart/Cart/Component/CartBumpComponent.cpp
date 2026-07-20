@@ -40,8 +40,8 @@ void UCartBumpComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 	//충돌 무적: 모든 클라가 몸통 깜빡 연출을 해야 하므로 소유자 포함 전체 복제
 	DOREPLIFETIME(UCartBumpComponent, bBumpInvincible);
-	//필살기 게이지: UI 표시용 => 소유 클라만 (임시 디버그 테스트 중엔 전체 복제 — 배포 시 COND_OwnerOnly 복귀)
-	DOREPLIFETIME(UCartBumpComponent, UltimateStack);
+	//필살기 게이지: UI 표시용 => 소유 클라만
+	DOREPLIFETIME_CONDITION(UCartBumpComponent, UltimateStack, COND_OwnerOnly);
 }
 
 //충돌 시 가해자 게이지 +1 (서버) — 발동 중이면 미획득, 상한 클램프
