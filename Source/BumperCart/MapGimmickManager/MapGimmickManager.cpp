@@ -53,11 +53,8 @@ void AMapGimmickManager::BeginPlay()
         }
     }
 
-    UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] 총 타겟 포인트 갯수 : %d "), GimmickSpawnPointList.Num());
+    //UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] 총 타겟 포인트 갯수 : %d "), GimmickSpawnPointList.Num());
 
-
-    // 테스트용 - 게임 모드에서 호출시 삭제 예정
-    //StartGimmickSpawning();
 }
 
 void AMapGimmickManager::StartGimmickSpawning()
@@ -114,7 +111,7 @@ void AMapGimmickManager::SpawnObstacles()
             }
         }
 
-        UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] %s %d개 스폰 완료"), *Info.ObstacleName.ToString(), Info.SpawnCount);
+        //UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] %s %d개 스폰 완료"), *Info.ObstacleName.ToString(), Info.SpawnCount);
     }
 }
 
@@ -133,7 +130,7 @@ void AMapGimmickManager::ClearAllObstacles()
 
     SpawnedObstacleList.Empty();
 
-    UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] 기존 장애물들 정리완료"));
+    //UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] 기존 장애물들 정리완료"));
 }
 
 void AMapGimmickManager::RespawnObstacles()
@@ -200,7 +197,7 @@ void AMapGimmickManager::SpawnNPCRush()
 
             if (IsValid(SpawnedGimmick))
             {
-                UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 시작"));
+                //UE_LOG(LogTemp, Log, TEXT("[맵기믹 매니저] NPCRush 시작"));
                 SpawnedGimmick->SetLifeSpan(7.0f);
             }
         }
@@ -226,11 +223,11 @@ void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* Target
     FVector StartPos = TargetPoint->GetActorLocation();
     // 플레이어 위로 쏴지게
     StartPos.Z += 100.0f;
+
     FVector ForwardDir = TargetPoint->GetActorForwardVector();
 
     // 기본적으로 벽에 안 부딪혔을 때를 대비한 가상의 끝점
     FVector EndPos = StartPos + (ForwardDir * MaxTraceDistance);
-    EndPos.Z += 100.0f;
 
     // 라인 트레이스
     FHitResult HitResult;
@@ -260,10 +257,10 @@ void AMapGimmickManager::CalculateTraceDimensionsFromTarget(ATargetPoint* Target
     float TotalDistance = FVector::Dist(StartPos, EndPos);
     float Radius = TotalDistance * 0.5f;
 
-    SpawnWarningDecal(CenterVector, Radius);
+    SpawnWarningDecal(CenterVector, ForwardDir, Radius, TotalDistance);
 }
 
-void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, float Radius)
+void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, FVector ForwardDir, float Radius, float TotalDistance)
 {
     if (WarningSound)
     {
@@ -273,7 +270,8 @@ void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, float Radius)
     // 데칼 스폰
     if (NPCRushWarningArea)
     {
-        FRotator DecalRotation = FRotationMatrix::MakeFromXZ(CenterPoint.ForwardVector, FVector::UpVector).Rotator();
+        FRotator DecalRotation = ForwardDir.Rotation();
+        DecalRotation.Yaw += 90;
 
         SpawnNPCRushWarningArea = GetWorld()->SpawnActor<ANPCRushWarningArea>(
             NPCRushWarningArea,
@@ -285,7 +283,7 @@ void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, float Radius)
     // 스폰된 데칼 사이즈 변경
     if (SpawnNPCRushWarningArea)
     {
-        FVector TargetExtent = FVector(20.f, 100.0f, Radius);
+        FVector TargetExtent = FVector(10.0f, Radius * 1.5f, 256.0f);
         FVector DefaultDecalSize = FVector(128.f, 128.f, 128.f); // 엔진 기본값
 
         FVector NewScale = FVector(

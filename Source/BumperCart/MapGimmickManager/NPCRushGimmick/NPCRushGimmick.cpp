@@ -105,8 +105,6 @@ void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 
     if (OtherComp && OtherComp->GetCollisionObjectType() == ECC_WorldStatic)
     {
-        UE_LOG(LogTemp, Log, TEXT("[맵 기믹 매니저] 거대 카트가 마트 벽에 부딪혀 박살났습니다!"));
-
         Destroy();
 
         return;
@@ -114,8 +112,6 @@ void ANPCRushGimmick::OnCartOverlap(UPrimitiveComponent* OverlappedComp, AActor*
 
     if (ACartPawn* HitPlayer = Cast<ACartPawn>(OtherActor))
     {
-        UE_LOG(LogTemp, Log, TEXT("[NPCRush] 플레이어 오버랩 감지"));
-
         // 중복 실행 방지
         float CurrentTime = GetWorld()->GetTimeSeconds();
         if (CurrentTime - LastHitTime < 1.5f)    return;
@@ -174,8 +170,6 @@ void ANPCRushGimmick::Knockback(ACartPawn* PlayerCart, const FHitResult& SweepRe
         CartLoadComp->DropProducts(ClosingSpeed * 3000.0f, DropRole);
 
         PlayerCart->ApplyExternalKnockback(FinalKnockbackDir, Strength);
-
-        UE_LOG(LogTemp, Log, TEXT("[거대 카트] 아이템 드롭, 밀치기 완료"));
     }
 
     PlayerCart->ClientPlayCameraShake(nullptr, 1.0f);

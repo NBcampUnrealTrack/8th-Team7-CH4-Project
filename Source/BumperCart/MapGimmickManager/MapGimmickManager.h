@@ -70,7 +70,7 @@ private:
 
 protected:
     // 장애물 리스폰 시간
-    UPROPERTY(EditAnywhere, Category = "Gimmick | WaterHole")
+    UPROPERTY(EditAnywhere, Category = "Gimmick | Settings")
     float ObstacleRespawnInterval = 20.0f;
 
 public:
@@ -126,7 +126,7 @@ public:
 
     void CalculateTraceDimensionsFromTarget(ATargetPoint* TargetPoint, float MaxTraceDistance);
 
-    void SpawnWarningDecal(FVector CenterPoint, float Radius);
+    void SpawnWarningDecal(FVector CenterPoint, FVector ForwardDir, float Radius, float TotalDistance);
 
 #pragma endregion
 
