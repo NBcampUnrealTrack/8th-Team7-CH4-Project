@@ -173,8 +173,6 @@ void ACheckoutZone::OnCheckoutZoneEndOverlap(UPrimitiveComponent* OverlappedComp
 
 
     RemovePlayerFromZone(PlayerCharacter);
-
-    UE_LOG(LogTemp, Warning, TEXT("계산 구역 이탈"));
 }
 
 // ------------------------------------------------------------
@@ -267,8 +265,6 @@ void ACheckoutZone::MulticastPlayCheckoutCompleteSound_Implementation()
     }
 
     UGameplayStatics::PlaySoundAtLocation(this, CheckoutCompleteSound, GetActorLocation());
-
-    UE_LOG(LogTemp, Warning, TEXT("정산 완료 사운드 재생"));
 }
 
 void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
@@ -279,8 +275,6 @@ void ACheckoutZone::MulticastPlayCheckoutStateChangeSound_Implementation()
     }
 
     UGameplayStatics::PlaySoundAtLocation(this, CheckoutStateChangeSound, GetActorLocation());
-
-    UE_LOG(LogTemp, Warning, TEXT("계산대 오픈"));
 }
 
 void ACheckoutZone::UpdateCheckoutEffect()
@@ -760,8 +754,6 @@ void ACheckoutZone::AddPlayerInZone(ACartPawn* PlayerCharacter)
         CartLoadComponent->OnLoadInfoChanged.AddUniqueDynamic(this,&ThisClass::HandleLoadInfoChanged);
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("계산 구역 진입: %s / 현재 계산대 내 인원: %d"), *GetNameSafe(PlayerCharacter), PlayersInZone.Num());
-
     // 배열에 추가 후 Checkout 시도
     // CheckoutZone에 진입 시 자동으로 정산 시작
     TryStartCheckout();
@@ -792,8 +784,6 @@ void ACheckoutZone::RemovePlayerFromZone(ACartPawn* PlayerCharacter)
     {
         MulticastSetPlayerBarrierIgnore(PlayerCharacter, false);
     }
-
-    UE_LOG(LogTemp, Warning, TEXT("계산 구역 이탈: %s / 현재 계산대 내 인원: %d"), *GetNameSafe(PlayerCharacter), PlayersInZone.Num());
 
     // 현재 정산 중인 플레이어가 이탈한 경우 정산 취소
     if (CurrentCheckoutPlayer == PlayerCharacter)
@@ -854,8 +844,6 @@ void ACheckoutZone::HandleLoadInfoChanged(AActor* OwnerActor, const FLoadInfo& L
     if (AddedProductCount > 0)
     {
         RequiredCheckoutTime += AdditionalCheckoutTime * AddedProductCount;
-
-        UE_LOG(LogTemp, Warning, TEXT("상품 %d개 추가 / 필요 시간: %.1f초"), AddedProductCount, RequiredCheckoutTime);
     }
 
     // 현재 적재한 상품 수 갱신
@@ -955,8 +943,6 @@ bool ACheckoutZone::CanStartCheckout(ACartPawn* PlayerCharacter) const
     {
         return false;
     }
-
-    UE_LOG(LogTemp, Warning, TEXT("정산 가능: %s / 상품 수: %d"), *GetNameSafe(PlayerCharacter), CartLoadComponent->GetCurrentLoadedCount());
 
     return true;
 }
@@ -1082,8 +1068,6 @@ void ACheckoutZone::StartCheckout(ACartPawn* PlayerCharacter)
 
     // 정산 시작 시 호출
     OnRep_CheckoutSession();
-
-    UE_LOG(LogTemp, Warning, TEXT("%s 정산 시작"), *GetNameSafe(CurrentCheckoutPlayer));
 }
 
 void ACheckoutZone::UpdateCheckoutProgress()
@@ -1276,8 +1260,6 @@ void ACheckoutZone::CompleteCheckout()
         return;
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("정산 완료 - 획득 점수: %d"), LastCheckoutScore);
-
     // 정산이 완료되면 플레이어는 대기열에서 제거
     //PlayersInZone.Remove(CompletedPlayer);
 
@@ -1306,8 +1288,6 @@ void ACheckoutZone::CancelCheckout()
     }
 
     ResetCheckout();
-
-    UE_LOG(LogTemp, Warning, TEXT("정산 취소"));
 }
 
 void ACheckoutZone::ResetCheckout()
@@ -1504,21 +1484,17 @@ void ACheckoutZone::OnRep_CurrentCheckoutZoneState()
     switch (CurrentCheckoutZoneState)
     {
     case ECheckoutZoneState::None:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: None"));
         break;
 
     case ECheckoutZoneState::Open:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Open"));
         // 초록색 색상 로직
         break;
 
     case ECheckoutZoneState::ClosingSoon:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: ClosingSoon"));
         // 노란색 색상 로직
         break;
 
     case ECheckoutZoneState::Closed:
-        UE_LOG(LogTemp, Warning, TEXT("계산대 상태: Closed"));
         // 빨간색 색상 로직
         break;
 
