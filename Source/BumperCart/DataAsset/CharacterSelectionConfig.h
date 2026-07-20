@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -17,7 +17,7 @@ struct FCharacterData
 
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
-    FLinearColor Color;
+    FLinearColor Color = FLinearColor(1.f, 1.f, 0.f, 0.f);
 };
 
 UCLASS()
