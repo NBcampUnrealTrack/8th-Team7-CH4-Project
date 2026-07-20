@@ -270,7 +270,6 @@ void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, FVector ForwardD
     // 데칼 스폰
     if (NPCRushWarningArea)
     {
-        //FRotator DecalRotation = FRotationMatrix::MakeFromXZ(CenterPoint.ForwardVector, FVector::UpVector).Rotator();
         FRotator DecalRotation = ForwardDir.Rotation();
         DecalRotation.Yaw += 90;
 

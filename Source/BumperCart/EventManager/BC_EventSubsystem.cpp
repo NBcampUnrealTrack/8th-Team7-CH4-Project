@@ -89,8 +89,6 @@ void UBC_EventSubsystem::ExecuteRepeatSpawn()
         if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
         {
             ProductShelfSubsystem->SaleProductSpawn();
-
-            //UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 선반 서브시스템 -> 세일제품 스폰 반복 호출"));
         }
         else
         {
@@ -121,7 +119,6 @@ void UBC_EventSubsystem::InitializeLimitedEventConfig(ULimitedEventConfig* InLim
     if (IsValid(InLimitedEventConfig))
     {
         LimitedEventConfig = InLimitedEventConfig;
-        //UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] GameMode에서 한정 이벤트 데이터 에셋 로드완료"));
 
         LimitedProductList = LimitedEventConfig->LimitedProductList;
 
