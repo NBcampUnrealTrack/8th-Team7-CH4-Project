@@ -155,3 +155,17 @@ int32 ALobbyGameState::GetNextAvailableCharacterIndex() const
     }
     return INDEX_NONE;
 }
+
+int32 ALobbyGameState::FindNextAvailableCharacterIndex(int32 StartIndex, const APlayerState* RequestPS) const
+{
+    const int32 AvailableNum = GetAvailableCharacters().Num();
+    if (AvailableNum <= 0) return INDEX_NONE;
+
+    int32 CharacterIndex = (StartIndex % AvailableNum + AvailableNum) % AvailableNum;
+    
+    while (IsCharacterIndexSelectedByOtherPlayer(CharacterIndex, RequestPS))
+    {
+        CharacterIndex = (CharacterIndex + 1) % AvailableNum;
+    }
+    return CharacterIndex;
+}
