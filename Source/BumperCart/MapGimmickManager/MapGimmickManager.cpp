@@ -283,7 +283,7 @@ void AMapGimmickManager::SpawnWarningDecal(FVector CenterPoint, FVector ForwardD
     // 스폰된 데칼 사이즈 변경
     if (SpawnNPCRushWarningArea)
     {
-        FVector TargetExtent = FVector(10.0f, Radius, 256.0f);
+        FVector TargetExtent = FVector(10.0f, Radius * 1.5f, 256.0f);
         FVector DefaultDecalSize = FVector(128.f, 128.f, 128.f); // 엔진 기본값
 
         FVector NewScale = FVector(
