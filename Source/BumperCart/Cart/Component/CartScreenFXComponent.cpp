@@ -44,9 +44,9 @@ UCartScreenFXComponent::UCartScreenFXComponent()
 		Entry.GhostColorMin = Min;
 		Entry.GhostColorMax = Max;
 	};
-	AddGhostColor(FLinearColor(0.232708f, 1.f, 0.932103f), FLinearColor(0.45f, 0.85f, 0.8f, 0.55f), FLinearColor(0.45f, 0.85f, 1.7f, 1.3f));   //Mint
+	AddGhostColor(FLinearColor(0.232708f, 1.f, 0.932103f), FLinearColor(0.45f, 0.85f, 0.8f, 0.7f), FLinearColor(0.45f, 0.85f, 1.7f, 1.55f));  //Mint
 	AddGhostColor(FLinearColor(1.f, 0.f, 0.f),             FLinearColor(0.8f, 0.36f, 0.36f, 0.55f), FLinearColor(1.7f, 0.765f, 0.765f, 1.3f)); //Red
-	AddGhostColor(FLinearColor(0.f, 0.f, 1.f),             FLinearColor(0.36f, 0.36f, 0.8f, 0.55f), FLinearColor(0.765f, 0.765f, 1.7f, 1.3f)); //Blue
+	AddGhostColor(FLinearColor(0.f, 0.f, 1.f),             FLinearColor(0.36f, 0.36f, 0.8f, 0.7f), FLinearColor(0.765f, 0.765f, 1.7f, 1.55f)); //Blue
 	AddGhostColor(FLinearColor(0.f, 1.f, 0.f),             FLinearColor(0.36f, 0.8f, 0.36f, 0.55f), FLinearColor(0.765f, 1.7f, 0.765f, 1.3f)); //Green
 	AddGhostColor(FLinearColor(1.f, 1.f, 0.f),             FLinearColor(0.8f, 0.8f, 0.36f, 0.55f),  FLinearColor(1.7f, 1.7f, 0.765f, 1.3f));   //Basic(노랑)
 	AddGhostColor(FLinearColor(0.443393f, 0.f, 0.494792f), FLinearColor(0.752f, 0.36f, 0.8f, 0.55f), FLinearColor(1.598f, 0.765f, 1.7f, 1.3f)); //Purple
