@@ -32,9 +32,9 @@ void UProductShelfSubsystem::RegisterShelf(AProductShelf* InShelf, EShelfType In
         break;
     }
 
-    FString NetModeStr = (GetWorld() && GetWorld()->GetNetMode() != NM_Client) ? TEXT("서버") : TEXT("클라이언트");
+    /*FString NetModeStr = (GetWorld() && GetWorld()->GetNetMode() != NM_Client) ? TEXT("서버") : TEXT("클라이언트");
     UE_LOG(LogTemp, Log, TEXT("[%s][제품 선반 매니저] 선반 등록 (종류: %d, 일반: %d, 세일: %d, 한정: %d)"),
-        *NetModeStr, (int32)InType, NormalProductShelfs.Num(), SaleProductShelfs.Num(), LimitedProductShelfs.Num());
+        *NetModeStr, (int32)InType, NormalProductShelfs.Num(), SaleProductShelfs.Num(), LimitedProductShelfs.Num());*/
 }
 
 void UProductShelfSubsystem::InitializeConfig(UProductShelfManagerConfig* InConfig)
@@ -49,16 +49,6 @@ void UProductShelfSubsystem::InitializeConfig(UProductShelfManagerConfig* InConf
         SpawnFX = SpawnConfig->SpawnFX;
         SpawnSound = SpawnConfig->SpawnSound;
 
-        FString NetModeStr = (GetWorld() && GetWorld()->GetNetMode() != NM_Client) ? TEXT("서버") : TEXT("클라이언트");
-        UE_LOG(LogTemp, Log, TEXT("[%s][선반매니저] 데이터 에셋 적용"), *NetModeStr);
-
-        // 서버에서만
-        //if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
-        //{
-        //    // 게임 모드에서 호출시 삭제 예정 - 테스트용
-        //    GetWorld()->GetTimerManager().SetTimer(GameStartTimerHandle, this, &UProductShelfSubsystem::StartProductSpawning, RespawnDelay, false);
-        //    UE_LOG(LogTemp, Log, TEXT("[선반매니저] 아이템 스폰"));
-        //}
     }
 }
 
@@ -101,7 +91,6 @@ void UProductShelfSubsystem::ProductSpawnCall()
             }
         }
     }
-    UE_LOG(LogTemp, Log, TEXT("[제품선반 서브시스템] 스폰된 제품 수 : %d"), CurrentProductCount);
 }
 
 void UProductShelfSubsystem::OnProductDestroyed()

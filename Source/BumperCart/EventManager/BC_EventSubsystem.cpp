@@ -20,7 +20,7 @@ void UBC_EventSubsystem::InitializeSaleEventConfig(USaleEventConfig* InSaleEnvan
     if (IsValid(InSaleEnvantConfig))
     {
         SaleEventConfig = InSaleEnvantConfig;
-        UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] GameMode에서 세일 이벤트 데이터 에셋 로드완료"));
+        //UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] GameMode에서 세일 이벤트 데이터 에셋 로드완료"));
 
         //SaleProductList = SaleEventConfig->SaleProductList;
         SaleEventTime = SaleEventConfig->SaleEventTime;
@@ -78,17 +78,11 @@ void UBC_EventSubsystem::StopSaleEvent()
 
     GetWorld()->GetTimerManager().ClearTimer(SaleEventTimerHandle);
     GetWorld()->GetTimerManager().ClearTimer(SaleProductSpawnTimerHandle);
-
-    //CurrentSaleProduct = nullptr;
-
-    UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 세일 이벤트 종료, "));
 }
 
 void UBC_EventSubsystem::ExecuteRepeatSpawn()
 {
     if (GetWorld() && GetWorld()->GetNetMode() == NM_Client) return;
-    
-    //if (!IsValid(CurrentSaleProduct)) return;
 
     if (UWorld* World = GetWorld())
     {
@@ -119,8 +113,6 @@ TSubclassOf<AProductBase> UBC_EventSubsystem::LimitedProductSelection()
     int32 RandomIndex = FMath::RandRange(0, LimitedProductList.Num() - 1);
     TSubclassOf<AProductBase> LimitedProduct = LimitedProductList[RandomIndex];
 
-    UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 한정판 제품 : %s"), *LimitedProduct->GetName());
-
     return LimitedProduct;
 }
 
@@ -129,16 +121,10 @@ void UBC_EventSubsystem::InitializeLimitedEventConfig(ULimitedEventConfig* InLim
     if (IsValid(InLimitedEventConfig))
     {
         LimitedEventConfig = InLimitedEventConfig;
-        UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] GameMode에서 한정 이벤트 데이터 에셋 로드완료"));
+        //UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] GameMode에서 한정 이벤트 데이터 에셋 로드완료"));
 
         LimitedProductList = LimitedEventConfig->LimitedProductList;
 
-        // 서버
-        //if (GetWorld() && GetWorld()->GetNetMode() != NM_Client)
-        //{
-        //    // 게임 모드에서 호출시 삭제 예정 - 테스트용
-        //    GetWorld()->GetTimerManager().SetTimer(TestLimitedEventTimerHandle, this, &UBC_EventSubsystem::StartLimitedEvent, 20.0f, false);
-        //}
     }
 }
 
@@ -147,8 +133,6 @@ void UBC_EventSubsystem::StartLimitedEvent()
     if (GetWorld() && GetWorld()->GetNetMode() == NM_Client) return;
 
     GetWorld()->GetTimerManager().ClearTimer(TestLimitedEventTimerHandle);
-
-    UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 한정판 이벤트 시작."));
 
     TSubclassOf<AProductBase> LimitedProduct = LimitedProductSelection();
 
@@ -159,8 +143,6 @@ void UBC_EventSubsystem::StartLimitedEvent()
         if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
         {
             ProductShelfSubsystem->LimitedProductSpawn(LimitedProduct);
-
-            UE_LOG(LogTemp, Log, TEXT("[이벤트 서브시스템] 선반 서브시스템 -> 한정판 제품 스폰"));
         }
         else
         {
