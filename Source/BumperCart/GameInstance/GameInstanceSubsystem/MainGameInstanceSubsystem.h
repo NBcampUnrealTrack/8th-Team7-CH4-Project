@@ -106,6 +106,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Online|Session")
     FString GetRoomName() const { return RoomName; }
 
+    UFUNCTION(BlueprintCallable, Category = "Online|Session")
+    void UpdateCurrentSession();
+
     // 클라이언트가 호스트한테 나가라라는 알림을 받았을 때 해당 PlayerController 호출
     void NotifyLeaveRequestedByHost();
     // 알림을 받은 클라이언트가 나갔다는 ACK를 받았을 때 PlayerController 호출

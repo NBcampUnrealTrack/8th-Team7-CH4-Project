@@ -5,6 +5,7 @@
 
 #include "GameFramework/GameSession.h"
 #include "GameInstance/MainGameInstance.h"
+#include "GameInstance/GameInstanceSubsystem/MainGameInstanceSubsystem.h"
 #include "GameState/LobbyGameState.h"
 #include "PlayerState/LobbyPlayerState.h"
 
@@ -31,6 +32,15 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
             {
                 GameSession->RegisterPlayer(NewPlayer, PlayerUniqueId, false);
                 UE_LOG(LogTemp, Warning, TEXT("[Lobby] 세션에 플레이어 등록: %s"), *NewPlayer->GetName());
+
+                // 세션 인원 등록 후 서버에 변경 내역 업데이트
+                if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+                {
+                    if (UMainGameInstanceSubsystem* Subsystem = GI->GetSubsystem<UMainGameInstanceSubsystem>())
+                    {
+                        Subsystem->UpdateCurrentSession();
+                    }
+                }
             }
             else
             {
@@ -97,6 +107,15 @@ void ALobbyGameMode::Logout(AController* Exiting)
         {
             GameSession->UnregisterPlayer(ExitingPC);
             UE_LOG(LogTemp, Warning, TEXT("[Lobby] 세션에서 플레이어 등록 해제: %s"), *Exiting->GetName());
+
+            // 세션 인원 해제 후 서버에 변경 내역 업데이트
+            if (UMainGameInstance* GI = GetGameInstance<UMainGameInstance>())
+            {
+                if (UMainGameInstanceSubsystem* Subsystem = GI->GetSubsystem<UMainGameInstanceSubsystem>())
+                {
+                    Subsystem->UpdateCurrentSession();
+                }
+            }
         }
     }
 

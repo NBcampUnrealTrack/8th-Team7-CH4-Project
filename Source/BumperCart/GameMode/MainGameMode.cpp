@@ -466,11 +466,9 @@ void AMainGameMode::ApplyTitles()
     int32 BestBumpCount = -1;
     for (AMainPlayerState* MainPS : AllPlayers)
     {
-        if (MainPS->GetCartBumpCount() >= 15)
-        {
-            BestBumpCount = FMath::Max(BestBumpCount, MainPS->GetCartBumpCount());
-        }
+        BestBumpCount = FMath::Max(BestBumpCount, MainPS->GetCartBumpCount());
     }
+
     for (int32 i = 0; i < AllPlayers.Num(); ++i)
     {
         AMainPlayerState* MainPS = AllPlayers[i];
@@ -485,10 +483,7 @@ void AMainGameMode::ApplyTitles()
     int32 BestDroppedCount = -1;
     for (AMainPlayerState* MainPS : AllPlayers)
     {
-        if (MainPS->GetDroppedItemCount() >= 8)
-        {
-            BestDroppedCount = FMath::Max(BestDroppedCount, MainPS->GetDroppedItemCount());
-        }
+        BestDroppedCount = FMath::Max(BestDroppedCount, MainPS->GetDroppedItemCount());
     }
     for (int32 i = 0; i < AllPlayers.Num(); ++i)
     {
@@ -504,10 +499,7 @@ void AMainGameMode::ApplyTitles()
     int32 BestCheckoutCount = -1;
     for (AMainPlayerState* MainPS : AllPlayers)
     {
-        if (MainPS->GetCheckoutCount() >= 4)
-        {
-            BestCheckoutCount = FMath::Max(BestCheckoutCount, MainPS->GetCheckoutCount());
-        }
+        BestCheckoutCount = FMath::Max(BestCheckoutCount, MainPS->GetCheckoutCount());
     }
     for (int32 i = 0; i < AllPlayers.Num(); ++i)
     {
