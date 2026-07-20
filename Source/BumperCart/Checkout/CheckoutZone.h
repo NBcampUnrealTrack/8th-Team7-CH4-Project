@@ -14,6 +14,7 @@ class USphereComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class USoundBase;
+class USoundAttenuation;
 class UAudioComponent;
 class UNiagaraComponent;
 class UNiagaraSystem;
@@ -209,6 +210,10 @@ private:
     // 정산 완료 및 점수 획득 
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
     TObjectPtr<USoundBase> CheckoutCompleteSound;
+
+    // 정산 완료음 거리 감쇠
+    UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
+    TObjectPtr<USoundAttenuation> CheckoutCompleteAttenuation;
 
     // 계산대 열림/폐쇄 사운드
     UPROPERTY(EditDefaultsOnly, Category = "Checkout|Sound")
