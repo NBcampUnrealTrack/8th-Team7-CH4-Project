@@ -87,7 +87,5 @@ bool UTomatoItemAction::Execute(ACartPawn* PlayerCharacter)
     //    TomatoProjectile->FireInDirection(FireDirection);
     //}
 
-    UE_LOG(LogTemp, Warning, TEXT("%s: 토마토 아이템 사용"), *GetNameSafe(PlayerCharacter));
-
     return true;
 }

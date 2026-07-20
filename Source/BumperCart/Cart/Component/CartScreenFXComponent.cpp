@@ -44,9 +44,9 @@ UCartScreenFXComponent::UCartScreenFXComponent()
 		Entry.GhostColorMin = Min;
 		Entry.GhostColorMax = Max;
 	};
-	AddGhostColor(FLinearColor(0.232708f, 1.f, 0.932103f), FLinearColor(0.45f, 0.85f, 0.8f, 0.55f), FLinearColor(0.45f, 0.85f, 1.7f, 1.3f));   //Mint
+	AddGhostColor(FLinearColor(0.232708f, 1.f, 0.932103f), FLinearColor(0.45f, 0.85f, 0.8f, 0.7f), FLinearColor(0.45f, 0.85f, 1.7f, 1.55f));  //Mint
 	AddGhostColor(FLinearColor(1.f, 0.f, 0.f),             FLinearColor(0.8f, 0.36f, 0.36f, 0.55f), FLinearColor(1.7f, 0.765f, 0.765f, 1.3f)); //Red
-	AddGhostColor(FLinearColor(0.f, 0.f, 1.f),             FLinearColor(0.36f, 0.36f, 0.8f, 0.55f), FLinearColor(0.765f, 0.765f, 1.7f, 1.3f)); //Blue
+	AddGhostColor(FLinearColor(0.f, 0.f, 1.f),             FLinearColor(0.36f, 0.36f, 0.8f, 0.7f), FLinearColor(0.765f, 0.765f, 1.7f, 1.55f)); //Blue
 	AddGhostColor(FLinearColor(0.f, 1.f, 0.f),             FLinearColor(0.36f, 0.8f, 0.36f, 0.55f), FLinearColor(0.765f, 1.7f, 0.765f, 1.3f)); //Green
 	AddGhostColor(FLinearColor(1.f, 1.f, 0.f),             FLinearColor(0.8f, 0.8f, 0.36f, 0.55f),  FLinearColor(1.7f, 1.7f, 0.765f, 1.3f));   //Basic(노랑)
 	AddGhostColor(FLinearColor(0.443393f, 0.f, 0.494792f), FLinearColor(0.752f, 0.36f, 0.8f, 0.55f), FLinearColor(1.598f, 0.765f, 1.7f, 1.3f)); //Purple
@@ -237,8 +237,9 @@ void UCartScreenFXComponent::DriveHeavyDrag(float ForwardSpeed)
 	const float LoadRatio = FMath::Clamp(OwnerCart->GetLoadRatio(), 0.f, 1.f);
 	const float HeavyAlpha = FMath::GetMappedRangeValueClamped(
 		FVector2D(HeavyDragMinLoad, 1.f), FVector2D(0.f, 1.f), LoadRatio);
-	//부스트 중엔 슬로우 자국 숨김 (빨라진 순간에 슬로우 연출은 모순)
-	const bool bWantMarks = HeavyAlpha > 0.f && ForwardSpeed > HeavyDragMinSpeed && !OwnerCart->IsBoosting();
+	//부스트(빨라짐)·브레이크(감속 연출은 스파크 담당)·물웅덩이 미끄럼 중엔 슬로우 자국 숨김
+	const bool bWantMarks = HeavyAlpha > 0.f && ForwardSpeed > HeavyDragMinSpeed
+		&& !OwnerCart->IsBoosting() && !OwnerCart->IsBraking() && !OwnerCart->IsSlipping();
 	if (!bWantMarks)
 	{
 		bHasLastHeavyMarkLeft = false;
@@ -266,7 +267,7 @@ void UCartScreenFXComponent::TrySpawnHeavyMark(const FVector& WheelPos, FVector&
 	}
 }
 
-//지정 위치 바닥에 속박 자국 데칼 하나 (웨이브 위상 랜덤 => 자국마다 다른 곡선, 수명 절반 후 페이드)
+//지정 위치 바닥에 속박 자국 데칼 하나 (/ \ 쉐브론 모양, 위상 랜덤, 수명 절반 후 페이드)
 void UCartScreenFXComponent::SpawnHeavyMarkAt(const FVector& WorldPos, float HeavyAlpha)
 {
 	UWorld* World = GetWorld();
@@ -283,9 +284,12 @@ void UCartScreenFXComponent::SpawnHeavyMarkAt(const FVector& WorldPos, float Hea
 	}
 	const FRotator DecalRot = FRotationMatrix::MakeFromXZ(FVector(0.f, 0.f, -1.f), MoveDir).Rotator();
 
+	//바퀴 밑이 아니라 바퀴 뒤에 보이도록 뒤로 물려서 찍음
+	const FVector SpawnPos = WorldPos - MoveDir * HeavyMarkBackOffset;
+
 	//무게가 찰수록 자국이 커짐
 	const FVector MarkSize = HeavyMarkSize * FMath::Lerp(0.8f, 1.3f, HeavyAlpha);
-	UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(World, HeavyMarkMaterial, MarkSize, WorldPos, DecalRot, HeavyMarkLifetime);
+	UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(World, HeavyMarkMaterial, MarkSize, SpawnPos, DecalRot, HeavyMarkLifetime);
 	if (Decal)
 	{
 		if (UMaterialInstanceDynamic* MID = Decal->CreateDynamicMaterialInstance())

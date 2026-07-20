@@ -31,7 +31,6 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
-#include "DrawDebugHelpers.h" //임시 디버그 - 필살기 게이지 출력 제거 시 함께 삭제
 
 ACartPawn::ACartPawn()
 {
@@ -351,16 +350,6 @@ void ACartPawn::Tick(float DeltaSeconds)
 
 	//충돌 세기 계산용: 이번 프레임 속도를 저장 (다음 프레임 NotifyHit에서 '충돌 직전' 속도로 사용)
 	PreviousVelocity = GetVelocity();
-
-	//임시 디버그 — 각 카트 머리 위에 게이지 표시. 테스트 빌드에서만 (UI 정식 반영 후 제거: 이 블록 + include + UltimateStack 전체복제 되돌리기)
-#if !UE_BUILD_SHIPPING
-	{
-		const FColor Col = bUltimateActive ? FColor::Yellow : (GetUltimateStack() >= UltimateRequiredStack ? FColor::Green : FColor::White);
-		DrawDebugString(GetWorld(), FVector(0.f, 0.f, 140.f),
-			FString::Printf(TEXT("ULT %d/%d%s"), GetUltimateStack(), UltimateRequiredStack, bUltimateActive ? TEXT(" ACT") : TEXT("")),
-			this, Col, 0.f, true);
-	}
-#endif
 }
 
 void ACartPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
