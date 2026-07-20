@@ -27,6 +27,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Lobby|Character")
     int32 GetSelectedCharacterIndex() const;
 
+
     void RestoreSelectedCharacterFromGameInstance();
 
 

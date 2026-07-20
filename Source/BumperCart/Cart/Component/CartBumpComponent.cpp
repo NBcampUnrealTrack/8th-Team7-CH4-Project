@@ -10,6 +10,9 @@
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "UObject/ConstructorHelpers.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "BumperCart.h"
 
 UCartBumpComponent::UCartBumpComponent()
@@ -20,11 +23,25 @@ UCartBumpComponent::UCartBumpComponent()
 	//임시 효과음 기본값 (정식 사운드 작업 때 교체)
 	static ConstructorHelpers::FObjectFinder<USoundBase> BumpSoundFinder(TEXT("/Game/BumperCart/Audio/SFX/Cart/SFX_Bump.SFX_Bump"));
 	if (BumpSoundFinder.Succeeded()) { BumpSound = BumpSoundFinder.Object; }
+
+	//충돌 임팩트도 코드 고정 (BP 오버라이드 병합 유실 방지)
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactFinder(TEXT("/Game/BumperCart/Cart/VFX/NS_BumpImpact.NS_BumpImpact"));
+	if (ImpactFinder.Succeeded()) { BumpImpactSystem = ImpactFinder.Object; }
+
+	//부스터·필살기 충돌용 별 버스트 — NPC러시 넉백 이펙트를 카트 크기로 줄인 복제본
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> StarFinder(TEXT("/Game/BumperCart/Cart/VFX/NS_BumpStars.NS_BumpStars"));
+	if (StarFinder.Succeeded()) { BumpStarSystem = StarFinder.Object; }
 }
 
 void UCartBumpComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	//에디터 기동 후 만들어진 에셋은 CDO 로드가 놓침 => 런타임 보강 로드
+	if (!BumpImpactSystem)
+	{
+		BumpImpactSystem = LoadObject<UNiagaraSystem>(nullptr, TEXT("/Game/BumperCart/Cart/VFX/NS_BumpImpact.NS_BumpImpact"));
+	}
 
 	OwnerCart = Cast<ACartPawn>(GetOwner());
 	if (OwnerCart)
@@ -157,7 +174,7 @@ void UCartBumpComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 }
 
 //카트가 IBumpable 대상(다른 카트·차단벽·장애물)에 부딪히면 충격 세기만큼 상품을 쏟는다
-void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
+void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal, const FVector& HitLocation)
 {
 	//충돌은 서버가 판정 (NotifyHit은 서버·소유클라 양쪽에서 떠서, 안 막으면 더블 드롭)
 	if (!OwnerCart || !OwnerCart->HasAuthority())
@@ -265,6 +282,9 @@ void UCartBumpComponent::HandleHit(AActor* Other, const FVector& HitNormal)
 	const bool bOtherUlt = OtherCart && OtherCart->IsUltimateActive();
 	const bool bIBoost = OwnerCart->IsBoosting();
 	const bool bOtherBoost = OtherCart && OtherCart->IsBoosting();
+
+	//충돌 지점 임팩트(링+퍽) — 전 클라 재생. 부스터/필살기 충돌엔 별까지
+	MulticastPlayBumpImpactFX(HitLocation, ShakeScale, bIUlt || bOtherUlt || bIBoost || bOtherBoost);
 	EDropCollisionRole DropRole = EDropCollisionRole::Normal;
 	EDropCollisionRole OtherDropRole = EDropCollisionRole::Normal;
 	const float NormalKnock = FMath::Min(ClosingSpeed * NormalKnockbackScale, NormalKnockbackMax);
@@ -450,6 +470,36 @@ void UCartBumpComponent::ClientPlayBumpSound_Implementation()
 	if (BumpSound)
 	{
 		UGameplayStatics::PlaySound2D(this, BumpSound);
+	}
+}
+
+//충돌 지점 임팩트 — 리슨서버 포함 전 클라에서 원샷 재생 (데디케이티드는 화면 없음 => 스킵)
+//기본 링+퍽, bStarBurst(부스터·필살기 충돌)면 별 버스트(NPC러시 넉백 이펙트) 추가
+void UCartBumpComponent::MulticastPlayBumpImpactFX_Implementation(FVector_NetQuantize Location, float Intensity, bool bStarBurst)
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	if (BumpImpactSystem)
+	{
+		//스폰 파라미터는 활성화 전에 넣어야 첫 프레임 스폰에 반영 => 비활성 스폰 후 Activate
+		UNiagaraComponent* Fx = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(), BumpImpactSystem, Location, FRotator::ZeroRotator, FVector(1.f),
+			true /*bAutoDestroy*/, false /*bAutoActivate*/);
+		if (Fx)
+		{
+			//부스터·필살기 충돌은 링·퍽도 커짐
+			const float SizeMul = bStarBurst ? 1.4f : 1.f;
+			Fx->SetVariableFloat(FName("RingSize"), 155.f * SizeMul);
+			Fx->SetVariableFloat(FName("PuffSizeMin"), 25.f * SizeMul);
+			Fx->SetVariableFloat(FName("PuffSizeMax"), 50.f * SizeMul);
+			Fx->Activate(true);
+		}
+	}
+	if (bStarBurst && BumpStarSystem)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), BumpStarSystem, Location);
 	}
 }
 

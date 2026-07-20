@@ -98,12 +98,9 @@ void ALobbyPlayerState::ApplySelectCharacter(int32 CharacterIndex)
     int32 AvailableNum = GS->GetAvailableCharacters().Num();
     if (AvailableNum <=0) return;
 
-    //다른 플레이어가 선택한 캐릭터인지 체크
-    while (GS->IsCharacterIndexSelectedByOtherPlayer(CharacterIndex, this))
-    {
-        CharacterIndex = (CharacterIndex + 1) % AvailableNum;
-    }
 
+    //다른 플레이어가 선택한 캐릭터인지 체크
+    CharacterIndex = GS->FindNextAvailableCharacterIndex(CharacterIndex, this);
 
     if (SelectedCharacterIndex == CharacterIndex) return;
 
@@ -159,3 +156,4 @@ void ALobbyPlayerState::RestoreSelectedCharacterFromGameInstance()
         }
     }
 }
+

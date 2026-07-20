@@ -10,6 +10,7 @@
 
 class ACartPawn;
 class USoundBase;
+class UNiagaraSystem;
 
 //CartPawn::NotifyHit(서버)에서 위임받아 충돌 전체를 처리. 복제 컴포넌트(무적 상태 + RPC)
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -23,7 +24,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	//서버: CartPawn::NotifyHit 위임 — 충돌 판정 + 페어 해결(양쪽 사운드·셰이크·넉백·스필·무적) 전체
-	void HandleHit(AActor* Other, const FVector& HitNormal);
+	void HandleHit(AActor* Other, const FVector& HitNormal, const FVector& HitLocation);
 
 	//서버: 외부 넉백 (CartPawn::ApplyExternalKnockback 위임 — 거대카트·체크아웃존 등)
 	void ApplyKnockback(const FVector& Direction, float Strength);
@@ -57,6 +58,18 @@ protected:
 	//충돌음을 소유 클라에서 재생 (서버 HandleHit에서 호출 — 셰이크와 동일 패턴, 멀티캐스트 중복재생 회피)
 	UFUNCTION(Client, Unreliable)
 	void ClientPlayBumpSound();
+
+	//충돌 지점 임팩트를 전 클라에서 재생 (서버 HandleHit에서 페어당 1회). 부스터·필살기 충돌이면 별 버스트 추가
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayBumpImpactFX(FVector_NetQuantize Location, float Intensity, bool bStarBurst);
+
+	//충돌 임팩트(링+퍽) 나이아가라 — 생성자에서 NS_BumpImpact 자동 로드 (비어있으면 무동작)
+	UPROPERTY(EditAnywhere, Category = "Bump|FX")
+	TObjectPtr<UNiagaraSystem> BumpImpactSystem;
+
+	//부스터·필살기 충돌용 별 버스트 — NPC러시 넉백 이펙트 재사용 (비어있으면 무동작)
+	UPROPERTY(EditAnywhere, Category = "Bump|FX")
+	TObjectPtr<UNiagaraSystem> BumpStarSystem;
 
 	//충돌 리액션(몸통 들썩·기울임)을 모든 클라에 재생. 서버에서만 호출
 	UFUNCTION(NetMulticast, Unreliable)

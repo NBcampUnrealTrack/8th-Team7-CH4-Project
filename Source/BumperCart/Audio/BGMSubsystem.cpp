@@ -18,28 +18,37 @@ void UBGMSubsystem::PlayBGM(EBGMScene Scene)
         return;
     }
 
-    // 같은 BGM이고, 실행중이라면 넘기기
-    if (CurrentScene == Scene && IsValid(AudioComponent)
-        && AudioComponent->IsPlaying())
-    {
-        return;
-    }
-
     const UMainGameInstance* GI = World->GetGameInstance<UMainGameInstance>();
     const UBGMConfig* Config = GI ? GI->BGMConfig : nullptr;
     const FBGMSceneInfo* Info = Config ? Config->FindBGMInfo(Scene) : nullptr;
 
-
+    // 적용할 사운드가 없다면 종료
     if (!Info || !IsValid(Info->Sound))
     {
         StopBGM();
         return;
     }
 
-    // 기존 BGM은 종료
+    // 같은 BGM이라면 재생 위치 유지
+    if (IsValid(AudioComponent)
+        && AudioComponent->IsPlaying()
+        && AudioComponent->GetSound() == Info->Sound)
+    {
+        CurrentScene = Scene;
+        return;
+    }
+
+    // 기존 BGM은 종료, 이전 음악의 설정으로 FadeOut
     if (IsValid(AudioComponent))
     {
-        AudioComponent->FadeOut(Info->FadeOutDuration, 0.f);
+        float FadeOutDuration = 1.f;
+
+        if (const FBGMSceneInfo* CurrentInfo = Config->FindBGMInfo(CurrentScene))
+        {
+            FadeOutDuration = CurrentInfo->FadeOutDuration;
+        }
+
+        AudioComponent->FadeOut(FadeOutDuration, 0.f);
     }
 
     AudioComponent = UGameplayStatics::CreateSound2D(
@@ -56,9 +65,12 @@ void UBGMSubsystem::PlayBGM(EBGMScene Scene)
     if (IsValid(AudioComponent))
     {
         AudioComponent->FadeIn(Info->FadeInDuration);
+        CurrentScene = Scene;
     }
-
-    CurrentScene = Scene;
+    else
+    {
+        CurrentScene = EBGMScene::None;
+    }
 }
 
 void UBGMSubsystem::StopBGM(float FadeOutDuration)

@@ -57,6 +57,9 @@ public:
     // 배정되지 않은 캐릭터 중 가장 앞선 index 조회
     int32 GetNextAvailableCharacterIndex() const;
 
+    UFUNCTION(BlueprintCallable, Category = "Lobby|Character")
+    int32 FindNextAvailableCharacterIndex(int32 StartIndex, const APlayerState* RequestPS) const;
+
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
