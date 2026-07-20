@@ -865,7 +865,7 @@ void ACartPawn::NotifyHit(UPrimitiveComponent* MyComp, AActor* Other, UPrimitive
 
 	if (BumpComponent)
 	{
-		BumpComponent->HandleHit(Other, HitNormal);
+		BumpComponent->HandleHit(Other, HitNormal, HitLocation);
 	}
 }
 
