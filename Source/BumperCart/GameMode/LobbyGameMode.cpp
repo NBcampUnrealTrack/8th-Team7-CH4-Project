@@ -38,7 +38,7 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
                 {
                     if (UMainGameInstanceSubsystem* Subsystem = GI->GetSubsystem<UMainGameInstanceSubsystem>())
                     {
-                        Subsystem->UpdateCurrentSession();
+                        Subsystem->NotifyPlayerJoinedSession();
                     }
                 }
             }
@@ -113,7 +113,7 @@ void ALobbyGameMode::Logout(AController* Exiting)
             {
                 if (UMainGameInstanceSubsystem* Subsystem = GI->GetSubsystem<UMainGameInstanceSubsystem>())
                 {
-                    Subsystem->UpdateCurrentSession();
+                    Subsystem->NotifyPlayerLeftSession();
                 }
             }
         }

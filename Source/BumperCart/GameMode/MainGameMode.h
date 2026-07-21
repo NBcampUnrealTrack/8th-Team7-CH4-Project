@@ -28,7 +28,7 @@ public:
 
     UFUNCTION()
     void UpdateAllPlayerRanks();
-    
+
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnRoundResultsReady OnRoundResultsReady;
 
