@@ -55,7 +55,7 @@ void UBGMSubsystem::PlayBGM(EBGMScene Scene)
         World,
         Info->Sound,
         Info->Volume,
-        1.f,
+        CurrentPitchMultiplier,
         0.f,
         nullptr,
         true,   // 레벨 전환 시 유지
@@ -82,4 +82,14 @@ void UBGMSubsystem::StopBGM(float FadeOutDuration)
 
     AudioComponent = nullptr;
     CurrentScene = EBGMScene::None;
+}
+
+void UBGMSubsystem::SetBGMPitchMultiplier(float NewPitchMultiplier)
+{
+    CurrentPitchMultiplier = FMath::Clamp(NewPitchMultiplier, 1.f, 2.f);
+
+    if (IsValid(AudioComponent))
+    {
+        AudioComponent->SetPitchMultiplier(CurrentPitchMultiplier);
+    }
 }

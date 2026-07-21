@@ -25,11 +25,11 @@ void AMainPlayerController::BeginPlay()
 
     if (!IsLocalController()) return;
 
-    if (UGameInstance* GameInstance = GetGameInstance())
+    if (UGameInstance* GI = GetGameInstance())
     {
-        if (UBGMSubsystem* BGMSubsystem = GameInstance->GetSubsystem<UBGMSubsystem>())
+        if (UBGMSubsystem* BGM = GI->GetSubsystem<UBGMSubsystem>())
         {
-            BGMSubsystem->PlayBGM(EBGMScene::InGame);
+            BGM->PlayBGM(EBGMScene::InGame);
         }
     }
 
@@ -48,6 +48,37 @@ void AMainPlayerController::BeginPlay()
     TryBindWaitingDelegate();
 }
 
+void AMainPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        EndPlay(EndPlayReason);
+        return;
+    }
+
+    World->GetTimerManager().ClearTimer(Timer_BindWaitingDelegate);
+
+    if (IsLocalController())
+    {
+        if (AMainGameState* GS = World->GetGameState<AMainGameState>())
+        {
+            GS->OnWaitingForPlayersChanged.RemoveDynamic(this, &ThisClass::HandleWaitingForPlayersChanged);
+            GS->OnRoundPhaseChanged.RemoveDynamic(this, &ThisClass::HandleRoundPhaseChanged);
+        }
+
+        if (UGameInstance* GI = GetGameInstance())
+        {
+            if (UBGMSubsystem* BGM = GI->GetSubsystem<UBGMSubsystem>())
+            {
+                BGM->SetBGMPitchMultiplier(1.f);
+            }
+        }
+    }
+
+    Super::EndPlay(EndPlayReason);
+}
+
 void AMainPlayerController::NotifyPlayerStateReady()
 {
     if (!IsLocalController()) return;
@@ -63,14 +94,16 @@ void AMainPlayerController::TryBindWaitingDelegate()
     AMainGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMainGameState>() : nullptr;
     if (!GS)
     {
-        GetWorldTimerManager().SetTimer(Timer_BindWaitingDelegate, this, &AMainPlayerController::TryBindWaitingDelegate, 0.1f, false);
+        GetWorldTimerManager().SetTimer(Timer_BindWaitingDelegate, this, &ThisClass::TryBindWaitingDelegate, 0.1f, false);
         return;
     }
 
-    GS->OnWaitingForPlayersChanged.AddDynamic(this, &AMainPlayerController::HandleWaitingForPlayersChanged);
+    GS->OnWaitingForPlayersChanged.AddUniqueDynamic(this, &ThisClass::HandleWaitingForPlayersChanged);
+    GS->OnRoundPhaseChanged.AddUniqueDynamic(this, &ThisClass::HandleRoundPhaseChanged);
 
     // 바인딩이 늦어서 이미 브로드캐스트를 놓쳤을 경우를 대비해 현재 값 즉시 반영
     HandleWaitingForPlayersChanged(GS->IsWaitingForPlayers());
+    HandleRoundPhaseChanged();
 }
 
 void AMainPlayerController::HandleWaitingForPlayersChanged(bool bIsWaiting)
@@ -91,4 +124,16 @@ void AMainPlayerController::HandleWaitingForPlayersChanged(bool bIsWaiting)
         WaitingWidgetInstance->RemoveFromParent();
         WaitingWidgetInstance = nullptr;
     }
+}
+
+void AMainPlayerController::HandleRoundPhaseChanged()
+{
+    AMainGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMainGameState>() : nullptr;
+    UBGMSubsystem* BGM = GetGameInstance() ? GetGameInstance()->GetSubsystem<UBGMSubsystem>() : nullptr;
+
+    if (!GS || !BGM) return;
+
+    bool bFever = GS->GetCurrentPhase() == ERoundPhase::FinalWarningOneOpen;
+
+    BGM->SetBGMPitchMultiplier(bFever ? 1.2f : 1.f);
 }

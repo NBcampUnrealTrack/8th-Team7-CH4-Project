@@ -28,8 +28,13 @@ public:
 protected:
     virtual void BeginPlay() override;
 
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
     void NotifyPlayerStateReady();
+
+    UFUNCTION()
+    void HandleRoundPhaseChanged();
 
 private:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Controller|Main", meta = (AllowPrivateAccess = "true"))
@@ -37,6 +42,9 @@ private:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Controller|Main", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UUserWidget> UIWidgetInstance;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Controller|Main|Sound", meta = (AllowPrivateAccess = "true"))
+    float FeverPitchMultiplier = 1.05f;
 
 #pragma region PlayerLoadingWait
 private:
