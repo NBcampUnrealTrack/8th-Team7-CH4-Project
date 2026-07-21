@@ -182,7 +182,7 @@ void AMainGameMode::CheckAllPlayersLoaded()
         GS->SetWaitingForPlayers(false);
 
         // 시작 연출 대기 이후 실제 라운드 시작
-        OnGameStartEvent.Broadcast();
+        GS->Multicast_NotifyGameStart();
         GetWorldTimerManager().SetTimer(Timer_StartDelay, this, &AMainGameMode::StartRound, StartDelay, false);
         return;
     }
