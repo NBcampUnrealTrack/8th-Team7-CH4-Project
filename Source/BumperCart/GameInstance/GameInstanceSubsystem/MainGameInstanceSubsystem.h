@@ -131,6 +131,8 @@ private:
     void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
     // 세션 나가기 완료 시 호출
     void OnLeaveSessionComplete(FName SessionName, bool bWasSuccessful);
+    // 세션 업데이트 완료 시 호출
+    void OnUpdateSessionComplete(FName SessionName, bool bWasSuccessful);
     // 퀵 매치 진행
     void TryJoinQuickMatchSession();
     // 비공개 방 참가 시도
@@ -166,6 +168,11 @@ private:
 
     // Steam을 못 잡아 Null로 폴백된 상태인지 (에디터 PIE 등 => LAN 모드로 로컬 테스트)
     bool IsUsingNullFallback() const;
+
+    // UpdateCurrentSession 중복 호출 방지
+    bool bSessionUpdateInProgress = false;
+    // 세션 업데이트 중 추가로 들어온 갱신 요청 존재 여부
+    bool bSessionUpdatePending = false;
 
     // 방 생성 시 사용되는 이름 및 비밀번호
     FString RoomName;

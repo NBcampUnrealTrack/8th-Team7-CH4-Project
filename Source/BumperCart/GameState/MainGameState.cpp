@@ -125,4 +125,9 @@ void AMainGameState::OnRep_bWaitingForPlayers()
     OnWaitingForPlayersChanged.Broadcast(bWaitingForPlayers);
 }
 
+void AMainGameState::Multicast_NotifyGameStart_Implementation()
+{
+    OnGameStartEvent.Broadcast();
+}
+
 

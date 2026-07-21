@@ -15,7 +15,7 @@ class ULimitedEventConfig;
 class AMapGimmickManager;
 class AItemSpawnManager;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameStartEvent);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRoundResultsReady);
 
 UCLASS()
@@ -28,9 +28,7 @@ public:
 
     UFUNCTION()
     void UpdateAllPlayerRanks();
-
-    UPROPERTY(BlueprintAssignable, Category = "Events")
-    FOnGameStartEvent OnGameStartEvent;
+    
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnRoundResultsReady OnRoundResultsReady;
 

@@ -24,6 +24,8 @@ class UUserWidget;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRoundPhaseChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMainPlayerStateChanged, AMainPlayerState*, PlayerState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWaitingForPlayersChanged, bool, bIsWaiting);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGameStartEvent);
+
 
 
 UCLASS()
@@ -77,6 +79,16 @@ public:
 
     // 플레이어 제거하는 함수
     virtual void RemovePlayerState(APlayerState* PlayerState) override;
+
+    // 클라이언트 UI가 바인딩할 델리게이트 (GameState는 클라/서버 양쪽에 존재)
+    UPROPERTY(BlueprintAssignable, Category = "Events")
+    FOnGameStartEvent OnGameStartEvent;
+
+    // 서버에서 호출 -> 서버 포함 모든 클라이언트에서 실행됨
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_NotifyGameStart();
+
+
 
 protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

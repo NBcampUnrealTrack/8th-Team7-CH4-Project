@@ -906,10 +906,51 @@ void UMainGameInstanceSubsystem::UpdateCurrentSession()
 
     // 현재 활성화된 방의 정보 조회
     FNamedOnlineSession* Session = Sessions->GetNamedSession(NAME_GameSession);
-    if (Session)
+    if (!Session) return;
+
+    // 진행 중이면 완료 콜백에서 다시 한번 최신 상태로 갱신하도록 예약만 해두고 리턴
+    if (bSessionUpdateInProgress)
     {
-        // 세션 정보 갱신 요청
-        Sessions->UpdateSession(NAME_GameSession, Session->SessionSettings, true);
-        UE_LOG(LogTemp, Log, TEXT("[Steam] 세션 인원수 갱신 (UpdateSession) 완료"));
+        bSessionUpdatePending = true;
+        UE_LOG(LogTemp, Verbose, TEXT("[Steam] UpdateSession 진행 중 → 이번 요청은 예약만 함"));
+        return;
+    }
+
+
+    bSessionUpdateInProgress = true;
+    Sessions->OnUpdateSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnUpdateSessionComplete);
+
+    // 세션 정보 갱신 요청
+    const bool bUpdateStarted = Sessions->UpdateSession(NAME_GameSession, Session->SessionSettings, true);
+    if (!bUpdateStarted)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Steam] UpdateSession 요청 시작 실패"));
+        Sessions->ClearOnUpdateSessionCompleteDelegates(this);
+        bSessionUpdateInProgress = false;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Steam] 세션 인원수 갱신 (UpdateSession) 요청 시작"));
+    }
+}
+
+void UMainGameInstanceSubsystem::OnUpdateSessionComplete(FName SessionName, bool bWasSuccessful)
+{
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (Sessions.IsValid())
+    {
+        Sessions->ClearOnUpdateSessionCompleteDelegates(this);
+    }
+
+    bSessionUpdateInProgress = false;
+
+    UE_LOG(LogTemp, Log, TEXT("[Steam] 세션 인원수 갱신 (UpdateSession) %s: %s"),
+        bWasSuccessful ? TEXT("성공") : TEXT("실패"), *SessionName.ToString());
+
+    // 갱신이 진행되는 동안 추가로 들어온 요청이 있었다면, 최신 인원 수 기준으로 한 번 더 갱신
+    if (bSessionUpdatePending)
+    {
+        bSessionUpdatePending = false;
+        UpdateCurrentSession();
     }
 }
