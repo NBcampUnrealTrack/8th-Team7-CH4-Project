@@ -15,6 +15,8 @@ AProductShelf::AProductShelf()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
+    bReplicates = true;
+
     ShelfMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShelfMesh"));
     ShelfMesh->SetMobility(EComponentMobility::Static);
     ShelfMesh->SetCollisionObjectType(ECollisionChannel::ECC_WorldStatic);
@@ -41,6 +43,8 @@ void AProductShelf::BeginPlay()
         if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
         {
             ProductShelfSubsystem->RegisterShelf(this, ShelfType);
+            ProductSpawnFX = ProductShelfSubsystem->GetSpawnFX();
+            SpawnSound = ProductShelfSubsystem->GetSpawnSound();
         }
         else
         {
@@ -101,8 +105,6 @@ AProductBase* AProductShelf::SpawnSpecificItem(TSubclassOf<AProductBase> ItemCla
         // 이펙트, 사운드
         Multicast_ProductSpawnEffect(SpawnStartLocation, SpawnStartRotation);
 
-        //UE_LOG(LogTemp, Log, TEXT("[선반] %s 제품 스폰."), *SpawnedProduct->GetName());
-
         return SpawnedProduct;
     }
 
@@ -138,35 +140,27 @@ void AProductShelf::Multicast_ProductSpawnEffect_Implementation(FVector SpawnLoc
 {
     if (UWorld* World = GetWorld())
     {
-        if (auto* ProductShelfSubsystem = World->GetSubsystem<UProductShelfSubsystem>())
+        if (IsValid(ProductSpawnFX))
         {
-            UNiagaraSystem* SpawnFX = ProductShelfSubsystem->GetSpawnFX();
+            UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+                World,
+                ProductSpawnFX,
+                SpawnLocation,
+                SpawnRotation,
+                FVector(1.0f),
+                true,
+                true
+            );
+        }
 
-            if (IsValid(SpawnFX))
-            {
-                UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-                    World,
-                    SpawnFX,
-                    SpawnLocation,
-                    SpawnRotation,
-                    FVector(1.0f),
-                    true,
-                    true
-                );
-            }
-
-            USoundBase* SpawnSound = ProductShelfSubsystem->GetSpawnSound();
-
-            if (IsValid(SpawnSound))
-            {
-                UGameplayStatics::PlaySoundAtLocation(
-                    World,
-                    SpawnSound,
-                    SpawnLocation,
-                    FRotator::ZeroRotator
-                );
-            }
-
+        if (IsValid(SpawnSound))
+        {
+            UGameplayStatics::PlaySoundAtLocation(
+                World,
+                SpawnSound,
+                SpawnLocation,
+                FRotator::ZeroRotator
+            );
         }
     }
 }

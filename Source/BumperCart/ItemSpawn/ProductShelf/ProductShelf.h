@@ -8,6 +8,7 @@
 
 class AProductBase;
 class UBoxComponent;
+class UNiagaraSystem;
 
 UCLASS()
 class BUMPERCART_API AProductShelf : public AActor
@@ -63,6 +64,10 @@ protected:
     // 스폰 확률
     UPROPERTY(EditAnywhere, Category = "Spawning | Config")
     float SpawnProbability = 0.5f;
+
+    TObjectPtr<UNiagaraSystem> ProductSpawnFX;
+
+    USoundBase* SpawnSound;
 
 public:
     // 제품 목록중 랜덤 선택후 스폰 호출, 제품 반환
