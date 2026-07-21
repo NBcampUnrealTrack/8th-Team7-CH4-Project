@@ -109,6 +109,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Online|Session")
     void UpdateCurrentSession();
 
+    // 접속 인원 카운트를 올리고 세션 인원수 정보를 갱신함
+    void NotifyPlayerJoinedSession();
+
+    // 접속 인원 카운트를 내리고 세션 인원수 정보를 갱신함
+    void NotifyPlayerLeftSession();
+
     // 클라이언트가 호스트한테 나가라라는 알림을 받았을 때 해당 PlayerController 호출
     void NotifyLeaveRequestedByHost();
     // 알림을 받은 클라이언트가 나갔다는 ACK를 받았을 때 PlayerController 호출
@@ -173,6 +179,8 @@ private:
     bool bSessionUpdateInProgress = false;
     // 세션 업데이트 중 추가로 들어온 갱신 요청 존재 여부
     bool bSessionUpdatePending = false;
+
+    int32 ConnectedPlayerCount = 0;
 
     // 방 생성 시 사용되는 이름 및 비밀번호
     FString RoomName;

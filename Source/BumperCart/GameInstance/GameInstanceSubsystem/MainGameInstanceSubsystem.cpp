@@ -917,6 +917,11 @@ void UMainGameInstanceSubsystem::UpdateCurrentSession()
     }
 
 
+    const int32 MaxPublicConnections = Session->SessionSettings.NumPublicConnections;
+    Session->NumOpenPublicConnections = FMath::Clamp(MaxPublicConnections - ConnectedPlayerCount, 0, MaxPublicConnections);
+
+
+
     bSessionUpdateInProgress = true;
     Sessions->OnUpdateSessionCompleteDelegates.AddUObject(this, &UMainGameInstanceSubsystem::OnUpdateSessionComplete);
 
@@ -953,4 +958,16 @@ void UMainGameInstanceSubsystem::OnUpdateSessionComplete(FName SessionName, bool
         bSessionUpdatePending = false;
         UpdateCurrentSession();
     }
+}
+
+void UMainGameInstanceSubsystem::NotifyPlayerJoinedSession()
+{
+    ++ConnectedPlayerCount;
+    UpdateCurrentSession();
+}
+
+void UMainGameInstanceSubsystem::NotifyPlayerLeftSession()
+{
+    ConnectedPlayerCount = FMath::Max(0, ConnectedPlayerCount - 1);
+    UpdateCurrentSession();
 }
