@@ -898,3 +898,18 @@ FString UMainGameInstanceSubsystem::GetLevelPath(const TSoftObjectPtr<UWorld>& L
 
     return Level.ToSoftObjectPath().GetLongPackageName();
 }
+
+void UMainGameInstanceSubsystem::UpdateCurrentSession()
+{
+    IOnlineSessionPtr Sessions = GetSessionInterface();
+    if (!Sessions.IsValid()) return;
+
+    // 현재 활성화된 방의 정보 조회
+    FNamedOnlineSession* Session = Sessions->GetNamedSession(NAME_GameSession);
+    if (Session)
+    {
+        // 세션 정보 갱신 요청
+        Sessions->UpdateSession(NAME_GameSession, Session->SessionSettings, true);
+        UE_LOG(LogTemp, Log, TEXT("[Steam] 세션 인원수 갱신 (UpdateSession) 완료"));
+    }
+}
